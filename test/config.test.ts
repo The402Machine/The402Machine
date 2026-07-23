@@ -18,6 +18,12 @@ describe("CATCH configuration", () => {
 			provisioningSecret: undefined,
 			publicBaseUrl: "https://catch.example",
 		});
+		expect(config.trustedProxy).toBeUndefined();
+	});
+
+	it("accepts an explicit trusted reverse proxy address", () => {
+		const config = loadConfig({ TRUSTED_PROXY: "127.0.0.1" });
+		expect(config.trustedProxy).toBe("127.0.0.1");
 	});
 
 	it("fails closed when only one CATCH runtime credential is configured", () => {

@@ -10,6 +10,7 @@ export type AppConfig = {
 	host: string;
 	port: number;
 	logLevel: string;
+	trustedProxy: string | undefined;
 	catch: CatchConfig;
 };
 
@@ -56,6 +57,7 @@ export const loadConfig = (environment: NodeJS.ProcessEnv = process.env): AppCon
 		host: environment.HOST ?? "127.0.0.1",
 		port: parsePort(environment.PORT),
 		logLevel: environment.LOG_LEVEL ?? "info",
+		trustedProxy: environment.TRUSTED_PROXY,
 		catch: catchConfig,
 	};
 };

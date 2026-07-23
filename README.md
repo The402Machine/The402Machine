@@ -69,6 +69,8 @@ npm run build
 
 Copy `.env.example` to `.env` for local development. Production Compose uses an untracked `.env.production` file and runs PostgreSQL, migrations, the web service, and the expiry worker. Never commit payment credentials, database passwords, token peppers, wallet material, private keys, macaroons, or deployment secrets.
 
+`TRUSTED_PROXY` must be the reverse proxy address as seen by Fastify. Leave it unset for direct development access; never trust arbitrary forwarding headers. The production Compose file pins its edge subnet and gateway so this trust boundary cannot drift silently.
+
 ## Security
 
 Please report security issues privately rather than opening a public issue. A dedicated security contact and disclosure policy will be published before payments are enabled.

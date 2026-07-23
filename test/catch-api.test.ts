@@ -64,6 +64,14 @@ const buildCatchApp = (repository = new FakeCatchRepository()) => {
 	apps.push(app);
 	return { app, repository };
 };
+const buildProxiedCatchApp = (trustedProxy: string, repository = new FakeCatchRepository()) => {
+	const app = buildApp({
+		trustedProxy,
+		catch: { repository, tokenPepper: pepper, provisioningEnabled: true, provisioningSecret },
+	});
+	apps.push(app);
+	return { app, repository };
+};
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
 
 function expectProvisionResponse(value: unknown): asserts value is { publicId: string; ownerToken: string; ingestToken: string } {
@@ -146,6 +154,84 @@ describe("CATCH HTTP API", () => {
 			}
 		}
 		expect(throttled).toBe(true);
+	});
+
+	it("ignores spoofed forwarding headers from untrusted direct clients", async () => {
+		const { app } = buildCatchApp();
+		let finalStatus = 0;
+		for (let attempt = 0; attempt < 61; attempt += 1) {
+			const response = await app.inject({
+				method: "POST",
+				url: "/c/catch_test-public-id",
+				headers: {
+					...bearer("catch_ing_wrong-token"),
+					"content-type": "text/plain",
+					"x-forwarded-for": `198.51.100.${attempt + 1}`,
+				},
+				payload: "x",
+			});
+			finalStatus = response.statusCode;
+		}
+		expect(finalStatus).toBe(429);
+	});
+
+	it("uses forwarding headers only when the direct proxy address is trusted", async () => {
+		const { app } = buildProxiedCatchApp("127.0.0.1");
+		for (let attempt = 0; attempt < 60; attempt += 1) {
+			const response = await app.inject({
+				method: "POST",
+				url: "/c/catch_test-public-id",
+				headers: {
+					...bearer("catch_ing_wrong-token"),
+					"content-type": "text/plain",
+					"x-forwarded-for": "198.51.100.10",
+				},
+				payload: "x",
+			});
+			expect(response.statusCode).toBe(401);
+		}
+		const throttled = await app.inject({
+			method: "POST",
+			url: "/c/catch_test-public-id",
+			headers: {
+				...bearer("catch_ing_wrong-token"),
+				"content-type": "text/plain",
+				"x-forwarded-for": "198.51.100.10",
+			},
+			payload: "x",
+		});
+		expect(throttled.statusCode).toBe(429);
+
+		const differentClient = await app.inject({
+			method: "POST",
+			url: "/c/catch_test-public-id",
+			headers: {
+				...bearer("catch_ing_wrong-token"),
+				"content-type": "text/plain",
+				"x-forwarded-for": "198.51.100.11",
+			},
+			payload: "x",
+		});
+		expect(differentClient.statusCode).toBe(401);
+	});
+
+	it("ignores forwarding headers when the direct peer does not match the configured proxy", async () => {
+		const { app } = buildProxiedCatchApp("192.0.2.1");
+		let finalStatus = 0;
+		for (let attempt = 0; attempt < 61; attempt += 1) {
+			const response = await app.inject({
+				method: "POST",
+				url: "/c/catch_test-public-id",
+				headers: {
+					...bearer("catch_ing_wrong-token"),
+					"content-type": "text/plain",
+					"x-forwarded-for": `198.51.100.${attempt + 1}`,
+				},
+				payload: "x",
+			});
+			finalStatus = response.statusCode;
+		}
+		expect(finalStatus).toBe(429);
 	});
 
 	it("protects admin data, avoids token leaks, and irreversibly destroys resources", async () => {

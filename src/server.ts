@@ -19,6 +19,7 @@ const app = buildApp({
 	logger: {
 		level: config.logLevel,
 	},
+	...(config.trustedProxy === undefined ? {} : { trustedProxy: config.trustedProxy }),
 	...(catchOptions === undefined ? {} : { catch: catchOptions }),
 });
 

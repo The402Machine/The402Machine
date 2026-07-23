@@ -34,6 +34,7 @@ type CatchAppOptions = {
 
 type BuildAppOptions = {
 	logger?: boolean | object;
+	trustedProxy?: string;
 	catch?: CatchAppOptions;
 };
 
@@ -42,7 +43,7 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
 		logger: options.logger ?? false,
 		bodyLimit: MAX_INGEST_BYTES,
 		logController: new LogController({ disableRequestLogging: true }),
-		trustProxy: true,
+		trustProxy: options.trustedProxy ?? false,
 	});
 
 	void app.register(helmet, {
