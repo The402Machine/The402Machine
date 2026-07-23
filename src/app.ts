@@ -91,7 +91,10 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
 };
 
 function registerPaymentRoutes(app: FastifyInstance, payment: PaymentAppOptions): void {
+	const quoteRateLimits = new Map<string, RateLimitBucket>();
+	const verificationRateLimits = new Map<string, RateLimitBucket>();
 	app.post<{ Body: { planId?: unknown } }>("/api/payments/catch", async (request, reply) => {
+		if (!consumeRateLimit(quoteRateLimits, request.ip, 10, 60_000)) return rateLimited(reply);
 		const idempotencyKey = request.headers["idempotency-key"];
 		const planId = request.body?.planId;
 		if (typeof idempotencyKey !== "string" || idempotencyKey.length < 8 || idempotencyKey.length > 128) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid idempotency key" });
@@ -101,6 +104,7 @@ function registerPaymentRoutes(app: FastifyInstance, payment: PaymentAppOptions)
 	});
 
 	app.post("/api/payments/whisper", async (request, reply) => {
+		if (!consumeRateLimit(quoteRateLimits, request.ip, 10, 60_000)) return rateLimited(reply);
 		const idempotencyKey = request.headers["idempotency-key"];
 		const planId = request.headers["x-whisper-plan"];
 		if (typeof idempotencyKey !== "string" || idempotencyKey.length < 8 || idempotencyKey.length > 128) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid idempotency key" });
@@ -111,6 +115,7 @@ function registerPaymentRoutes(app: FastifyInstance, payment: PaymentAppOptions)
 	});
 
 	app.get<{ Params: { orderId: string } }>("/api/payments/:orderId", async (request, reply) => {
+		if (!consumeRateLimit(verificationRateLimits, request.ip, 30, 60_000)) return rateLimited(reply);
 		const result = await payment.fulfill(request.params.orderId);
 		if (!result.settled) return reply.header("Cache-Control", "no-store").code(402).send(result);
 		const resource = result.resource.product === "catch"
@@ -168,6 +173,7 @@ function registerWhisperRoutes(app: FastifyInstance, options: WhisperAppOptions)
 function registerCatchRoutes(app: FastifyInstance, options: CatchAppOptions): void {
 	const ingestionRateLimits = new Map<string, RateLimitBucket>();
 	const provisioningRateLimits = new Map<string, RateLimitBucket>();
+	const ownerRateLimits = new Map<string, RateLimitBucket>();
 	for (const contentType of ALLOWED_CONTENT_TYPES) {
 		app.addContentTypeParser(contentType, { parseAs: "buffer" }, (_request, body, done) => done(null, body));
 	}
@@ -207,6 +213,7 @@ function registerCatchRoutes(app: FastifyInstance, options: CatchAppOptions): vo
 	});
 
 	app.get<{ Params: { publicId: string } }>("/api/catch/:publicId", async (request, reply) => {
+		if (!consumeRateLimit(ownerRateLimits, request.ip, 30, 60_000)) return rateLimited(reply);
 		if (!await authorizeOwner(request, options)) return unauthorized(reply);
 		const resource = await options.repository.getResource(request.params.publicId);
 		if (resource === null) return reply.header("Cache-Control", "no-store").code(404).send({ error: "not found" });
@@ -214,6 +221,7 @@ function registerCatchRoutes(app: FastifyInstance, options: CatchAppOptions): vo
 	});
 
 	app.get<{ Params: { publicId: string }; Querystring: { limit?: string } }>("/api/catch/:publicId/events", async (request, reply) => {
+		if (!consumeRateLimit(ownerRateLimits, request.ip, 30, 60_000)) return rateLimited(reply);
 		if (!await authorizeOwner(request, options)) return unauthorized(reply);
 		const limit = parseLimit(request.query.limit);
 		const events = await options.repository.listEvents(request.params.publicId, limit);
@@ -221,12 +229,14 @@ function registerCatchRoutes(app: FastifyInstance, options: CatchAppOptions): vo
 	});
 
 	app.delete<{ Params: { publicId: string; eventId: string } }>("/api/catch/:publicId/events/:eventId", async (request, reply) => {
+		if (!consumeRateLimit(ownerRateLimits, request.ip, 30, 60_000)) return rateLimited(reply);
 		if (!await authorizeOwner(request, options)) return unauthorized(reply);
 		const deleted = await options.repository.deleteEvent(request.params.publicId, request.params.eventId);
 		return deleted ? reply.header("Cache-Control", "no-store").code(204).send() : reply.header("Cache-Control", "no-store").code(404).send({ error: "not found" });
 	});
 
 	app.delete<{ Params: { publicId: string } }>("/api/catch/:publicId", async (request, reply) => {
+		if (!consumeRateLimit(ownerRateLimits, request.ip, 30, 60_000)) return rateLimited(reply);
 		if (!await authorizeOwner(request, options)) return unauthorized(reply);
 		const destroyed = await options.repository.destroy(request.params.publicId);
 		return destroyed ? reply.header("Cache-Control", "no-store").code(204).send() : reply.header("Cache-Control", "no-store").code(404).send({ error: "not found" });

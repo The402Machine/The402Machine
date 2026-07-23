@@ -28,6 +28,7 @@ class FakeCatchRepository implements CatchApiRepository {
 	public readonly accepted: Parameters<CatchApiRepository["acceptEvent"]>[] = [];
 	public readonly deletedEvents: string[] = [];
 	public destroyed = false;
+	public credentialLookups = 0;
 	public credentials = {
 		ownerTokenHash: hashToken("owner", ownerToken, pepper),
 		ingestTokenHash: hashToken("ingest", ingestToken, pepper),
@@ -43,6 +44,7 @@ class FakeCatchRepository implements CatchApiRepository {
 	}
 
 	public getCredentialHashes(publicId: string): Promise<{ ownerTokenHash: string | null; ingestTokenHash: string | null } | null> {
+		this.credentialLookups += 1;
 		return Promise.resolve(publicId === resource().publicId ? this.credentials : null);
 	}
 
@@ -232,6 +234,17 @@ describe("CATCH HTTP API", () => {
 			finalStatus = response.statusCode;
 		}
 		expect(finalStatus).toBe(429);
+	});
+
+	it("rate-limits owner authentication before repeated database lookups", async () => {
+		const { app, repository } = buildCatchApp();
+		let finalStatus = 0;
+		for (let attempt = 0; attempt < 31; attempt += 1) {
+			const response = await app.inject({ method: "GET", url: `/api/catch/missing-${attempt}`, headers: bearer("catch_own_wrong-token") });
+			finalStatus = response.statusCode;
+		}
+		expect(finalStatus).toBe(429);
+		expect(repository.credentialLookups).toBe(30);
 	});
 
 	it("protects admin data, avoids token leaks, and irreversibly destroys resources", async () => {

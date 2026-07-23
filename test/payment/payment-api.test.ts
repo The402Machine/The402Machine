@@ -71,4 +71,24 @@ describe("public payment API", () => {
 		] } });
 		await app.close();
 	});
+
+	it("rate-limits invoice creation and verification before payment backend work", async () => {
+		let quotes = 0;
+		let fulfillments = 0;
+		const app = buildApp({ payment: {
+			quote: () => { quotes += 1; return Promise.resolve({ orderId: "order-rate", product: "catch", planId: "spark", amountSats: 4, bolt11: "lnbc4n1rate", paymentHash: "f".repeat(64) }); },
+			fulfill: () => { fulfillments += 1; return Promise.resolve({ settled: false }); },
+		} });
+		let quoteStatus = 0;
+		for (let attempt = 0; attempt < 11; attempt += 1) {
+			quoteStatus = (await app.inject({ method: "POST", url: "/api/payments/catch", headers: { "content-type": "application/json", "idempotency-key": `rate-key-${attempt}` }, payload: { planId: "spark" } })).statusCode;
+		}
+		expect(quoteStatus).toBe(429);
+		expect(quotes).toBe(10);
+		let verifyStatus = 0;
+		for (let attempt = 0; attempt < 31; attempt += 1) verifyStatus = (await app.inject({ method: "GET", url: `/api/payments/order-${attempt}` })).statusCode;
+		expect(verifyStatus).toBe(429);
+		expect(fulfillments).toBe(30);
+		await app.close();
+	});
 });
