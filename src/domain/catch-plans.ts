@@ -19,7 +19,7 @@ export const CATCH_PLANS: Readonly<Record<CatchPlanId, CatchPlan>> = {
 		duration: { kind: "fixed", seconds: 14_520 },
 		requestLimit: 402,
 		storageLimitBytes: 2 * 1024 * 1024,
-		maxBytesPerRequest: 16 * 1024,
+		maxBytesPerRequest: 64 * 1024,
 		available: true,
 	},
 	standard: {
@@ -27,7 +27,7 @@ export const CATCH_PLANS: Readonly<Record<CatchPlanId, CatchPlan>> = {
 		duration: { kind: "fixed", seconds: 2_592_000 },
 		requestLimit: 4_020,
 		storageLimitBytes: 20 * 1024 * 1024,
-		maxBytesPerRequest: 16 * 1024,
+		maxBytesPerRequest: 256 * 1024,
 		available: true,
 	},
 	long: {
@@ -35,7 +35,7 @@ export const CATCH_PLANS: Readonly<Record<CatchPlanId, CatchPlan>> = {
 		duration: { kind: "calendar", months: 4, days: 2 },
 		requestLimit: 40_200,
 		storageLimitBytes: 200 * 1024 * 1024,
-		maxBytesPerRequest: 16 * 1024,
+		maxBytesPerRequest: 1024 * 1024,
 		available: true,
 	},
 };

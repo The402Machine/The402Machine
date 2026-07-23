@@ -87,9 +87,9 @@ describe("public payment API", () => {
 		expect(response.statusCode).toBe(200);
 		expect(response.json()).toMatchObject({ checkoutEnabled: true, currency: "sat", products: {
 			catch: { plans: [
-				{ planId: "spark", priceSats: 42, durationLabel: "4h 02m", requestLimit: 402, storageLimitBytes: 2 * 1024 * 1024, available: true },
-				{ planId: "standard", priceSats: 402, durationLabel: "30 days", requestLimit: 4_020, storageLimitBytes: 20 * 1024 * 1024, available: true },
-				{ planId: "long", priceSats: 4_002, durationLabel: "4 months + 2 days", requestLimit: 40_200, storageLimitBytes: 200 * 1024 * 1024, available: true },
+				{ planId: "spark", priceSats: 42, durationLabel: "4h 02m", requestLimit: 402, storageLimitBytes: 2 * 1024 * 1024, maxBytesPerRequest: 64 * 1024, available: true },
+				{ planId: "standard", priceSats: 402, durationLabel: "30 days", requestLimit: 4_020, storageLimitBytes: 20 * 1024 * 1024, maxBytesPerRequest: 256 * 1024, available: true },
+				{ planId: "long", priceSats: 4_002, durationLabel: "4 months + 2 days", requestLimit: 40_200, storageLimitBytes: 200 * 1024 * 1024, maxBytesPerRequest: 1024 * 1024, available: true },
 			] },
 			whisper: { plans: [
 				{ planId: "spark", priceSats: 42, durationLabel: "7 days", readOnce: true, available: true },

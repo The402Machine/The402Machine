@@ -31,6 +31,10 @@ describe("public landing page", () => {
 		expect(response.body).toContain("42 days");
 		expect(response.body).toContain("402 days");
 		expect(response.body).toContain("Plans change only how long an unread WHISPER waits");
+		expect(response.body).toContain("64 KiB");
+		expect(response.body).toContain("256 KiB");
+		expect(response.body).toContain("1 MiB");
+		expect(response.body).toContain("available cartridges");
 		expect(response.body).toContain("CHECKING LIGHTNING CHECKOUT");
 		expect(response.body).toContain("TWO CARTRIDGES LIVE");
 		expect(response.body).toContain("Source-available");
@@ -38,7 +42,7 @@ describe("public landing page", () => {
 		expect(response.body).toContain('data-buy="catch"');
 		expect(response.body).toContain('data-buy="whisper"');
 		expect(response.body).toContain('data-plan="long"');
-		expect(response.body).toContain('src="/assets/checkout.js?v=2"');
+		expect(response.body).toContain('src="/assets/checkout.js?v=4"');
 	});
 
 	it("exposes the landing stylesheet", async () => {
@@ -89,5 +93,15 @@ describe("public landing page", () => {
 		expect(source).toContain('button.textContent = "Checkout disabled"');
 		expect(source).toContain("renderPlanChoices");
 		expect(source).not.toContain('data.get("planId") === "standard"');
+	});
+
+	it("keeps the WHISPER message field out of CATCH checkout", async () => {
+		const [source, styles] = await Promise.all([
+			readFile(new URL("../public/assets/checkout.js", import.meta.url), "utf8"),
+			readFile(new URL("../public/assets/styles.css", import.meta.url), "utf8"),
+		]);
+
+		expect(source).toContain('noteField.hidden = product !== "whisper"');
+		expect(styles).toContain("[hidden] { display: none !important; }");
 	});
 });

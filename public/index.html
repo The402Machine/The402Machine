@@ -6,7 +6,7 @@
 		<meta name="description" content="Buy a temporary webhook or an encrypted read-once message with Bitcoin over Lightning. No account, no subscription, hard limits." />
 		<meta name="theme-color" content="#080a08" />
 		<title>The402Machine — Disposable Internet Infrastructure</title>
-		<link rel="stylesheet" href="/assets/styles.css?v=2" />
+		<link rel="stylesheet" href="/assets/styles.css?v=4" />
 	</head>
 	<body>
 		<div class="noise" aria-hidden="true"></div>
@@ -46,19 +46,22 @@
 			<section class="manifesto-band"><div class="shell band-inner"><span>INSERT SATS</span><i>→</i><span>RECEIVE A CAPABILITY</span><i>→</i><span>WATCH IT DISAPPEAR</span></div></section>
 
 			<section class="shell section" id="machines">
-				<div class="section-heading"><p class="eyebrow">CARTRIDGE CATALOGUE / 02 UNITS</p><div><h2>Choose what the internet should forget.</h2><p class="section-intro">CATCH plans scale time, requests, and storage. WHISPER plans change only how long an unread message waits before self-erasing.</p></div></div>
+				<header class="catalogue-heading">
+					<div class="catalogue-meta"><p class="eyebrow">CARTRIDGE CATALOGUE</p><div class="catalogue-count"><strong>02</strong><span>available cartridges</span></div></div>
+					<div class="catalogue-copy"><h2>Choose what the internet should forget.</h2><div class="catalogue-side"><p class="section-intro">Start with the job, then pick the fuse. CATCH scales payload, requests, storage, and time. WHISPER scales only the unread waiting window.</p><div class="catalogue-slots"><a href="#catch"><small>A1 · MACHINE INPUT</small><b>CATCH</b></a><a href="#whisper"><small>B1 · HUMAN HANDOFF</small><b>WHISPER</b></a></div></div></div>
+				</header>
 
 				<div class="product-stack">
 					<article class="product-card featured" id="catch">
 						<div class="card-index">A1</div>
 						<div class="card-body">
 							<div class="card-title"><div><p class="product-kicker">INBOUND-ONLY WEBHOOK</p><h3>CATCH</h3></div><span>LIVE</span></div>
-							<p>A private webhook inbox that accepts small POST requests, returns an empty 204, and never forwards or executes anything. Separate credentials keep sending and inspection apart.</p>
+							<p>A private webhook inbox that accepts bounded POST requests, returns an empty 204, and never forwards or executes anything. Separate credentials keep sending and inspection apart.</p>
 							<div class="feature-strip"><span>Opaque payloads</span><span>Hard quotas</span><span>Manual destroy</span><span>Automatic erasure</span></div>
 							<div class="plan-grid" aria-label="CATCH plan comparison">
-								<article class="plan-card"><header><small>SPARK · 42 SATS</small><strong>4h 02m</strong></header><p>Fast debugging and throwaway integrations.</p><dl><div><dt>Requests</dt><dd>402</dd></div><div><dt>Storage</dt><dd>2 MiB</dd></div><div><dt>Payload</dt><dd>16 KiB</dd></div></dl><button class="button plan-buy" data-buy="catch" data-plan="spark">Choose Spark</button></article>
-								<article class="plan-card recommended"><div class="recommendation">MOST USEFUL</div><header><small>STANDARD · 402 SATS</small><strong>30 days</strong></header><p>Real temporary workflows without becoming permanent infrastructure.</p><dl><div><dt>Requests</dt><dd>4,020</dd></div><div><dt>Storage</dt><dd>20 MiB</dd></div><div><dt>Payload</dt><dd>16 KiB</dd></div></dl><button class="button plan-buy primary" data-buy="catch" data-plan="standard">Choose Standard</button></article>
-								<article class="plan-card"><header><small>LONG · 4,002 SATS</small><strong>4 months + 2 days</strong></header><p>Long-running missions that still need a guaranteed ending.</p><dl><div><dt>Requests</dt><dd>40,200</dd></div><div><dt>Storage</dt><dd>200 MiB</dd></div><div><dt>Payload</dt><dd>16 KiB</dd></div></dl><button class="button plan-buy" data-buy="catch" data-plan="long">Choose Long</button></article>
+								<article class="plan-card"><header><small>SPARK · 42 SATS</small><strong>4h 02m</strong></header><p>Fast debugging and compact webhook events.</p><dl><div><dt>Requests</dt><dd>402</dd></div><div><dt>Storage</dt><dd>2 MiB</dd></div><div><dt>Payload</dt><dd>64 KiB</dd></div></dl><button class="button plan-buy" data-buy="catch" data-plan="spark">Choose Spark</button></article>
+								<article class="plan-card recommended"><div class="recommendation">MOST USEFUL</div><header><small>STANDARD · 402 SATS</small><strong>30 days</strong></header><p>Real temporary workflows with room for richer events.</p><dl><div><dt>Requests</dt><dd>4,020</dd></div><div><dt>Storage</dt><dd>20 MiB</dd></div><div><dt>Payload</dt><dd>256 KiB</dd></div></dl><button class="button plan-buy primary" data-buy="catch" data-plan="standard">Choose Standard</button></article>
+								<article class="plan-card"><header><small>LONG · 4,002 SATS</small><strong>4 months + 2 days</strong></header><p>Long-running missions and occasional large JSON payloads.</p><dl><div><dt>Requests</dt><dd>40,200</dd></div><div><dt>Storage</dt><dd>200 MiB</dd></div><div><dt>Payload</dt><dd>1 MiB</dd></div></dl><button class="button plan-buy" data-buy="catch" data-plan="long">Choose Long</button></article>
 							</div>
 						</div>
 					</article>
@@ -110,6 +113,6 @@
 		</dialog>
 
 		<footer class="footer shell"><span>THE402MACHINE.COM</span><span>PAYMENT REQUIRED / TAKEN LITERALLY</span><span>© 2026</span></footer>
-		<script type="module" src="/assets/checkout.js?v=2"></script>
+		<script type="module" src="/assets/checkout.js?v=4"></script>
 	</body>
 </html>

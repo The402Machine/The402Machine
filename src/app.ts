@@ -14,7 +14,7 @@ import { generateIngestToken, generateOwnerToken, hashToken, verifyToken } from 
 import type { AcceptEventInput, AcceptEventResult, CatchCredentialHashes, CatchEvent, CatchResource, ProvisionInput } from "./storage/catch-repository.js";
 import type { CreateWhisperInput } from "./whisper/whisper-repository.js";
 
-const MAX_INGEST_BYTES = 16 * 1024;
+const MAX_INGEST_BYTES = Math.max(...Object.values(CATCH_PLANS).map((plan) => plan.maxBytesPerRequest));
 const MAX_WHISPER_BYTES = 16 * 1024;
 const MAX_RATE_LIMIT_BUCKETS = 10_000;
 const ALLOWED_CONTENT_TYPES = new Set(["application/json", "text/plain", "application/x-www-form-urlencoded"]);

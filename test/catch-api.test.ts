@@ -16,7 +16,7 @@ const resource = (): CatchResource => ({
 	status: "active",
 	requestLimit: 402,
 	storageLimitBytes: 2 * 1024 * 1024,
-	maxBytesPerRequest: 16 * 1024,
+	maxBytesPerRequest: 64 * 1024,
 	acceptedRequestCount: 1,
 	storedBytes: 5,
 	createdAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -126,13 +126,21 @@ describe("CATCH HTTP API", () => {
 		expect(repository.accepted[0]?.[0]).toMatchObject({ body: Buffer.from("hello"), headers: { "content-type": "text/plain", "user-agent": "test", "x-request-id": "request-1" } });
 	});
 
+	it("accepts a Spark payload above the former 16 KiB ceiling", async () => {
+		const { app, repository } = buildCatchApp();
+		const payload = "x".repeat(64 * 1024);
+		const response = await app.inject({ method: "POST", url: "/c/catch_test-public-id", headers: { ...bearer(ingestToken), "content-type": "text/plain" }, payload });
+		expect(response.statusCode).toBe(204);
+		expect(repository.accepted[0]?.[0].body.byteLength).toBe(64 * 1024);
+	});
+
 	it("rejects incorrect role tokens, unsupported MIME, encoded and oversized ingestion", async () => {
 		const { app, repository } = buildCatchApp();
 		for (const request of [
 			{ headers: { ...bearer(ownerToken), "content-type": "text/plain" }, payload: "x" },
 			{ headers: { ...bearer(ingestToken), "content-type": "image/png" }, payload: "x" },
 			{ headers: { ...bearer(ingestToken), "content-type": "text/plain", "content-encoding": "gzip" }, payload: "x" },
-			{ headers: { ...bearer(ingestToken), "content-type": "text/plain" }, payload: "x".repeat(16 * 1024 + 1) },
+			{ headers: { ...bearer(ingestToken), "content-type": "text/plain" }, payload: "x".repeat(1024 * 1024 + 1) },
 		]) {
 			const response = await app.inject({ method: "POST", url: "/c/catch_test-public-id", ...request });
 			expect(response.statusCode).toBeGreaterThanOrEqual(400);
