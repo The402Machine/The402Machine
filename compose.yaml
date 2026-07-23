@@ -76,11 +76,8 @@ services:
   lnbits-bridge:
     image: alpine/socat:latest
     restart: unless-stopped
-    network_mode: "service:web"
-    command: ["TCP-LISTEN:2180,reuseaddr,fork,bind=127.0.0.1", "TCP:172.30.240.1:2180"]
-    depends_on:
-      web:
-        condition: service_started
+    network_mode: "host"
+    command: ["TCP-LISTEN:2180,reuseaddr,fork,bind=172.30.240.1", "TCP:127.0.0.1:2180"]
     read_only: true
     security_opt:
       - no-new-privileges:true

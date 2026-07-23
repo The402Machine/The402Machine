@@ -14,8 +14,9 @@ describe("expiry deployment", () => {
 		expect(compose).toContain("expiry-worker:");
 		expect(compose).toContain('command: ["node", "dist/worker.js"]');
 		expect(compose).toContain("lnbits-bridge:");
-		expect(compose).toContain('network_mode: "service:web"');
-		expect(compose).toContain("TCP:172.30.240.1:2180");
+		expect(compose).toContain('network_mode: "host"');
+		expect(compose).toContain("bind=172.30.240.1");
+		expect(compose).toContain("TCP:127.0.0.1:2180");
 		expect(compose).toContain("condition: service_completed_successfully");
 		expect(dockerfile).toContain("COPY --chown=app:app migrations ./migrations");
 		expect(dockerfile).toContain("COPY --chown=app:app scripts ./scripts");

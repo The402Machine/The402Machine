@@ -80,7 +80,7 @@ npm run build
 
 Copy `.env.example` to `.env` for local development. Production Compose uses an untracked `.env.production` file and runs PostgreSQL, migrations, the web service, and the expiry worker. Never commit payment credentials, database passwords, token peppers, wallet material, private keys, macaroons, or deployment secrets.
 
-The LNbits adapter accepts only loopback HTTP or the pinned Docker gateway bridge, plus an invoice-only key. A sidecar binds the host bridge into the web container's loopback namespace. `PAYMENT_DELIVERY_KEY` is a separate 32-byte base64url key used to encrypt recoverable credentials for idempotent delivery; it must not be reused as the CATCH token pepper.
+The LNbits adapter accepts only loopback HTTP or the pinned Docker gateway bridge, plus an invoice-only key. A constrained sidecar publishes the existing host-loopback tunnel only on the pinned Docker gateway address. `PAYMENT_DELIVERY_KEY` is a separate 32-byte base64url key used to encrypt recoverable credentials for idempotent delivery; it must not be reused as the CATCH token pepper.
 
 Invoice creation uses the payment order UUID as LNbits `external_id`. Before creating an invoice, the broker looks up that stable identifier so retries can recover an invoice whose response was lost instead of blindly creating another one.
 
