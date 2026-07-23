@@ -54,7 +54,7 @@ beforeAll(async () => {
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 4 });
 
-	for (const file of ["0001_catch.sql", "0004_catch_storage_hardening.sql"]) {
+	for (const file of ["0001_catch.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -125,5 +125,36 @@ describe("CATCH migration", () => {
 				)
 			`).rejects.toMatchObject({ code: "23514" });
 		}
+	});
+
+	it("reconciles legacy headers and stored byte counters before validating the constraint", async () => {
+		const publicId = `catch_${randomUUID().replaceAll("-", "")}`;
+		const [resource] = await sql<{ id: string }[]>`
+			insert into catch_resources (
+				public_id, plan_id, owner_token_hash, ingest_token_hash,
+				request_limit, storage_limit_bytes, max_bytes_per_request, stored_bytes, expires_at
+			) values (
+				${publicId}, 'spark', 'owner', 'ingest',
+				402, 23, ${16 * 1024}, 1, clock_timestamp() + interval '1 hour'
+			) returning id
+		`;
+		expect(resource).toBeDefined();
+		await sql`alter table catch_events drop constraint catch_events_headers_allowlist_check`;
+		await sql`
+			insert into catch_events (resource_id, sequence_number, content_type, headers, body)
+			values
+				(${resource!.id}, 1, 'text/plain', ${sql.json({ cookie: "secret", "x-request-id": "ok" })}, ${Buffer.from("x")}),
+				(${resource!.id}, 2, 'text/plain', ${sql.json({ authorization: "secret", "x-request-id": "ok" })}, ${Buffer.from("y")})
+		`;
+		const migration4 = (await readFile(new URL("../../migrations/0004_catch_storage_hardening.sql", import.meta.url), "utf8"))
+			.replace("INSERT INTO schema_migrations (version) VALUES ('0004_catch_storage_hardening') ON CONFLICT DO NOTHING;", "");
+		await sql.unsafe(migration4).simple();
+		await sql.unsafe(await readFile(new URL("../../migrations/0005_catch_storage_reconcile.sql", import.meta.url), "utf8")).simple();
+
+		const [event] = await sql<{ headers: Record<string, string> }[]>`select headers from catch_events where resource_id = ${resource!.id}`;
+		const [stored] = await sql<{ status: string; stored_bytes: string }[]>`select status, stored_bytes from catch_resources where id = ${resource!.id}`;
+		expect(event?.headers).toEqual({ "x-request-id": "ok" });
+		expect(await sql`select id from catch_events where resource_id = ${resource!.id}`).toHaveLength(1);
+		expect(stored).toMatchObject({ status: "exhausted", stored_bytes: "23" });
 	});
 });

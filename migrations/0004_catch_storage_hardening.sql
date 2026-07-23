@@ -8,7 +8,7 @@ ALTER TABLE catch_events
 			'x-github-delivery',
 			'stripe-signature'
 		]::text[] = '{}'::jsonb
-	);
+	) NOT VALID;
 
 CREATE OR REPLACE FUNCTION catch_event_stored_bytes(event_headers jsonb, event_body bytea)
 RETURNS integer
