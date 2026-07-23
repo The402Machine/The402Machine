@@ -148,7 +148,7 @@ function registerWhisperRoutes(app: FastifyInstance, options: WhisperAppOptions)
 			if (normalizedContentType(request.headers["content-type"]) !== "application/octet-stream") return reply.code(400).send({ error: "invalid request" });
 			if (!Buffer.isBuffer(request.body) || request.body.byteLength < 1 || request.body.byteLength > MAX_WHISPER_BYTES) return reply.code(400).send({ error: "invalid request" });
 			const planId = request.headers["x-whisper-plan"];
-			if (planId !== "spark" && planId !== "standard" && planId !== "long") return reply.code(400).send({ error: "invalid plan" });
+			if (planId !== "spark" && planId !== "standard") return reply.code(400).send({ error: "invalid plan" });
 			const plan = CATCH_PLANS[planId];
 			const readToken = generateOwnerToken();
 			const publicId = `whisper_${randomBytes(24).toString("base64url")}`;

@@ -82,4 +82,19 @@ describe("WHISPER HTTP API", () => {
 		expect(oversized.statusCode).toBeGreaterThanOrEqual(400);
 		expect(repository.created).toBeNull();
 	});
+
+	it("rejects unavailable Long provisioning", async () => {
+		const repository = new FakeWhisperRepository();
+		const app = buildApp({ whisper: { repository, tokenPepper: pepper, provisioningEnabled: true, provisioningSecret } });
+		apps.push(app);
+		const response = await app.inject({
+			method: "POST",
+			url: "/internal/whisper/provision",
+			headers: { ...bearer(provisioningSecret), "content-type": "application/octet-stream", "x-whisper-plan": "long" },
+			payload: Buffer.from("opaque-client-ciphertext"),
+		});
+
+		expect(response.statusCode).toBe(400);
+		expect(repository.created).toBeNull();
+	});
 });

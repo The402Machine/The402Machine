@@ -67,4 +67,16 @@ describe("LNbits payment adapter", () => {
 		expect(await adapter.verifyInvoice({ paymentHash: "a".repeat(64), amountSats: 4 })).toEqual({ settled: true });
 		await expect(adapter.verifyInvoice({ paymentHash: "a".repeat(64), amountSats: 4 })).rejects.toThrow(/payment hash mismatch/);
 	});
+
+	it.each([
+		["missing details", { paid: true }],
+		["missing amount", { paid: true, details: { payment_hash: "a".repeat(64) } }],
+		["missing hash", { paid: true, details: { amount: 4_000 } }],
+		["wrong amount", { paid: true, details: { payment_hash: "a".repeat(64), amount: 42_000 } }],
+	])("fails closed for a paid response with %s", async (_description, payload) => {
+		const fetchImplementation = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify(payload), { status: 200 }));
+		const adapter = new LnbitsPaymentAdapter({ baseUrl: "http://127.0.0.1:2180", invoiceKey: "invoice-key", fetchImplementation });
+
+		await expect(adapter.verifyInvoice({ paymentHash: "a".repeat(64), amountSats: 4 })).rejects.toThrow(/verification details|payment hash|payment amount/);
+	});
 });

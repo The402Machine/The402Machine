@@ -82,11 +82,14 @@ export class LnbitsPaymentAdapter implements PaymentAdapter {
 		});
 		if (!response.ok) throw new Error(`LNbits payment verification failed with HTTP ${response.status}`);
 		const payload = await response.json() as LnbitsPaymentStatusResponse;
+		if (payload.paid !== true) return { settled: false };
 		const detailsHash = payload.details?.payment_hash;
-		if (detailsHash !== undefined && detailsHash !== input.paymentHash) throw new Error("LNbits payment hash mismatch");
+		if (!isPaymentHash(detailsHash)) throw new Error("LNbits payment verification details are incomplete");
+		if (detailsHash !== input.paymentHash) throw new Error("LNbits payment hash mismatch");
 		const amountMsat = normalizedAmountMsat(payload.details);
-		if (amountMsat !== undefined && amountMsat !== input.amountSats * 1_000) throw new Error("LNbits payment amount mismatch");
-		return { settled: payload.paid === true };
+		if (amountMsat === undefined) throw new Error("LNbits payment verification details are incomplete");
+		if (amountMsat !== input.amountSats * 1_000) throw new Error("LNbits payment amount mismatch");
+		return { settled: true };
 	}
 }
 
