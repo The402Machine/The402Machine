@@ -1,7 +1,7 @@
 import type { Sql } from "postgres";
 
 import type { CatchPlanId } from "../domain/catch-plans.js";
-import type { CatchResourceStatus } from "../domain/catch-resource.js";
+import { transitionCatchResource, type CatchResourceStatus } from "../domain/catch-resource.js";
 
 export type CatchResource = {
 	id: string;
@@ -241,11 +241,17 @@ export class CatchRepository {
 			const [resource] = await tx<ResourceRow[]>`
 				select * from catch_resources where public_id = ${publicId} for update
 			`;
-			if (resource === undefined || resource.status === "deleted" || resource.status === "expired" || resource.status === "manually_destroyed") return false;
+			if (resource === undefined || resource.status === "expired" || resource.status === "manually_destroyed" || resource.status === "deleted") return false;
+			const nextStatus = transitionCatchResource(
+				resource.status,
+				resource.status === "active" ? "manually_destroyed" : "deleted",
+			);
 			await tx`delete from catch_events where resource_id = ${resource.id}`;
 			await tx`
 				update catch_resources
-				set status = 'manually_destroyed', manually_destroyed_at = clock_timestamp(),
+				set status = ${nextStatus}::catch_resource_status,
+					manually_destroyed_at = case when ${nextStatus === "manually_destroyed"} then clock_timestamp() else manually_destroyed_at end,
+					deleted_at = case when ${nextStatus === "deleted"} then clock_timestamp() else deleted_at end,
 					owner_token_hash = null, ingest_token_hash = null, stored_bytes = 0, updated_at = clock_timestamp()
 				where id = ${resource.id}
 			`;

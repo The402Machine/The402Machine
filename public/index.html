@@ -27,7 +27,7 @@
 				<div class="hero-copy">
 					<p class="eyebrow"><span class="live-dot"></span> CATCH CORE ONLINE / SALES PREVIEW</p>
 					<h1>Tiny internet appliances.<br /><em>Hard limits. Built-in fuse.</em></h1>
-					<p class="lede">Pay once with Bitcoin over Lightning. Receive a temporary webhook or an encrypted burn-after-read note. No account. No subscription. No generic hosting.</p>
+					<p class="lede">Pay once with Bitcoin over Lightning. Receive a temporary webhook or an encrypted read-once whisper. No account. No subscription. No generic hosting.</p>
 					<div class="hero-actions">
 						<a class="button primary" href="#machines">Inspect the machines</a>
 						<a class="button ghost" href="https://github.com/The402Machine/The402Machine" rel="noreferrer">View source</a>
@@ -86,18 +86,18 @@
 								<li>Separate ingest and owner credentials</li>
 							</ul>
 							<div class="durations">
-								<div><small>SPARK</small><strong>4h 02m</strong><span>cheap experiments</span></div>
-								<div class="selected"><small>STANDARD</small><strong>4 weeks + 2 days</strong><span>real temporary work</span></div>
-								<div><small>LONG</small><strong>4 months + 2 days</strong><span>extended missions</span></div>
+								<div><small>SPARK · 4 SATS</small><strong>4h 02m</strong><span>cheap experiments</span></div>
+								<div class="selected"><small>STANDARD · 42 SATS</small><strong>4 weeks + 2 days</strong><span>real temporary work</span></div>
+								<div><small>LONG · 402 SATS</small><strong>4 months + 2 days</strong><span>extended missions</span></div>
 							</div>
-							<button class="button disabled" disabled>Dispensing soon</button>
+							<button class="button primary" data-buy="catch">Dispense CATCH</button>
 						</div>
 					</article>
 
 					<article class="product-card">
 						<div class="card-index">B1</div>
 						<div class="card-body">
-							<div class="card-title"><h3>BURN</h3><span>NEXT CARTRIDGE</span></div>
+							<div class="card-title"><h3>WHISPER</h3><span>NEXT CARTRIDGE</span></div>
 							<p>An encrypted note that survives until the first successful read — or until the lifetime you selected ends. Whichever arrives first.</p>
 							<ul>
 								<li>Encrypted before it leaves your device</li>
@@ -105,7 +105,7 @@
 								<li>Same Spark, Standard, and Long lifetimes</li>
 							</ul>
 							<div class="sealed-box"><span>SEALED PAYLOAD</span><b>████ ████ ████</b></div>
-							<button class="button disabled" disabled>Queued after CATCH</button>
+							<button class="button primary" data-buy="whisper">Dispense WHISPER</button>
 						</div>
 					</article>
 				</div>
@@ -127,17 +127,28 @@
 			</section>
 
 			<section class="shell section closing">
-				<p class="eyebrow">STATUS / CATCH CORE READY</p>
-				<h2>The first cartridge works.<br />The payment slot comes next.</h2>
-				<p>CATCH now has bounded ingestion, private retrieval, hard quotas, rate controls, PostgreSQL persistence, and automatic erasure. Public dispensing stays disabled until Lightning fulfilment passes its tests.</p>
+				<p class="eyebrow">STATUS / TWO CARTRIDGES READY</p>
+				<h2>Insert sats.<br />Receive a tiny piece of the Internet.</h2>
+				<p>CATCH and WHISPER are dispensed without accounts. Spark and Standard are available; Long remains sealed while the machine proves itself.</p>
 				<a class="button primary" href="https://github.com/The402Machine/The402Machine" rel="noreferrer">Follow the build on GitHub</a>
 			</section>
 		</main>
+		<dialog id="checkout" class="checkout">
+			<form id="checkout-form" method="dialog">
+				<div class="card-title"><h3 id="checkout-title">Dispense</h3><button id="checkout-close" type="button" class="button ghost">Close</button></div>
+				<label>Cartridge <select name="planId"><option value="spark">Spark · 4 sats</option><option value="standard">Standard · 42 sats</option></select></label>
+				<label id="whisper-note-field" hidden>Message <textarea id="whisper-note" maxlength="15000" rows="7" placeholder="Encrypted in this browser before upload"></textarea></label>
+				<button class="button primary" type="submit">Create invoice</button>
+				<p id="checkout-status">Choose a cartridge.</p>
+				<textarea id="checkout-output" rows="8" readonly hidden aria-label="Invoice or dispensed credentials"></textarea>
+			</form>
+		</dialog>
 
 		<footer class="footer shell">
 			<span>THE402MACHINE.COM</span>
 			<span>PAYMENT REQUIRED / TAKEN LITERALLY</span>
 			<span>© 2026</span>
 		</footer>
+		<script type="module" src="/assets/checkout.js"></script>
 	</body>
 </html>

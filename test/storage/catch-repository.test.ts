@@ -171,4 +171,26 @@ describe("CatchRepository", () => {
 		expect(await repository.listEvents(resource.publicId, 50)).toEqual([]);
 		expect((await repository.getResource(resource.publicId))?.status).toBe("manually_destroyed");
 	});
+
+	it("uses legal terminal transitions when destroying inactive resources", async () => {
+		const exhausted = await provisionSpark({ requestLimit: 1 });
+		await repository.acceptEvent({
+			publicId: exhausted.publicId,
+			contentType: "text/plain",
+			headers: {},
+			body: Buffer.from("one"),
+		});
+		expect((await repository.getResource(exhausted.publicId))?.status).toBe("exhausted");
+		expect(await repository.destroy(exhausted.publicId)).toBe(true);
+		expect((await repository.getResource(exhausted.publicId))?.status).toBe("deleted");
+
+		const suspended = await provisionSpark();
+		await sql`
+			update catch_resources
+			set status = 'suspended', suspended_at = clock_timestamp()
+			where id = ${suspended.id}
+		`;
+		expect(await repository.destroy(suspended.publicId)).toBe(true);
+		expect((await repository.getResource(suspended.publicId))?.status).toBe("deleted");
+	});
 });

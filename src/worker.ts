@@ -3,6 +3,7 @@ import postgres from "postgres";
 import { loadConfig } from "./config.js";
 import { startExpiryWorker } from "./expiry-worker.js";
 import { CatchRepository } from "./storage/catch-repository.js";
+import { WhisperRepository } from "./whisper/whisper-repository.js";
 
 const config = loadConfig();
 if (config.catch.databaseUrl === undefined) {
@@ -13,9 +14,16 @@ const database = postgres(config.catch.databaseUrl);
 const worker = startExpiryWorker(new CatchRepository(database), {
 	onError: (error) => { console.error("CATCH expiry worker failed", error); },
 });
+const whisperRepository = new WhisperRepository(database);
+const whisperTimer = setInterval(() => {
+	void whisperRepository.expireDue(100).catch((error: unknown) => { console.error("WHISPER expiry worker failed", error); });
+}, 30_000);
+whisperTimer.unref();
+void whisperRepository.expireDue(100).catch((error: unknown) => { console.error("WHISPER expiry worker failed", error); });
 
 const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
 	console.info(`CATCH expiry worker stopping after ${signal}`);
+	clearInterval(whisperTimer);
 	await worker.stop();
 	await database.end();
 };

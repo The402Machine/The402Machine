@@ -6,10 +6,14 @@ import fastifyStatic from "@fastify/static";
 import Fastify, { LogController, type FastifyInstance, type FastifyRequest } from "fastify";
 
 import { calculatePlanExpiry, CATCH_PLANS } from "./domain/catch-plans.js";
+import type { DispensedResource } from "./payment/payment-repository.js";
+import type { PaymentQuote } from "./payment/payment-service.js";
 import { generateIngestToken, generateOwnerToken, hashToken, verifyToken } from "./security/tokens.js";
 import type { AcceptEventInput, AcceptEventResult, CatchCredentialHashes, CatchEvent, CatchResource, ProvisionInput } from "./storage/catch-repository.js";
+import type { CreateWhisperInput } from "./whisper/whisper-repository.js";
 
 const MAX_INGEST_BYTES = 16 * 1024;
+const MAX_WHISPER_BYTES = 16 * 1024;
 const MAX_RATE_LIMIT_BUCKETS = 10_000;
 const ALLOWED_CONTENT_TYPES = new Set(["application/json", "text/plain", "application/x-www-form-urlencoded"]);
 const ALLOWED_HEADERS = new Set(["content-type", "user-agent", "x-request-id", "x-github-event", "x-github-delivery", "stripe-signature"]);
@@ -25,6 +29,12 @@ export interface CatchApiRepository {
 	destroy(publicId: string): Promise<boolean>;
 }
 
+export interface WhisperApiRepository {
+	create(input: CreateWhisperInput): Promise<{ id: string; publicId: string }>;
+	getCredentialHash(publicId: string): Promise<string | null>;
+	consume(publicId: string): Promise<Buffer | null>;
+}
+
 type CatchAppOptions = {
 	repository: CatchApiRepository;
 	tokenPepper: string;
@@ -32,24 +42,41 @@ type CatchAppOptions = {
 	provisioningSecret?: string;
 };
 
+type WhisperAppOptions = {
+	repository: WhisperApiRepository;
+	tokenPepper: string;
+	provisioningEnabled?: boolean;
+	provisioningSecret?: string;
+};
+
+type PaymentAppOptions = {
+	quote(input: { idempotencyKey: string; product: "catch" | "whisper"; planId: "spark" | "standard"; productPayload: Buffer | null }): Promise<PaymentQuote>;
+	fulfill(orderId: string): Promise<{ settled: false } | { settled: true; resource: DispensedResource }>;
+};
+
 type BuildAppOptions = {
 	logger?: boolean | object;
 	trustedProxy?: string;
 	catch?: CatchAppOptions;
+	whisper?: WhisperAppOptions;
+	payment?: PaymentAppOptions;
 };
 
 export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
 	const app = Fastify({
 		logger: options.logger ?? false,
-		bodyLimit: MAX_INGEST_BYTES,
+		bodyLimit: Math.max(MAX_INGEST_BYTES, MAX_WHISPER_BYTES),
 		logController: new LogController({ disableRequestLogging: true }),
 		trustProxy: options.trustedProxy ?? false,
 	});
+	if (options.whisper !== undefined || options.payment !== undefined) {
+		app.addContentTypeParser("application/octet-stream", { parseAs: "buffer" }, (_request, body, done) => done(null, body));
+	}
 
 	void app.register(helmet, {
 		contentSecurityPolicy: {
 			directives: {
-				defaultSrc: ["'self'"], fontSrc: ["'self'", "https://fonts.gstatic.com"], styleSrc: ["'self'", "https://fonts.googleapis.com"], imgSrc: ["'self'", "data:"], scriptSrc: ["'none'"],
+				defaultSrc: ["'self'"], fontSrc: ["'self'", "https://fonts.gstatic.com"], styleSrc: ["'self'", "https://fonts.googleapis.com"], imgSrc: ["'self'", "data:"], scriptSrc: ["'self'"], scriptSrcAttr: ["'none'"],
 			},
 		},
 		crossOriginEmbedderPolicy: false,
@@ -58,8 +85,85 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
 	app.get("/health", () => ({ service: "the402machine", status: "ok" }));
 
 	if (options.catch !== undefined) registerCatchRoutes(app, options.catch);
+	if (options.whisper !== undefined) registerWhisperRoutes(app, options.whisper);
+	if (options.payment !== undefined) registerPaymentRoutes(app, options.payment);
 	return app;
 };
+
+function registerPaymentRoutes(app: FastifyInstance, payment: PaymentAppOptions): void {
+	app.post<{ Body: { planId?: unknown } }>("/api/payments/catch", async (request, reply) => {
+		const idempotencyKey = request.headers["idempotency-key"];
+		const planId = request.body?.planId;
+		if (typeof idempotencyKey !== "string" || idempotencyKey.length < 8 || idempotencyKey.length > 128) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid idempotency key" });
+		if (planId !== "spark" && planId !== "standard") return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid plan" });
+		const quote = await payment.quote({ idempotencyKey, product: "catch", planId, productPayload: null });
+		return reply.header("Cache-Control", "no-store").code(402).send(quote);
+	});
+
+	app.post("/api/payments/whisper", async (request, reply) => {
+		const idempotencyKey = request.headers["idempotency-key"];
+		const planId = request.headers["x-whisper-plan"];
+		if (typeof idempotencyKey !== "string" || idempotencyKey.length < 8 || idempotencyKey.length > 128) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid idempotency key" });
+		if (planId !== "spark" && planId !== "standard") return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid plan" });
+		if (normalizedContentType(request.headers["content-type"]) !== "application/octet-stream" || !Buffer.isBuffer(request.body) || request.body.byteLength < 30 || request.body.byteLength > MAX_WHISPER_BYTES) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid ciphertext" });
+		const quote = await payment.quote({ idempotencyKey, product: "whisper", planId, productPayload: request.body });
+		return reply.header("Cache-Control", "no-store").code(402).send(quote);
+	});
+
+	app.get<{ Params: { orderId: string } }>("/api/payments/:orderId", async (request, reply) => {
+		const result = await payment.fulfill(request.params.orderId);
+		if (!result.settled) return reply.header("Cache-Control", "no-store").code(402).send(result);
+		const resource = result.resource.product === "catch"
+			? { product: "catch", publicId: result.resource.publicId, ownerToken: result.resource.ownerToken, ingestToken: result.resource.ingestToken, expiresAt: result.resource.expiresAt.toISOString() }
+			: { product: "whisper", publicId: result.resource.publicId, readToken: result.resource.readToken, expiresAt: result.resource.expiresAt.toISOString() };
+		return reply.header("Cache-Control", "no-store").send({ settled: true, resource });
+	});
+
+	app.get("/api/catalog", async (_request, reply) => reply.header("Cache-Control", "public, max-age=60").send({
+		currency: "sat",
+		products: {
+			catch: [
+				{ planId: "spark", priceSats: 4, available: true },
+				{ planId: "standard", priceSats: 42, available: true },
+				{ planId: "long", priceSats: 402, available: false },
+			],
+			whisper: { status: "preview", clientEncryption: "AES-256-GCM", readOnce: true },
+		},
+	}));
+}
+
+function registerWhisperRoutes(app: FastifyInstance, options: WhisperAppOptions): void {
+	const provisioningRateLimits = new Map<string, RateLimitBucket>();
+	const readRateLimits = new Map<string, RateLimitBucket>();
+	if (options.provisioningEnabled === true && nonEmpty(options.provisioningSecret)) {
+		const provisioningSecret = options.provisioningSecret;
+		app.post("/internal/whisper/provision", async (request, reply) => {
+			if (!consumeRateLimit(provisioningRateLimits, request.ip, 10, 60_000)) return rateLimited(reply);
+			if (!safeSecretMatches(bearerToken(request), provisioningSecret)) return unauthorized(reply);
+			if (normalizedContentType(request.headers["content-type"]) !== "application/octet-stream") return reply.code(400).send({ error: "invalid request" });
+			if (!Buffer.isBuffer(request.body) || request.body.byteLength < 1 || request.body.byteLength > MAX_WHISPER_BYTES) return reply.code(400).send({ error: "invalid request" });
+			const planId = request.headers["x-whisper-plan"];
+			if (planId !== "spark" && planId !== "standard" && planId !== "long") return reply.code(400).send({ error: "invalid plan" });
+			const plan = CATCH_PLANS[planId];
+			const readToken = generateOwnerToken();
+			const publicId = `whisper_${randomBytes(24).toString("base64url")}`;
+			const expiresAt = calculatePlanExpiry(planId, new Date());
+			await options.repository.create({ publicId, planId, readTokenHash: hashToken("owner", readToken, options.tokenPepper), ciphertext: request.body, expiresAt });
+			return reply.header("Cache-Control", "no-store").code(201).send({ publicId, readToken, expiresAt: expiresAt.toISOString(), maxBytes: plan.maxBytesPerRequest });
+		});
+	}
+
+	app.get<{ Params: { publicId: string } }>("/w/:publicId", async (request, reply) => {
+		if (!consumeRateLimit(readRateLimits, `${request.ip}:${request.params.publicId}`, 30, 60_000)) return rateLimited(reply);
+		const credentialHash = await options.repository.getCredentialHash(request.params.publicId);
+		if (credentialHash === null || !verifyToken("owner", bearerToken(request) ?? "", credentialHash, options.tokenPepper)) {
+			return reply.header("Cache-Control", "no-store").code(404).send({ error: "not found" });
+		}
+		const ciphertext = await options.repository.consume(request.params.publicId);
+		if (ciphertext === null) return reply.header("Cache-Control", "no-store").code(404).send({ error: "not found" });
+		return reply.header("Cache-Control", "no-store").type("application/octet-stream").send(ciphertext);
+	});
+}
 
 function registerCatchRoutes(app: FastifyInstance, options: CatchAppOptions): void {
 	const ingestionRateLimits = new Map<string, RateLimitBucket>();

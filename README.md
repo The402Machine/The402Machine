@@ -10,15 +10,26 @@ The402Machine is an open-source vending machine for temporary Internet appliance
 
 A private, inbound-only webhook inbox with hard request, storage, and lifetime limits.
 
-- **Spark:** 4 hours 2 minutes.
-- **Standard:** 4 weeks 2 days.
-- **Long:** 4 months 2 days.
+- **Spark:** 4 hours 2 minutes — **4 sats**.
+- **Standard:** 4 weeks 2 days — **42 sats**.
+- **Long:** 4 months 2 days — **402 sats**.
 
 CATCH accepts bounded POST requests and never forwards, executes, or calls back into user-provided destinations.
 
-### BURN
+When LNbits payments are enabled, the public flow is:
 
-An encrypted note that disappears after its first successful read or when its selected lifetime ends.
+```text
+POST /api/payments/catch        Idempotency-Key: <8-128 chars>  {"planId":"spark"}
+GET  /api/payments/<order-id>   returns 402 while pending, then the CATCH credentials
+```
+
+Concurrent retries reuse one invoice. After server-side settlement verification, CATCH provisioning and an encrypted delivery receipt are committed in one PostgreSQL transaction.
+
+### WHISPER
+
+An encrypted whisper that disappears after its first successful read or when its selected lifetime ends. The server accepts only bounded opaque ciphertext; encryption and decryption belong to the client.
+
+The browser helper uses AES-256-GCM. The server receives ciphertext and a read credential, but not the AES key: the key stays in the URL fragment (`#...`). A successful read atomically clears both the ciphertext and read-token hash.
 
 ## Product boundary
 
@@ -68,6 +79,10 @@ npm run build
 ## Configuration
 
 Copy `.env.example` to `.env` for local development. Production Compose uses an untracked `.env.production` file and runs PostgreSQL, migrations, the web service, and the expiry worker. Never commit payment credentials, database passwords, token peppers, wallet material, private keys, macaroons, or deployment secrets.
+
+The LNbits adapter accepts only a loopback HTTP URL and an invoice-only key. `PAYMENT_DELIVERY_KEY` is a separate 32-byte base64url key used to encrypt recoverable credentials for idempotent delivery; it must not be reused as the CATCH token pepper.
+
+Invoice creation uses the payment order UUID as LNbits `external_id`. Before creating an invoice, the broker looks up that stable identifier so retries can recover an invoice whose response was lost instead of blindly creating another one.
 
 `TRUSTED_PROXY` must be the reverse proxy address as seen by Fastify. Leave it unset for direct development access; never trust arbitrary forwarding headers. The production Compose file pins its edge subnet and gateway so this trust boundary cannot drift silently.
 

@@ -30,4 +30,17 @@ describe("CATCH configuration", () => {
 		expect(() => loadConfig({ DATABASE_URL: "postgres://example" })).toThrow(/CATCH_TOKEN_PEPPER/);
 		expect(() => loadConfig({ CATCH_TOKEN_PEPPER: "pepper" })).toThrow(/DATABASE_URL/);
 	});
+
+	it("enables payments only with loopback LNbits, an invoice key, and a 32-byte delivery key", () => {
+		expect(() => loadConfig({ PAYMENT_PROVIDER: "lnbits" })).toThrow(/PAYMENT_API_URL/);
+		expect(() => loadConfig({ PAYMENT_PROVIDER: "lnbits", PAYMENT_API_URL: "https://lnbits.example" })).toThrow(/loopback/);
+		expect(() => loadConfig({ PAYMENT_PROVIDER: "lnbits", PAYMENT_API_URL: "http://127.0.0.1:2180" })).toThrow(/PAYMENT_API_KEY/);
+		expect(() => loadConfig({ PAYMENT_PROVIDER: "lnbits", PAYMENT_API_URL: "http://127.0.0.1:2180", PAYMENT_API_KEY: "invoice" })).toThrow(/PAYMENT_DELIVERY_KEY/);
+		const config = loadConfig({
+			DATABASE_URL: "postgres://example", CATCH_TOKEN_PEPPER: "pepper",
+			PAYMENT_PROVIDER: "lnbits", PAYMENT_API_URL: "http://127.0.0.1:2180", PAYMENT_API_KEY: "invoice",
+			PAYMENT_DELIVERY_KEY: Buffer.alloc(32, 1).toString("base64url"),
+		});
+		expect(config.payment.provider).toBe("lnbits");
+	});
 });
