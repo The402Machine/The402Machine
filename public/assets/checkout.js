@@ -119,6 +119,7 @@ function updateSummary() {
 
 closeButton.addEventListener("click", () => closeCheckout());
 dialog.addEventListener("click", (event) => { if (event.target === dialog) closeCheckout(); });
+dialog.addEventListener("cancel", (event) => { event.preventDefault(); closeCheckout(); });
 copyButton.addEventListener("click", async () => {
 	if (currentInvoice.length === 0) return;
 	try {
