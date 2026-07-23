@@ -54,7 +54,7 @@ describe("public landing page", () => {
 		expect(response.body).toContain('data-buy="whisper"');
 		expect(response.body).toContain('data-plan="long"');
 		expect(response.body).toContain('href="/assets/styles.css?v=8"');
-		expect(response.body).toContain('src="/assets/checkout.js?v=12"');
+		expect(response.body).toContain('src="/assets/checkout.js?v=13"');
 		expect(response.body).toContain('id="checkout-payment"');
 		expect(response.body).toContain('id="checkout-qr"');
 		expect(response.body).toContain('id="checkout-wallet"');
@@ -135,6 +135,7 @@ describe("public landing page", () => {
 		expect(source).toContain("navigator.clipboard.writeText");
 		expect(source).toContain("requestProvider");
 		expect(source).toContain("sendPayment(currentInvoice)");
+		expect(source).toContain('webLnButton.hidden = !("webln" in window)');
 		expect(source).toContain('data:image/svg+xml;charset=utf-8,${encodeURIComponent(qrMarkup)}');
 		expect(source).toContain("qr.replaceChildren(qrImage)");
 		expect(source).toContain('setPaymentStage("pending")');

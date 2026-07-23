@@ -220,6 +220,7 @@ function showInvoice(quote) {
 	qr.replaceChildren(qrImage);
 	amount.textContent = `${formatSats(quote.amountSats)} sats`;
 	walletLink.href = `lightning:${quote.bolt11}`;
+	webLnButton.hidden = !("webln" in window);
 	paymentPanel.hidden = false;
 	submitButton.hidden = true;
 	setPaymentStage("pending");
