@@ -6,7 +6,7 @@
 		<meta name="description" content="Buy a temporary webhook or an encrypted read-once message with Bitcoin over Lightning. No account, no subscription, hard limits." />
 		<meta name="theme-color" content="#080a08" />
 		<title>The402Machine — Disposable Internet Infrastructure</title>
-		<link rel="stylesheet" href="/assets/styles.css?v=7" />
+		<link rel="stylesheet" href="/assets/styles.css?v=8" />
 	</head>
 	<body>
 		<div class="noise" aria-hidden="true"></div>
@@ -112,12 +112,31 @@
 				<label id="whisper-note-field" hidden><span>Message</span><textarea id="whisper-note" maxlength="4000000" rows="7" placeholder="Encrypted in this browser before upload"></textarea><small>Plaintext stays in this browser. Up to 4,000,000 characters; encrypted payload must fit within 4.02 MiB.</small></label>
 				<div id="checkout-summary" class="checkout-summary"></div>
 				<button id="checkout-submit" class="button primary" type="submit">Create Lightning invoice</button>
-				<p id="checkout-status" class="checkout-status">Choose a plan before paying.</p>
+				<section id="checkout-payment" class="checkout-payment" hidden aria-live="polite">
+					<div id="checkout-progress" class="checkout-progress" data-stage="pending">
+						<span class="active">1 · Invoice</span><span>2 · Waiting</span><span>3 · Dispensed</span>
+					</div>
+					<div class="invoice-layout">
+						<div id="checkout-qr" class="checkout-qr" aria-label="Lightning invoice QR code"></div>
+						<div class="invoice-details">
+							<p class="eyebrow">PAYMENT PENDING</p>
+							<strong id="checkout-amount"></strong>
+							<p>Scan with a Lightning wallet or pay directly in a compatible browser wallet.</p>
+							<div class="invoice-actions">
+								<a id="checkout-wallet" class="button primary" href="#">Open Lightning wallet</a>
+								<button id="checkout-webln" class="button" type="button">Pay with WebLN wallet</button>
+								<button id="checkout-copy" class="button ghost" type="button">Copy invoice</button>
+							</div>
+						</div>
+					</div>
+					<details class="invoice-raw"><summary>Show BOLT11 invoice</summary><textarea id="checkout-invoice" rows="4" readonly aria-label="Lightning invoice"></textarea></details>
+				</section>
+				<p id="checkout-status" class="checkout-status" role="status">Choose a plan before paying.</p>
 				<textarea id="checkout-output" rows="8" readonly hidden aria-label="Invoice or dispensed credentials"></textarea>
 			</form>
 		</dialog>
 
 		<footer class="footer shell"><span>THE402MACHINE.COM</span><span>PAYMENT REQUIRED / TAKEN LITERALLY</span><span>© 2026</span></footer>
-		<script type="module" src="/assets/checkout.js?v=5"></script>
+		<script type="module" src="/assets/checkout.js?v=11"></script>
 	</body>
 </html>

@@ -4,7 +4,8 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
-RUN npm run build
+COPY public ./public
+RUN npm run build && npm run build:browser
 
 FROM node:22-alpine AS production
 ENV NODE_ENV=production
@@ -15,7 +16,7 @@ RUN addgroup -S app && adduser -S -G app app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build --chown=app:app /app/dist ./dist
-COPY --chown=app:app public ./public
+COPY --from=build --chown=app:app /app/public ./public
 COPY --chown=app:app migrations ./migrations
 COPY --chown=app:app scripts ./scripts
 USER app

@@ -53,8 +53,13 @@ describe("public landing page", () => {
 		expect(response.body).toContain('data-buy="catch"');
 		expect(response.body).toContain('data-buy="whisper"');
 		expect(response.body).toContain('data-plan="long"');
-		expect(response.body).toContain('href="/assets/styles.css?v=7"');
-		expect(response.body).toContain('src="/assets/checkout.js?v=5"');
+		expect(response.body).toContain('href="/assets/styles.css?v=8"');
+		expect(response.body).toContain('src="/assets/checkout.js?v=11"');
+		expect(response.body).toContain('id="checkout-payment"');
+		expect(response.body).toContain('id="checkout-qr"');
+		expect(response.body).toContain('id="checkout-wallet"');
+		expect(response.body).toContain('id="checkout-copy"');
+		expect(response.body).toContain('id="checkout-progress"');
 	});
 
 	it("exposes the landing stylesheet", async () => {
@@ -115,5 +120,33 @@ describe("public landing page", () => {
 
 		expect(source).toContain('noteField.hidden = product !== "whisper"');
 		expect(styles).toContain("[hidden] { display: none !important; }");
+	});
+
+	it("presents the invoice as a QR, Lightning link, WebLN action, and pending state", async () => {
+		const [source, qrBundle, webLnBundle] = await Promise.all([
+			readFile(new URL("../public/assets/checkout.js", import.meta.url), "utf8"),
+			readFile(new URL("../public/assets/qr-browser-v3.js", import.meta.url), "utf8"),
+			readFile(new URL("../public/assets/webln-browser.js", import.meta.url), "utf8"),
+		]);
+
+		expect(source).toContain('import { renderQr } from "/assets/qr-browser-v3.js"');
+		expect(source).toContain('import { requestProvider } from "/assets/webln-browser.js"');
+		expect(source).toContain('href = `lightning:${quote.bolt11}`');
+		expect(source).toContain("navigator.clipboard.writeText");
+		expect(source).toContain("requestProvider");
+		expect(source).toContain("sendPayment(currentInvoice)");
+		expect(source).toContain('data:image/svg+xml;charset=utf-8,${encodeURIComponent(qrMarkup)}');
+		expect(source).toContain("qr.replaceChildren(qrImage)");
+		expect(source).toContain('setPaymentStage("pending")');
+		expect(source).toContain('setPaymentStage("paid")');
+		expect(source).toContain("form.dataset.stage = stage");
+		expect(source).toContain("session !== checkoutSession || !dialog.open");
+		expect(source).toContain("output.hidden = false");
+		expect(source).toContain("attempt < 205");
+		expect(source).not.toContain("window.webln.enable()");
+		expect(qrBundle.length).toBeGreaterThan(1_000);
+		expect(qrBundle).toContain("Lightning invoice QR code");
+		expect(webLnBundle.length).toBeGreaterThan(1_000);
+		expect(webLnBundle).toContain("requestProvider");
 	});
 });
