@@ -96,7 +96,7 @@ function registerPaymentRoutes(app: FastifyInstance, payment: PaymentAppOptions)
 	app.post<{ Body: { planId?: unknown } }>("/api/payments/catch", async (request, reply) => {
 		if (!consumeRateLimit(quoteRateLimits, request.ip, 10, 60_000)) return rateLimited(reply);
 		const idempotencyKey = request.headers["idempotency-key"];
-		const planId = request.body?.planId;
+		const planId = Buffer.isBuffer(request.body) ? parsePaymentPlan(request.body) : request.body?.planId;
 		if (typeof idempotencyKey !== "string" || idempotencyKey.length < 8 || idempotencyKey.length > 128) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid idempotency key" });
 		if (planId !== "spark" && planId !== "standard") return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid plan" });
 		const quote = await payment.quote({ idempotencyKey, product: "catch", planId, productPayload: null });
@@ -140,6 +140,15 @@ function paymentCatalogue() {
 			whisper: { status: "available", clientEncryption: "AES-256-GCM", readOnce: true },
 			},
 	};
+}
+
+function parsePaymentPlan(body: Buffer): unknown {
+	try {
+		const parsed: unknown = JSON.parse(body.toString("utf8"));
+		return typeof parsed === "object" && parsed !== null ? (parsed as { planId?: unknown }).planId : undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 function registerWhisperRoutes(app: FastifyInstance, options: WhisperAppOptions): void {

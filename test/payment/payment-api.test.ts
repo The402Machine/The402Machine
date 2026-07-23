@@ -19,6 +19,24 @@ describe("public payment API", () => {
 		await app.close();
 	});
 
+	it("parses checkout JSON when CATCH ingestion is installed in the same app", async () => {
+		const quote: PaymentQuote = { orderId: "order-combined", product: "catch", planId: "spark", amountSats: 4, bolt11: "lnbc4n1combined", paymentHash: "e".repeat(64) };
+		const calls: unknown[] = [];
+		const repository = {
+			provision: () => Promise.reject(new Error("not used")), getCredentialHashes: () => Promise.resolve(null),
+			acceptEvent: () => Promise.resolve({ accepted: false as const, reason: "not_found" as const }), getResource: () => Promise.resolve(null),
+			listEvents: () => Promise.resolve([]), deleteEvent: () => Promise.resolve(false), destroy: () => Promise.resolve(false),
+		};
+		const app = buildApp({
+			catch: { repository, tokenPepper: "pepper", provisioningEnabled: false },
+			payment: { quote: (input) => { calls.push(input); return Promise.resolve(quote); }, fulfill: () => Promise.resolve({ settled: false }) },
+		});
+		const response = await app.inject({ method: "POST", url: "/api/payments/catch", headers: { "content-type": "application/json", "idempotency-key": "idempotency-combined-1" }, payload: { planId: "spark" } });
+		expect(response.statusCode).toBe(402);
+		expect(calls).toEqual([{ idempotencyKey: "idempotency-combined-1", product: "catch", planId: "spark", productPayload: null }]);
+		await app.close();
+	});
+
 	it("quotes a client-encrypted WHISPER without accepting plaintext media types", async () => {
 		const quote: PaymentQuote = { orderId: "order-whisper", product: "whisper", planId: "spark", amountSats: 4, bolt11: "lnbc4n1whisper", paymentHash: "d".repeat(64) };
 		const calls: unknown[] = [];
