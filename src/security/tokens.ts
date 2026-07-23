@@ -9,6 +9,7 @@ const TOKEN_PREFIX: Readonly<Record<CatchTokenRole, string>> = {
 
 const TOKEN_ENTROPY_BYTES = 32;
 const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/;
+const TOKEN_PAYLOAD_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
 export function generateIngestToken(): string {
 	return generateToken("ingest");
@@ -31,7 +32,8 @@ export function verifyToken(
 ): boolean {
 	requirePepper(pepper);
 
-	if (!token.startsWith(TOKEN_PREFIX[role])) {
+	const prefix = TOKEN_PREFIX[role];
+	if (!token.startsWith(prefix) || !TOKEN_PAYLOAD_PATTERN.test(token.slice(prefix.length))) {
 		return false;
 	}
 

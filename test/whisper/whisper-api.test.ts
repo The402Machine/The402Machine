@@ -6,7 +6,7 @@ import { decryptWhisper, encryptWhisper } from "../../src/whisper/whisper-crypto
 
 const pepper = "whisper-test-pepper";
 const provisioningSecret = "whisper-provisioning-secret";
-const readToken = "catch_own_whisper-read-token";
+const readToken = `catch_own_${"r".repeat(43)}`;
 
 class FakeWhisperRepository implements WhisperApiRepository {
 	public created: Parameters<WhisperApiRepository["create"]>[0] | null = null;

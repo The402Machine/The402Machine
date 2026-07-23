@@ -63,4 +63,10 @@ describe("CATCH plan expiry", () => {
 			"2027-03-02T12:34:56.000Z",
 		);
 	});
+
+	it("clamps Long across leap February while preserving UTC time", () => {
+		expect(calculatePlanExpiry("long", new Date("2023-10-31T12:34:56.789Z")).toISOString()).toBe(
+			"2024-03-02T12:34:56.789Z",
+		);
+	});
 });

@@ -6,8 +6,8 @@ import type { CatchResource } from "../src/storage/catch-repository.js";
 
 const pepper = "test-pepper";
 const provisioningSecret = "provisioning-secret";
-const ownerToken = "catch_own_owner-token";
-const ingestToken = "catch_ing_ingest-token";
+const ownerToken = `catch_own_${"o".repeat(43)}`;
+const ingestToken = `catch_ing_${"i".repeat(43)}`;
 
 const resource = (): CatchResource => ({
 	id: "resource-1",

@@ -39,6 +39,16 @@ describe("opaque CATCH tokens", () => {
 	});
 
 	it.each([
+		["missing entropy", "catch_ing_"],
+		["short entropy", "catch_ing_a"],
+		["oversized entropy", `catch_ing_${"a".repeat(44)}`],
+		["non-base64url entropy", `catch_ing_${"a".repeat(42)}!`],
+	])("rejects a correctly prefixed token with %s", (_description, malformedToken) => {
+		const malformedHash = hashToken("ingest", malformedToken, pepper);
+		expect(verifyToken("ingest", malformedToken, malformedHash, pepper)).toBe(false);
+	});
+
+	it.each([
 		["non-hex characters", (hash: string) => `${hash.slice(0, -1)}z`],
 		["trailing garbage", (hash: string) => `${hash}!`],
 		["trailing newline", (hash: string) => `${hash}\n`],
