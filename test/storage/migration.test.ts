@@ -54,8 +54,10 @@ beforeAll(async () => {
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 4 });
 
-	const migration = await readFile(new URL("../../migrations/0001_catch.sql", import.meta.url), "utf8");
-	await sql.unsafe(migration).simple();
+	for (const file of ["0001_catch.sql", "0004_catch_storage_hardening.sql"]) {
+		const migration = await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8");
+		await sql.unsafe(migration).simple();
+	}
 }, 60_000);
 
 afterAll(async () => {

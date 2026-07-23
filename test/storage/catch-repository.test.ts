@@ -39,8 +39,10 @@ beforeAll(async () => {
 	databaseUrl = `postgresql://postgres:${password}@127.0.0.1:${port}/the402machine_test`;
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 12 });
-	const migration = await readFile(new URL("../../migrations/0001_catch.sql", import.meta.url), "utf8");
-	await sql.unsafe(migration).simple();
+	for (const file of ["0001_catch.sql", "0004_catch_storage_hardening.sql"]) {
+		const migration = await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8");
+		await sql.unsafe(migration).simple();
+	}
 	repository = new CatchRepository(sql);
 }, 60_000);
 
@@ -61,6 +63,20 @@ const provisionSpark = async (overrides: { requestLimit?: number; storageLimitBy
 		maxBytesPerRequest: plan.maxBytesPerRequest,
 		expiresAt: overrides.expiresAt ?? calculatePlanExpiry("spark", new Date()),
 	});
+};
+
+const rawResource = async (publicId: string) => {
+	const [row] = await sql<{ status: string; owner_token_hash: string | null; ingest_token_hash: string | null; stored_bytes: string }[]>`
+		select status, owner_token_hash, ingest_token_hash, stored_bytes
+		from catch_resources
+		where public_id = ${publicId}
+	`;
+	return row;
+};
+
+const eventCount = async (resourceId: string): Promise<number> => {
+	const [row] = await sql<{ count: number }[]>`select count(*)::int as count from catch_events where resource_id = ${resourceId}`;
+	return row?.count ?? 0;
 };
 
 describe("CatchRepository", () => {
@@ -106,6 +122,76 @@ describe("CatchRepository", () => {
 		expect(events).toEqual([]);
 	});
 
+	it("serializes concurrent accepts and never exceeds the byte quota", async () => {
+		const resource = await provisionSpark({ requestLimit: 10, storageLimitBytes: 14 });
+		const results = await Promise.all(Array.from({ length: 6 }, () => repository.acceptEvent({
+			publicId: resource.publicId,
+			contentType: "text/plain",
+			headers: {},
+			body: Buffer.from("123"),
+		})));
+
+		expect(results.filter((result) => result.accepted)).toHaveLength(2);
+		expect(results.filter((result) => !result.accepted && "reason" in result && result.reason === "exhausted")).toHaveLength(4);
+		expect(await rawResource(resource.publicId)).toMatchObject({ status: "exhausted", stored_bytes: "10" });
+		expect(await eventCount(resource.id)).toBe(2);
+	});
+
+	it("accepts exactly at quota and leaves a stable exhausted resource", async () => {
+		const resource = await provisionSpark({ requestLimit: 2, storageLimitBytes: 10 });
+		const first = await repository.acceptEvent({ publicId: resource.publicId, contentType: "text/plain", headers: {}, body: Buffer.from("123") });
+		const second = await repository.acceptEvent({ publicId: resource.publicId, contentType: "text/plain", headers: {}, body: Buffer.from("456") });
+		const third = await repository.acceptEvent({ publicId: resource.publicId, contentType: "text/plain", headers: {}, body: Buffer.from("7") });
+
+		expect(first.accepted).toBe(true);
+		expect(second.accepted).toBe(true);
+		expect(third).toEqual({ accepted: false, reason: "exhausted" });
+		expect(await rawResource(resource.publicId)).toMatchObject({ status: "exhausted", stored_bytes: "10" });
+		expect(await eventCount(resource.id)).toBe(2);
+	});
+
+	it("rejects oversized request bodies without storing them", async () => {
+		const resource = await repository.provision({
+			publicId: `catch_${randomUUID().replaceAll("-", "")}`,
+			planId: "spark",
+			ownerTokenHash: randomUUID().replaceAll("-", ""),
+			ingestTokenHash: randomUUID().replaceAll("-", ""),
+			requestLimit: 5,
+			storageLimitBytes: 100,
+			maxBytesPerRequest: 4,
+			expiresAt: calculatePlanExpiry("spark", new Date()),
+		});
+
+		expect(await repository.acceptEvent({ publicId: resource.publicId, contentType: "text/plain", headers: {}, body: Buffer.from("12345") })).toEqual({ accepted: false, reason: "body_too_large" });
+		expect(await rawResource(resource.publicId)).toMatchObject({ status: "active", stored_bytes: "0" });
+		expect(await eventCount(resource.id)).toBe(0);
+	});
+
+	it("counts persisted headers against storage quota", async () => {
+		const resource = await provisionSpark({ requestLimit: 5, storageLimitBytes: 5 });
+		const result = await repository.acceptEvent({
+			publicId: resource.publicId,
+			contentType: "text/plain",
+			headers: { "x-request-id": "abcd" },
+			body: Buffer.from("x"),
+		});
+
+		expect(result).toEqual({ accepted: false, reason: "exhausted" });
+		expect(await rawResource(resource.publicId)).toMatchObject({ status: "exhausted", stored_bytes: "0" });
+		expect(await eventCount(resource.id)).toBe(0);
+	});
+
+	it("rejects non-allowlisted headers at the repository boundary", async () => {
+		const resource = await provisionSpark();
+		await expect(repository.acceptEvent({
+			publicId: resource.publicId,
+			contentType: "text/plain",
+			headers: { cookie: "secret" },
+			body: Buffer.from("x"),
+		})).rejects.toThrow("CATCH event headers are invalid");
+		expect(await eventCount(resource.id)).toBe(0);
+	});
+
 	it("expires and erases credentials before the worker runs", async () => {
 		const resource = await provisionSpark({ expiresAt: new Date(Date.now() + 150) });
 		await new Promise((resolve) => setTimeout(resolve, 200));
@@ -131,6 +217,26 @@ describe("CatchRepository", () => {
 		`;
 
 		expect(await repository.getCredentialHashes(resource.publicId)).toBeNull();
+	});
+
+	it("expires and purges an overdue resource during owner credential lookup", async () => {
+		const resource = await provisionSpark();
+		await repository.acceptEvent({ publicId: resource.publicId, contentType: "text/plain", headers: {}, body: Buffer.from("stored") });
+		await sql`update catch_resources set created_at = clock_timestamp() - interval '2 seconds', expires_at = clock_timestamp() - interval '1 second' where id = ${resource.id}`;
+
+		expect(await repository.getCredentialHashes(resource.publicId)).toBeNull();
+		expect(await rawResource(resource.publicId)).toMatchObject({ status: "expired", owner_token_hash: null, ingest_token_hash: null, stored_bytes: "0" });
+		expect(await eventCount(resource.id)).toBe(0);
+	});
+
+	it("expires and purges an overdue resource during private listing", async () => {
+		const resource = await provisionSpark();
+		await repository.acceptEvent({ publicId: resource.publicId, contentType: "text/plain", headers: {}, body: Buffer.from("stored") });
+		await sql`update catch_resources set created_at = clock_timestamp() - interval '2 seconds', expires_at = clock_timestamp() - interval '1 second' where id = ${resource.id}`;
+
+		expect(await repository.listEvents(resource.publicId, 50)).toEqual([]);
+		expect(await rawResource(resource.publicId)).toMatchObject({ status: "expired", owner_token_hash: null, ingest_token_hash: null, stored_bytes: "0" });
+		expect(await eventCount(resource.id)).toBe(0);
 	});
 
 	it("uses the database clock for expiry rather than the application clock", async () => {
@@ -170,6 +276,8 @@ describe("CatchRepository", () => {
 		await repository.destroy(resource.publicId);
 		expect(await repository.listEvents(resource.publicId, 50)).toEqual([]);
 		expect((await repository.getResource(resource.publicId))?.status).toBe("manually_destroyed");
+		expect(await rawResource(resource.publicId)).toMatchObject({ status: "manually_destroyed", owner_token_hash: null, ingest_token_hash: null, stored_bytes: "0" });
+		expect(await eventCount(resource.id)).toBe(0);
 	});
 
 	it("uses legal terminal transitions when destroying inactive resources", async () => {

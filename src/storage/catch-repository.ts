@@ -1,7 +1,9 @@
-import type { Sql } from "postgres";
+import type { Sql, TransactionSql } from "postgres";
 
 import type { CatchPlanId } from "../domain/catch-plans.js";
 import { transitionCatchResource, type CatchResourceStatus } from "../domain/catch-resource.js";
+
+const ALLOWED_EVENT_HEADERS = new Set(["content-type", "user-agent", "x-request-id", "x-github-event", "x-github-delivery", "stripe-signature"]);
 
 export type CatchResource = {
 	id: string;
@@ -50,6 +52,8 @@ type ResourceRow = {
 	created_at: Date;
 	expires_at: Date;
 };
+
+type LockedResourceRow = ResourceRow & CredentialRow;
 
 type EventRow = {
 	id: string;
@@ -108,18 +112,20 @@ export class CatchRepository {
 	}
 
 	public async getCredentialHashes(publicId: string): Promise<CatchCredentialHashes | null> {
-		const [row] = await this.sql<CredentialRow[]>`
-			select owner_token_hash, ingest_token_hash
-			from catch_resources
-			where public_id = ${publicId}
-				and status in ('active', 'exhausted', 'suspended')
-				and clock_timestamp() < expires_at
-		`;
-		if (row === undefined) return null;
-		return { ownerTokenHash: row.owner_token_hash, ingestTokenHash: row.ingest_token_hash };
+		return this.sql.begin(async (tx) => {
+			const resource = await lockResource(tx, publicId);
+			if (resource === undefined) return null;
+			if (resource.is_expired) {
+				await expireLockedResource(tx, resource);
+				return null;
+			}
+			if (resource.status !== "active" && resource.status !== "exhausted" && resource.status !== "suspended") return null;
+			return { ownerTokenHash: resource.owner_token_hash, ingestTokenHash: resource.ingest_token_hash };
+		});
 	}
 
 	public async acceptEvent(input: AcceptEventInput): Promise<AcceptEventResult> {
+		assertAllowedHeaders(input.headers);
 		return this.sql.begin(async (tx) => {
 			const [resource] = await tx<ResourceRow[]>`
 				select *, clock_timestamp() >= expires_at as is_expired
@@ -130,14 +136,7 @@ export class CatchRepository {
 			if (resource === undefined) return { accepted: false, reason: "not_found" };
 
 			if (resource.is_expired) {
-				if (resource.status === "active" || resource.status === "exhausted" || resource.status === "suspended") {
-					await tx`
-						update catch_resources
-						set status = 'expired', expired_at = coalesce(expired_at, clock_timestamp()),
-							owner_token_hash = null, ingest_token_hash = null, updated_at = clock_timestamp()
-						where id = ${resource.id}
-					`;
-				}
+				await expireLockedResource(tx, resource);
 				return { accepted: false, reason: "expired" };
 			}
 			if (resource.status === "exhausted") return { accepted: false, reason: "exhausted" };
@@ -145,7 +144,11 @@ export class CatchRepository {
 			if (input.body.byteLength > resource.max_bytes_per_request) return { accepted: false, reason: "body_too_large" };
 
 			const nextCount = resource.accepted_request_count + 1;
-			const nextBytes = Number(resource.stored_bytes) + input.body.byteLength;
+			const [eventSize] = await tx<{ bytes: number }[]>`
+				select catch_event_stored_bytes(${tx.json(input.headers)}, ${input.body}) as bytes
+			`;
+			if (eventSize === undefined) throw new Error("CATCH event size could not be calculated");
+			const nextBytes = Number(resource.stored_bytes) + eventSize.bytes;
 			if (nextCount > resource.request_limit || nextBytes > Number(resource.storage_limit_bytes)) {
 				await tx`
 					update catch_resources
@@ -177,17 +180,23 @@ export class CatchRepository {
 
 	public async listEvents(publicId: string, requestedLimit: number): Promise<CatchEvent[]> {
 		const limit = Math.max(1, Math.min(50, requestedLimit));
-		const rows = await this.sql<EventRow[]>`
-			select e.id, e.sequence_number, e.content_type, e.headers, e.body, e.received_at
-			from catch_events e
-			join catch_resources r on r.id = e.resource_id
-			where r.public_id = ${publicId}
-				and r.status in ('active', 'exhausted', 'suspended')
-				and clock_timestamp() < r.expires_at
-			order by e.sequence_number desc
-			limit ${limit}
-		`;
-		return rows.map(mapEvent);
+		return this.sql.begin(async (tx) => {
+			const resource = await lockResource(tx, publicId);
+			if (resource === undefined) return [];
+			if (resource.is_expired) {
+				await expireLockedResource(tx, resource);
+				return [];
+			}
+			if (resource.status !== "active" && resource.status !== "exhausted" && resource.status !== "suspended") return [];
+			const rows = await tx<EventRow[]>`
+				select id, sequence_number, content_type, headers, body, received_at
+				from catch_events
+				where resource_id = ${resource.id}
+				order by sequence_number desc
+				limit ${limit}
+			`;
+			return rows.map(mapEvent);
+		});
 	}
 
 	public async deleteEvent(publicId: string, eventId: string): Promise<boolean> {
@@ -196,13 +205,15 @@ export class CatchRepository {
 				select * from catch_resources where public_id = ${publicId} for update
 			`;
 			if (resource === undefined || !["active", "exhausted", "suspended"].includes(resource.status)) return false;
-			const [deleted] = await tx<{ body_bytes: number }[]>`
-				delete from catch_events where id = ${eventId} and resource_id = ${resource.id} returning body_bytes
+			const [deleted] = await tx<{ stored_bytes: number }[]>`
+				delete from catch_events
+				where id = ${eventId} and resource_id = ${resource.id}
+				returning catch_event_stored_bytes(headers, body) as stored_bytes
 			`;
 			if (deleted === undefined) return false;
 			await tx`
 				update catch_resources
-				set stored_bytes = greatest(0, stored_bytes - ${deleted.body_bytes}), updated_at = clock_timestamp()
+				set stored_bytes = greatest(0, stored_bytes - ${deleted.stored_bytes}), updated_at = clock_timestamp()
 				where id = ${resource.id}
 			`;
 			return true;
@@ -257,6 +268,34 @@ export class CatchRepository {
 			`;
 			return true;
 		});
+	}
+}
+
+async function lockResource(tx: TransactionSql, publicId: string): Promise<LockedResourceRow | undefined> {
+	const [resource] = await tx<LockedResourceRow[]>`
+		select *, clock_timestamp() >= expires_at as is_expired
+		from catch_resources
+		where public_id = ${publicId}
+		for update
+	`;
+	return resource;
+}
+
+async function expireLockedResource(tx: TransactionSql, resource: ResourceRow): Promise<void> {
+	if (resource.status !== "active" && resource.status !== "exhausted" && resource.status !== "suspended") return;
+	await tx`delete from catch_events where resource_id = ${resource.id}`;
+	await tx`
+		update catch_resources
+		set status = 'expired', expired_at = coalesce(expired_at, clock_timestamp()),
+			owner_token_hash = null, ingest_token_hash = null, stored_bytes = 0,
+			updated_at = clock_timestamp()
+		where id = ${resource.id}
+	`;
+}
+
+function assertAllowedHeaders(headers: Record<string, string>): void {
+	if (Object.entries(headers).some(([name, value]) => !ALLOWED_EVENT_HEADERS.has(name) || typeof value !== "string")) {
+		throw new Error("CATCH event headers are invalid");
 	}
 }
 
