@@ -43,4 +43,23 @@ describe("CATCH expiry worker", () => {
 		expect(expireDueResources).toHaveBeenCalledTimes(2);
 		await worker.stop();
 	});
+
+	it("drains every full due batch immediately before sleeping", async () => {
+		vi.useFakeTimers();
+		const expireDueResources = vi.fn<() => Promise<number>>()
+			.mockResolvedValueOnce(25)
+			.mockResolvedValueOnce(25)
+			.mockResolvedValueOnce(7)
+			.mockResolvedValue(0);
+		const worker = startExpiryWorker({ expireDueResources } as unknown as CatchRepository, {
+			intervalMs: 60_000,
+			batchSize: 25,
+		});
+
+		await vi.waitFor(() => expect(expireDueResources).toHaveBeenCalledTimes(3));
+		expect(expireDueResources).toHaveBeenNthCalledWith(1, 25);
+		expect(expireDueResources).toHaveBeenNthCalledWith(2, 25);
+		expect(expireDueResources).toHaveBeenNthCalledWith(3, 25);
+		await worker.stop();
+	});
 });

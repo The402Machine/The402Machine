@@ -15,11 +15,16 @@ const worker = startExpiryWorker(new CatchRepository(database), {
 	onError: (error) => { console.error("CATCH expiry worker failed", error); },
 });
 const whisperRepository = new WhisperRepository(database);
+const drainWhispers = async (): Promise<void> => {
+	while (await whisperRepository.expireDue(100) === 100) {
+		// Drain the complete overdue backlog before returning to the interval.
+	}
+};
 const whisperTimer = setInterval(() => {
-	void whisperRepository.expireDue(100).catch((error: unknown) => { console.error("WHISPER expiry worker failed", error); });
+	void drainWhispers().catch((error: unknown) => { console.error("WHISPER expiry worker failed", error); });
 }, 30_000);
 whisperTimer.unref();
-void whisperRepository.expireDue(100).catch((error: unknown) => { console.error("WHISPER expiry worker failed", error); });
+void drainWhispers().catch((error: unknown) => { console.error("WHISPER expiry worker failed", error); });
 
 const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
 	console.info(`CATCH expiry worker stopping after ${signal}`);

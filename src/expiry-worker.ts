@@ -18,8 +18,12 @@ export function startExpiryWorker(repository: CatchRepository, options: ExpiryWo
 
 	const run = async (): Promise<void> => {
 		if (stopped || activeRun !== undefined) return;
-		activeRun = repository.expireDueResources(batchSize)
-			.then(() => undefined)
+		activeRun = (async () => {
+			while (!stopped) {
+				const expired = await repository.expireDueResources(batchSize);
+				if (expired < batchSize) return;
+			}
+		})()
 			.catch((error: unknown) => options.onError?.(error))
 			.finally(() => { activeRun = undefined; });
 		await activeRun;
