@@ -96,10 +96,10 @@ describe("CATCH HTTP API", () => {
 		expect((await app.inject({ method: "POST", url: "/internal/catch/provision" })).statusCode).toBe(404);
 	});
 
-	it("provisions only available plans and returns distinct clear tokens once", async () => {
+	it("provisions every listed plan and returns distinct clear tokens once", async () => {
 		const { app, repository } = buildCatchApp();
-		const rejected = await app.inject({ method: "POST", url: "/internal/catch/provision", headers: bearer(provisioningSecret), payload: { planId: "long" } });
-		expect(rejected.statusCode).toBe(400);
+		const long = await app.inject({ method: "POST", url: "/internal/catch/provision", headers: bearer(provisioningSecret), payload: { planId: "long" } });
+		expect(long.statusCode).toBe(201);
 
 		const response = await app.inject({ method: "POST", url: "/internal/catch/provision", headers: bearer(provisioningSecret), payload: { planId: "spark" } });
 		expect(response.statusCode).toBe(201);
@@ -110,9 +110,9 @@ describe("CATCH HTTP API", () => {
 		expect(body.ownerToken).toMatch(/^catch_own_/);
 		expect(body.ingestToken).toMatch(/^catch_ing_/);
 		expect(body.ownerToken).not.toBe(body.ingestToken);
-		expect(repository.provisions).toHaveLength(1);
-		expect(repository.provisions[0]?.[0]).toMatchObject({ planId: "spark" });
-		expect(repository.provisions[0]?.[0].ownerTokenHash).not.toBe(body.ownerToken);
+		expect(repository.provisions).toHaveLength(2);
+		expect(repository.provisions.map(([input]) => input.planId)).toEqual(["long", "spark"]);
+		expect(repository.provisions[1]?.[0].ownerTokenHash).not.toBe(body.ownerToken);
 	});
 
 	it("accepts an authorized raw event as fixed empty 204 and filters headers", async () => {

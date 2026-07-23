@@ -5,10 +5,16 @@ export type PaymentProduct = "catch" | "whisper";
 export type PaymentOrderStatus = "created" | "invoice_issued" | "paid" | "dispensed" | "expired" | "failed";
 
 export const CATCH_PRICES_SATS: Readonly<Record<PurchasableCatchPlanId, number>> = Object.freeze({
-	spark: 4,
-	standard: 42,
-	long: 402,
+	spark: 42,
+	standard: 402,
+	long: 4_002,
 });
+
+export const WHISPER_PRICES_SATS: Readonly<Record<PurchasableCatchPlanId, number>> = CATCH_PRICES_SATS;
+
+export function priceForProduct(_product: PaymentProduct, planId: PurchasableCatchPlanId): number {
+	return CATCH_PRICES_SATS[planId];
+}
 
 export type PaymentOrder = {
 	id: string;
@@ -35,7 +41,7 @@ export function createPaymentOrder(input: {
 }): PaymentOrder {
 	return {
 		...input,
-		amountSats: CATCH_PRICES_SATS[input.planId],
+		amountSats: priceForProduct(input.product, input.planId),
 		status: "created",
 		paymentHash: null,
 		resourcePublicId: null,

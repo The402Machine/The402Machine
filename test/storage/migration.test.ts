@@ -54,7 +54,7 @@ beforeAll(async () => {
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 4 });
 
-	for (const file of ["0001_catch.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql"]) {
+	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -83,6 +83,20 @@ describe("CATCH migration", () => {
 			event: "catch_events",
 			version: "0001_catch",
 		});
+	});
+
+	it("accepts current prices while preserving already issued legacy orders", async () => {
+		for (const [planId, amountSats] of [["spark", 4], ["spark", 42], ["standard", 42], ["standard", 402], ["long", 402], ["long", 4002]] as const) {
+			await expect(sql`
+				insert into payment_orders (idempotency_key, product, plan_id, amount_sats)
+				values (${`pricing-${planId}-${amountSats}`}, 'catch', ${planId}::catch_plan_id, ${amountSats})
+			`).resolves.toBeDefined();
+		}
+
+		await expect(sql`
+			insert into payment_orders (idempotency_key, product, plan_id, amount_sats)
+			values ('pricing-invalid', 'catch', 'spark', 402)
+		`).rejects.toMatchObject({ code: "23514" });
 	});
 
 	it("rejects counters beyond the purchased quotas", async () => {

@@ -39,7 +39,7 @@ beforeAll(async () => {
 	databaseUrl = `postgresql://postgres:${password}@127.0.0.1:${port}/the402machine_test`;
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 12 });
-	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql"]) {
+	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0006_payment_pricing_v2.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${migrationName}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -58,8 +58,11 @@ describe("PaymentRepository", () => {
 		expect(second.id).toBe(first.id);
 	});
 
-	it("permits only currently available plans", async () => {
-		await expect(repository.createOrder({ idempotencyKey: "idem-long-plan", planId: "long" })).rejects.toThrow(/not available/);
+	it("prices all three currently available plans", async () => {
+		const spark = await repository.createOrder({ idempotencyKey: "idem-price-spark", planId: "spark" });
+		const standard = await repository.createOrder({ idempotencyKey: "idem-price-standard", planId: "standard" });
+		const long = await repository.createOrder({ idempotencyKey: "idem-price-long", planId: "long" });
+		expect([spark.amountSats, standard.amountSats, long.amountSats]).toEqual([42, 402, 4_002]);
 	});
 
 	it("claims one payment hash for only one order", async () => {

@@ -6,6 +6,8 @@ import fastifyStatic from "@fastify/static";
 import Fastify, { LogController, type FastifyInstance, type FastifyRequest } from "fastify";
 
 import { calculatePlanExpiry, CATCH_PLANS } from "./domain/catch-plans.js";
+import { calculateWhisperExpiry, WHISPER_PLANS } from "./domain/whisper-plans.js";
+import { CATCH_PRICES_SATS, WHISPER_PRICES_SATS } from "./payment/payment-domain.js";
 import type { DispensedResource } from "./payment/payment-repository.js";
 import type { PaymentQuote } from "./payment/payment-service.js";
 import { generateIngestToken, generateOwnerToken, hashToken, verifyToken } from "./security/tokens.js";
@@ -50,7 +52,7 @@ type WhisperAppOptions = {
 };
 
 type PaymentAppOptions = {
-	quote(input: { idempotencyKey: string; product: "catch" | "whisper"; planId: "spark" | "standard"; productPayload: Buffer | null }): Promise<PaymentQuote>;
+	quote(input: { idempotencyKey: string; product: "catch" | "whisper"; planId: "spark" | "standard" | "long"; productPayload: Buffer | null }): Promise<PaymentQuote>;
 	fulfill(orderId: string): Promise<{ settled: false } | { settled: true; resource: DispensedResource }>;
 };
 
@@ -98,7 +100,7 @@ function registerPaymentRoutes(app: FastifyInstance, payment: PaymentAppOptions)
 		const idempotencyKey = request.headers["idempotency-key"];
 		const planId = Buffer.isBuffer(request.body) ? parsePaymentPlan(request.body) : request.body?.planId;
 		if (typeof idempotencyKey !== "string" || idempotencyKey.length < 8 || idempotencyKey.length > 128) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid idempotency key" });
-		if (planId !== "spark" && planId !== "standard") return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid plan" });
+		if (!isPlanId(planId) || !CATCH_PLANS[planId].available) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid plan" });
 		const quote = await payment.quote({ idempotencyKey, product: "catch", planId, productPayload: null });
 		return reply.header("Cache-Control", "no-store").code(402).send(quote);
 	});
@@ -108,8 +110,8 @@ function registerPaymentRoutes(app: FastifyInstance, payment: PaymentAppOptions)
 		const idempotencyKey = request.headers["idempotency-key"];
 		const planId = request.headers["x-whisper-plan"];
 		if (typeof idempotencyKey !== "string" || idempotencyKey.length < 8 || idempotencyKey.length > 128) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid idempotency key" });
-		if (planId !== "spark" && planId !== "standard") return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid plan" });
-		if (normalizedContentType(request.headers["content-type"]) !== "application/octet-stream" || !Buffer.isBuffer(request.body) || request.body.byteLength < 30 || request.body.byteLength > MAX_WHISPER_BYTES) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid ciphertext" });
+		if (!isPlanId(planId) || !WHISPER_PLANS[planId].available) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid plan" });
+		if (normalizedContentType(request.headers["content-type"]) !== "application/octet-stream" || !Buffer.isBuffer(request.body) || request.body.byteLength < 30 || request.body.byteLength > WHISPER_PLANS[planId].maxCiphertextBytes) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid ciphertext" });
 		const quote = await payment.quote({ idempotencyKey, product: "whisper", planId, productPayload: request.body });
 		return reply.header("Cache-Control", "no-store").code(402).send(quote);
 	});
@@ -132,14 +134,35 @@ function paymentCatalogue() {
 		checkoutEnabled: true,
 		currency: "sat",
 		products: {
-			catch: [
-				{ planId: "spark", priceSats: 4, available: true },
-				{ planId: "standard", priceSats: 42, available: true },
-				{ planId: "long", priceSats: 402, available: false },
-			],
-			whisper: { status: "available", clientEncryption: "AES-256-GCM", readOnce: true },
+			catch: {
+				description: "Private inbound-only webhook inbox with fixed quotas.",
+				plans: [
+					catchPlan("spark", "4h 02m", "Quick tests and short-lived integrations"),
+					catchPlan("standard", "30 days", "Temporary projects and real workflows"),
+					catchPlan("long", "4 months + 2 days", "Long-running missions with a hard stop"),
+				],
 			},
+			whisper: {
+				description: "Client-encrypted message that vanishes after one successful read.",
+				clientEncryption: "AES-256-GCM",
+				plans: [
+					whisperPlan("spark", "7 days", "Short handoff"),
+					whisperPlan("standard", "42 days", "Patient delivery window"),
+					whisperPlan("long", "402 days", "Long-term dead drop"),
+				],
+			},
+		},
 	};
+}
+
+function catchPlan(planId: "spark" | "standard" | "long", durationLabel: string, bestFor: string) {
+	const plan = CATCH_PLANS[planId];
+	return { planId, priceSats: CATCH_PRICES_SATS[planId], durationLabel, bestFor, requestLimit: plan.requestLimit, storageLimitBytes: plan.storageLimitBytes, maxBytesPerRequest: plan.maxBytesPerRequest, available: plan.available };
+}
+
+function whisperPlan(planId: "spark" | "standard" | "long", durationLabel: string, bestFor: string) {
+	const plan = WHISPER_PLANS[planId];
+	return { planId, priceSats: WHISPER_PRICES_SATS[planId], durationLabel, bestFor, readOnce: true, maxCiphertextBytes: plan.maxCiphertextBytes, available: plan.available };
 }
 
 function parsePaymentPlan(body: Buffer): unknown {
@@ -149,6 +172,10 @@ function parsePaymentPlan(body: Buffer): unknown {
 	} catch {
 		return undefined;
 	}
+}
+
+function isPlanId(value: unknown): value is "spark" | "standard" | "long" {
+	return value === "spark" || value === "standard" || value === "long";
 }
 
 function registerWhisperRoutes(app: FastifyInstance, options: WhisperAppOptions): void {
@@ -162,13 +189,13 @@ function registerWhisperRoutes(app: FastifyInstance, options: WhisperAppOptions)
 			if (normalizedContentType(request.headers["content-type"]) !== "application/octet-stream") return reply.code(400).send({ error: "invalid request" });
 			if (!Buffer.isBuffer(request.body) || request.body.byteLength < 1 || request.body.byteLength > MAX_WHISPER_BYTES) return reply.code(400).send({ error: "invalid request" });
 			const planId = request.headers["x-whisper-plan"];
-			if (planId !== "spark" && planId !== "standard") return reply.code(400).send({ error: "invalid plan" });
-			const plan = CATCH_PLANS[planId];
+			if (!isPlanId(planId) || !WHISPER_PLANS[planId].available) return reply.code(400).send({ error: "invalid plan" });
+			const plan = WHISPER_PLANS[planId];
 			const readToken = generateOwnerToken();
 			const publicId = `whisper_${randomBytes(24).toString("base64url")}`;
-			const expiresAt = calculatePlanExpiry(planId, new Date());
+			const expiresAt = calculateWhisperExpiry(planId, new Date());
 			await options.repository.create({ publicId, planId, readTokenHash: hashToken("owner", readToken, options.tokenPepper), ciphertext: request.body, expiresAt });
-			return reply.header("Cache-Control", "no-store").code(201).send({ publicId, readToken, expiresAt: expiresAt.toISOString(), maxBytes: plan.maxBytesPerRequest });
+			return reply.header("Cache-Control", "no-store").code(201).send({ publicId, readToken, expiresAt: expiresAt.toISOString(), maxBytes: plan.maxCiphertextBytes });
 		});
 	}
 
@@ -198,7 +225,7 @@ function registerCatchRoutes(app: FastifyInstance, options: CatchAppOptions): vo
 			if (!consumeRateLimit(provisioningRateLimits, request.ip, 10, 60_000)) return rateLimited(reply);
 			if (!safeSecretMatches(bearerToken(request), provisioningSecret)) return reply.code(401).send({ error: "unauthorized" });
 			const planId = provisionPlanId(request.body);
-			if (planId !== "spark" && planId !== "standard") return reply.code(400).send({ error: "invalid plan" });
+			if (!isPlanId(planId)) return reply.code(400).send({ error: "invalid plan" });
 			const plan = CATCH_PLANS[planId];
 			if (!plan.available) return reply.code(400).send({ error: "invalid plan" });
 

@@ -3,8 +3,9 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import type { Sql, TransactionSql } from "postgres";
 
 import { CATCH_PLANS } from "../domain/catch-plans.js";
+import { WHISPER_PLANS } from "../domain/whisper-plans.js";
 import type { ProvisionInput } from "../storage/catch-repository.js";
-import { CATCH_PRICES_SATS, type PaymentOrder, type PaymentOrderStatus, type PaymentProduct, type PurchasableCatchPlanId } from "./payment-domain.js";
+import { priceForProduct, type PaymentOrder, type PaymentOrderStatus, type PaymentProduct, type PurchasableCatchPlanId } from "./payment-domain.js";
 
 type PaymentOrderRow = {
 	id: string;
@@ -39,14 +40,15 @@ export class PaymentRepository {
 	public constructor(private readonly sql: Sql, deliveryKey: string) { this.deliveryKey = decodeDeliveryKey(deliveryKey); }
 
 	public async createOrder(input: { idempotencyKey: string; product?: PaymentProduct; planId: PurchasableCatchPlanId; productPayload?: Buffer | null }): Promise<PaymentOrder> {
-		if (!CATCH_PLANS[input.planId].available) throw new Error("Plan is not available");
 		const product = input.product ?? "catch";
+		const planAvailable = product === "catch" ? CATCH_PLANS[input.planId].available : WHISPER_PLANS[input.planId].available;
+		if (!planAvailable) throw new Error("Plan is not available");
 		const productPayload = input.productPayload ?? null;
 		if (product === "catch" && productPayload !== null) throw new Error("CATCH orders cannot contain a product payload");
 		if (product === "whisper" && (productPayload === null || productPayload.byteLength < 30 || productPayload.byteLength > 16 * 1024)) throw new Error("WHISPER ciphertext is invalid");
 		const rows = await this.sql<PaymentOrderRow[]>`
 			insert into payment_orders (idempotency_key, product, plan_id, product_payload, amount_sats)
-			values (${input.idempotencyKey}, ${product}, ${input.planId}, ${productPayload}, ${CATCH_PRICES_SATS[input.planId]})
+			values (${input.idempotencyKey}, ${product}, ${input.planId}, ${productPayload}, ${priceForProduct(product, input.planId)})
 			on conflict (idempotency_key) do update set idempotency_key = excluded.idempotency_key
 			returning *, null::text as resource_public_id
 		`;

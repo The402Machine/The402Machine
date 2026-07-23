@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
 	CATCH_PRICES_SATS,
+	WHISPER_PRICES_SATS,
 	attachPaymentOrderInvoice,
 	createPaymentOrder,
 	markPaymentOrderDispensed,
@@ -18,9 +19,10 @@ const pendingOrder = (): PaymentOrder => createPaymentOrder({
 	createdAt: new Date("2026-07-23T08:00:00.000Z"),
 });
 
-describe("CATCH payment domain", () => {
-	it("uses the tiny fixed-sats cartridge catalogue", () => {
-		expect(CATCH_PRICES_SATS).toEqual({ spark: 4, standard: 42, long: 402 });
+describe("payment domain", () => {
+	it("uses the 42 / 402 / 4002 sats cartridge ladder for both products", () => {
+		expect(CATCH_PRICES_SATS).toEqual({ spark: 42, standard: 402, long: 4_002 });
+		expect(WHISPER_PRICES_SATS).toEqual({ spark: 42, standard: 402, long: 4_002 });
 	});
 
 	it("creates an unpaid order without granting a resource", () => {
@@ -30,7 +32,7 @@ describe("CATCH payment domain", () => {
 			product: "catch",
 			planId: "spark",
 			productPayload: null,
-			amountSats: 4,
+			amountSats: 42,
 			status: "created",
 			paymentHash: null,
 			resourcePublicId: null,

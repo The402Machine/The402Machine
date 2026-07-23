@@ -14,7 +14,7 @@ class FakeOrderStore implements PaymentOrderStore {
 		if (existing !== undefined) return Promise.resolve(existing);
 		const order: PaymentOrder & { bolt11: string | null } = {
 			id: `order-${this.orders.size + 1}`, idempotencyKey: input.idempotencyKey, product: input.product ?? "catch", planId: input.planId, productPayload: input.productPayload ?? null,
-			amountSats: input.planId === "spark" ? 4 : input.planId === "standard" ? 42 : 402,
+			amountSats: input.planId === "spark" ? 42 : input.planId === "standard" ? 402 : 4_002,
 			status: "created", paymentHash: null, resourcePublicId: null, createdAt: new Date(), paidAt: null, dispensedAt: null, bolt11: null,
 		};
 		this.orders.set(order.id, order);

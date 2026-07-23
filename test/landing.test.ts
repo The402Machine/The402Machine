@@ -19,22 +19,26 @@ describe("public landing page", () => {
 
 		expect(response.statusCode).toBe(200);
 		expect(response.headers["content-type"]).toContain("text/html");
-		expect(response.body).toContain("Tiny internet appliances");
-		expect(response.body).toContain("4 weeks + 2 days");
+		expect(response.body).toContain("Rent less internet");
+		expect(response.body).toContain("30 days");
 		expect(response.body).toContain("4 months + 2 days");
 		expect(response.body).toContain("CATCH");
 		expect(response.body).toContain("WHISPER");
-		expect(response.body).toContain("SPARK · 4 SATS");
-		expect(response.body).toContain("STANDARD · 42 SATS");
-		expect(response.body).toContain("LONG · 402 SATS");
-		expect(response.body).toContain("CORE ONLINE / CHECKOUT DISABLED");
-		expect(response.body).toContain("TWO CARTRIDGES BUILT");
-		expect(response.body).toContain("Public Lightning checkout is currently disabled");
+		expect(response.body).toContain("SPARK · 42 SATS");
+		expect(response.body).toContain("STANDARD · 402 SATS");
+		expect(response.body).toContain("LONG · 4,002 SATS");
+		expect(response.body).toContain("7 days");
+		expect(response.body).toContain("42 days");
+		expect(response.body).toContain("402 days");
+		expect(response.body).toContain("Plans change only how long an unread WHISPER waits");
+		expect(response.body).toContain("CHECKING LIGHTNING CHECKOUT");
+		expect(response.body).toContain("TWO CARTRIDGES LIVE");
 		expect(response.body).toContain("Source-available");
 		expect(response.body).not.toContain("Open source");
 		expect(response.body).toContain('data-buy="catch"');
 		expect(response.body).toContain('data-buy="whisper"');
-		expect(response.body).toContain('src="/assets/checkout.js"');
+		expect(response.body).toContain('data-plan="long"');
+		expect(response.body).toContain('src="/assets/checkout.js?v=2"');
 	});
 
 	it("exposes the landing stylesheet", async () => {
@@ -55,7 +59,7 @@ describe("public landing page", () => {
 		const response = await app.inject({ method: "GET", url: "/whisper.html" });
 
 		expect(response.statusCode).toBe(200);
-		expect(response.body).toContain('src="/assets/whisper-page.js"');
+		expect(response.body).toContain('src="/assets/whisper-page.js?v=2"');
 		expect(response.headers["content-security-policy"]).toContain("script-src 'self'");
 		expect(response.headers["content-security-policy"]).not.toContain("script-src 'none'");
 	});
@@ -83,5 +87,7 @@ describe("public landing page", () => {
 		expect(source).toContain('fetch("/api/catalog"');
 		expect(source).toContain("disableCheckout()");
 		expect(source).toContain('button.textContent = "Checkout disabled"');
+		expect(source).toContain("renderPlanChoices");
+		expect(source).not.toContain('data.get("planId") === "standard"');
 	});
 });

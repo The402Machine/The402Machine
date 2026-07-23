@@ -36,7 +36,7 @@ export const CATCH_PLANS: Readonly<Record<CatchPlanId, CatchPlan>> = {
 		requestLimit: 40_200,
 		storageLimitBytes: 200 * 1024 * 1024,
 		maxBytesPerRequest: 16 * 1024,
-		available: false,
+		available: true,
 	},
 };
 

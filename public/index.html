@@ -3,21 +3,19 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<meta name="description" content="Tiny internet appliances with hard limits and a built-in fuse. Paid once with Bitcoin over Lightning." />
+		<meta name="description" content="Buy a temporary webhook or an encrypted read-once message with Bitcoin over Lightning. No account, no subscription, hard limits." />
 		<meta name="theme-color" content="#080a08" />
 		<title>The402Machine — Disposable Internet Infrastructure</title>
-		<link rel="stylesheet" href="/assets/styles.css" />
+		<link rel="stylesheet" href="/assets/styles.css?v=2" />
 	</head>
 	<body>
 		<div class="noise" aria-hidden="true"></div>
 		<header class="topbar">
-			<a class="brand" href="#top" aria-label="The402Machine home">
-				<span class="brand-mark">402</span>
-				<span>The402Machine</span>
-			</a>
+			<a class="brand" href="#top" aria-label="The402Machine home"><span class="brand-mark">402</span><span>The402Machine</span></a>
 			<nav aria-label="Main navigation">
-				<a href="#machines">Machines</a>
-				<a href="#principles">Principles</a>
+				<a href="#machines">Cartridges</a>
+				<a href="#compare">Compare</a>
+				<a href="#principles">Safety</a>
 				<a href="https://github.com/The402Machine/The402Machine" rel="noreferrer">Source ↗</a>
 			</nav>
 		</header>
@@ -25,130 +23,93 @@
 		<main id="top">
 			<section class="hero shell">
 				<div class="hero-copy">
-					<p class="eyebrow"><span class="live-dot"></span> CORE ONLINE / CHECKOUT DISABLED</p>
-					<h1>Tiny internet appliances.<br /><em>Hard limits. Built-in fuse.</em></h1>
-					<p class="lede">Pay once with Bitcoin over Lightning. Receive a temporary webhook or an encrypted read-once whisper. No account. No subscription. No generic hosting.</p>
+					<p class="eyebrow"><span class="live-dot"></span> <span id="checkout-indicator">CHECKING LIGHTNING CHECKOUT</span></p>
+					<h1>Rent less internet.<br /><em>Own the ending.</em></h1>
+					<p class="lede">Pay once over Lightning. Receive one narrow, temporary capability. No account, no renewal, no general-purpose hosting — just a visible fuse and a clean exit.</p>
 					<div class="hero-actions">
-						<a class="button primary" href="#machines">Inspect the machines</a>
-						<a class="button ghost" href="https://github.com/The402Machine/The402Machine" rel="noreferrer">View source</a>
+						<a class="button primary" href="#machines">Choose a cartridge</a>
+						<a class="button ghost" href="#compare">Compare every plan</a>
 					</div>
 					<ul class="signal-list" aria-label="Product properties">
-						<li>HTTP 402</li>
-						<li>Lightning native</li>
-						<li>No auto-renewal</li>
-						<li>Source-available</li>
+						<li>From 42 sats</li><li>HTTP 402</li><li>Lightning native</li><li>No auto-renewal</li><li>Source-available</li>
 					</ul>
 				</div>
 
 				<div class="machine" aria-label="Vending machine preview">
-					<div class="machine-head">
-						<span>THE 402 MACHINE</span>
-						<span class="machine-status">CORE READY</span>
-					</div>
-					<div class="display">
-						<p>SELECT CARTRIDGE</p>
-						<strong>CATCH</strong>
-						<span>temporary webhook inbox</span>
-					</div>
-					<div class="slot-grid" aria-hidden="true">
-						<span>A1</span><span>A2</span><span>A3</span>
-						<span>B1</span><span>B2</span><span>B3</span>
-					</div>
-					<div class="machine-footer">
-						<div><small>PAYMENT</small><b>LIGHTNING</b></div>
-						<div class="bolt">ϟ</div>
-						<div><small>ACCOUNT</small><b>NOT REQUIRED</b></div>
-					</div>
+					<div class="machine-head"><span>THE 402 MACHINE</span><span class="machine-status">TWO SLOTS LIVE</span></div>
+					<div class="display"><p>SELECT CAPABILITY</p><strong>CATCH</strong><span>private webhook / inbound only</span></div>
+					<div class="slot-grid"><a href="#catch"><span>A1</span><b>CATCH</b><small>FROM 42</small></a><a href="#whisper"><span>B1</span><b>WHISPER</b><small>FROM 42</small></a></div>
+					<div class="machine-footer"><div><small>PAYMENT</small><b>LIGHTNING</b></div><div class="bolt">ϟ</div><div><small>ACCOUNT</small><b>NOT REQUIRED</b></div></div>
 				</div>
 			</section>
 
-			<section class="manifesto-band">
-				<div class="shell band-inner">
-					<span>BUY IT</span><i>→</i><span>USE IT</span><i>→</i><span>WATCH IT DISAPPEAR</span>
-				</div>
-			</section>
+			<section class="manifesto-band"><div class="shell band-inner"><span>INSERT SATS</span><i>→</i><span>RECEIVE A CAPABILITY</span><i>→</i><span>WATCH IT DISAPPEAR</span></div></section>
 
 			<section class="shell section" id="machines">
-				<div class="section-heading">
-					<p class="eyebrow">CARTRIDGE CATALOGUE / 02 UNITS</p>
-					<h2>Choose what the internet should forget.</h2>
-				</div>
+				<div class="section-heading"><p class="eyebrow">CARTRIDGE CATALOGUE / 02 UNITS</p><div><h2>Choose what the internet should forget.</h2><p class="section-intro">CATCH plans scale time, requests, and storage. WHISPER plans change only how long an unread message waits before self-erasing.</p></div></div>
 
-				<div class="cards">
-					<article class="product-card featured">
+				<div class="product-stack">
+					<article class="product-card featured" id="catch">
 						<div class="card-index">A1</div>
 						<div class="card-body">
-							<div class="card-title"><h3>CATCH</h3><span>FIRST IN LINE</span></div>
-							<p>A private inbound-only webhook inbox. POST small payloads, inspect them with a separate owner key, and let the resource erase itself when its fuse runs out.</p>
-							<ul>
-								<li>Fixed response — never forwards traffic</li>
-								<li>Hard request and storage quotas</li>
-								<li>Separate ingest and owner credentials</li>
-							</ul>
-							<div class="durations">
-								<div><small>SPARK · 4 SATS</small><strong>4h 02m</strong><span>cheap experiments</span></div>
-								<div class="selected"><small>STANDARD · 42 SATS</small><strong>4 weeks + 2 days</strong><span>real temporary work</span></div>
-								<div><small>LONG · 402 SATS</small><strong>4 months + 2 days</strong><span>extended missions</span></div>
+							<div class="card-title"><div><p class="product-kicker">INBOUND-ONLY WEBHOOK</p><h3>CATCH</h3></div><span>LIVE</span></div>
+							<p>A private webhook inbox that accepts small POST requests, returns an empty 204, and never forwards or executes anything. Separate credentials keep sending and inspection apart.</p>
+							<div class="feature-strip"><span>Opaque payloads</span><span>Hard quotas</span><span>Manual destroy</span><span>Automatic erasure</span></div>
+							<div class="plan-grid" aria-label="CATCH plan comparison">
+								<article class="plan-card"><header><small>SPARK · 42 SATS</small><strong>4h 02m</strong></header><p>Fast debugging and throwaway integrations.</p><dl><div><dt>Requests</dt><dd>402</dd></div><div><dt>Storage</dt><dd>2 MiB</dd></div><div><dt>Payload</dt><dd>16 KiB</dd></div></dl><button class="button plan-buy" data-buy="catch" data-plan="spark">Choose Spark</button></article>
+								<article class="plan-card recommended"><div class="recommendation">MOST USEFUL</div><header><small>STANDARD · 402 SATS</small><strong>30 days</strong></header><p>Real temporary workflows without becoming permanent infrastructure.</p><dl><div><dt>Requests</dt><dd>4,020</dd></div><div><dt>Storage</dt><dd>20 MiB</dd></div><div><dt>Payload</dt><dd>16 KiB</dd></div></dl><button class="button plan-buy primary" data-buy="catch" data-plan="standard">Choose Standard</button></article>
+								<article class="plan-card"><header><small>LONG · 4,002 SATS</small><strong>4 months + 2 days</strong></header><p>Long-running missions that still need a guaranteed ending.</p><dl><div><dt>Requests</dt><dd>40,200</dd></div><div><dt>Storage</dt><dd>200 MiB</dd></div><div><dt>Payload</dt><dd>16 KiB</dd></div></dl><button class="button plan-buy" data-buy="catch" data-plan="long">Choose Long</button></article>
 							</div>
-							<button class="button primary" data-buy="catch">Dispense CATCH</button>
 						</div>
 					</article>
 
-					<article class="product-card">
+					<article class="product-card whisper-card" id="whisper">
 						<div class="card-index">B1</div>
 						<div class="card-body">
-							<div class="card-title"><h3>WHISPER</h3><span>NEXT CARTRIDGE</span></div>
-							<p>An encrypted note that survives until the first successful read — or until the lifetime you selected ends. Whichever arrives first.</p>
-							<ul>
-								<li>Encrypted before it leaves your device</li>
-								<li>One read, then irreversible deletion</li>
-								<li>Same Spark, Standard, and Long lifetimes</li>
-							</ul>
-							<div class="sealed-box"><span>SEALED PAYLOAD</span><b>████ ████ ████</b></div>
-							<button class="button primary" data-buy="whisper">Dispense WHISPER</button>
+							<div class="card-title"><div><p class="product-kicker">CLIENT-ENCRYPTED DEAD DROP</p><h3>WHISPER</h3></div><span>LIVE</span></div>
+							<p>Write a message in the browser. It is encrypted before upload; the decryption key stays in the URL fragment and never reaches the server. The first successful read destroys the ciphertext.</p>
+							<div class="whisper-rule"><b>One read on every plan.</b><span>Plans change only how long an unread WHISPER waits. The 16 KiB encrypted payload limit and read-once destruction are identical.</span></div>
+							<div class="plan-grid" aria-label="WHISPER plan comparison">
+								<article class="plan-card"><header><small>SPARK · 42 SATS</small><strong>7 days</strong></header><p>A quick secret handoff with a full week to be opened.</p><dl><div><dt>Reads</dt><dd>1</dd></div><div><dt>Encrypted size</dt><dd>16 KiB</dd></div><div><dt>Key location</dt><dd>URL fragment</dd></div></dl><button class="button plan-buy" data-buy="whisper" data-plan="spark">Choose Spark</button></article>
+								<article class="plan-card recommended"><div class="recommendation">BEST BALANCE</div><header><small>STANDARD · 402 SATS</small><strong>42 days</strong></header><p>Enough time for travel, async teams, and delayed delivery.</p><dl><div><dt>Reads</dt><dd>1</dd></div><div><dt>Encrypted size</dt><dd>16 KiB</dd></div><div><dt>Key location</dt><dd>URL fragment</dd></div></dl><button class="button plan-buy primary" data-buy="whisper" data-plan="standard">Choose Standard</button></article>
+								<article class="plan-card"><header><small>LONG · 4,002 SATS</small><strong>402 days</strong></header><p>A long-term dead drop that still vanishes after one read.</p><dl><div><dt>Reads</dt><dd>1</dd></div><div><dt>Encrypted size</dt><dd>16 KiB</dd></div><div><dt>Key location</dt><dd>URL fragment</dd></div></dl><button class="button plan-buy" data-buy="whisper" data-plan="long">Choose Long</button></article>
+							</div>
 						</div>
 					</article>
 				</div>
 			</section>
 
-			<section class="principles" id="principles">
-				<div class="shell section principles-grid">
-					<div>
-						<p class="eyebrow">THE SAFETY INTERLOCK</p>
-						<h2>Closed machines.<br />Not generic infrastructure.</h2>
-					</div>
-					<div class="rules">
-						<div><span>01</span><p><strong>No arbitrary code.</strong> A cartridge has one job and a fixed response.</p></div>
-						<div><span>02</span><p><strong>No hidden forwarding.</strong> CATCH receives; it never calls an address supplied by a user.</p></div>
-						<div><span>03</span><p><strong>No forever plan.</strong> Every machine has a visible lifetime and no automatic renewal.</p></div>
-						<div><span>04</span><p><strong>No account maze.</strong> Payment dispenses one bounded resource and its one-time keys.</p></div>
+			<section class="compare-section" id="compare">
+				<div class="shell section">
+					<div class="section-heading"><p class="eyebrow">DECISION GUIDE</p><div><h2>Two jobs. No feature fog.</h2><p class="section-intro">Choose CATCH when a machine needs to send data. Choose WHISPER when a person needs to read a secret exactly once.</p></div></div>
+					<div class="compare-grid">
+						<div class="compare-label">What do you receive?</div><div><b>CATCH</b><span>Webhook URL + ingest key + owner key</span></div><div><b>WHISPER</b><span>One shareable, client-encrypted link</span></div>
+						<div class="compare-label">What selects the plan?</div><div><span>Lifetime, request quota, and storage quota</span></div><div><span>How long the unread message waits</span></div>
+						<div class="compare-label">What destroys it?</div><div><span>Expiry, quota exhaustion, or manual destroy</span></div><div><span>First successful read or expiry</span></div>
+						<div class="compare-label">What it never does</div><div><span>Forward traffic or execute payloads</span></div><div><span>Send the decryption key to the server</span></div>
 					</div>
 				</div>
 			</section>
 
-			<section class="shell section closing">
-				<p class="eyebrow">STATUS / TWO CARTRIDGES BUILT</p>
-				<h2>Insert sats.<br />Receive a tiny piece of the Internet.</h2>
-				<p>CATCH and WHISPER are built and under validation. Public Lightning checkout is currently disabled; Long remains sealed while the machine proves itself.</p>
-				<a class="button primary" href="https://github.com/The402Machine/The402Machine" rel="noreferrer">Follow the build on GitHub</a>
-			</section>
+			<section class="principles" id="principles"><div class="shell section principles-grid"><div><p class="eyebrow">THE SAFETY INTERLOCK</p><h2>Closed machines.<br />Not generic infrastructure.</h2></div><div class="rules"><div><span>01</span><p><strong>No arbitrary code.</strong> Every cartridge has one job and fixed behavior.</p></div><div><span>02</span><p><strong>No hidden forwarding.</strong> CATCH receives; it never calls a user-supplied destination.</p></div><div><span>03</span><p><strong>No forever plan.</strong> Every purchase shows its fuse before payment.</p></div><div><span>04</span><p><strong>No account recovery.</strong> Save the dispensed keys or link when it appears.</p></div></div></div></section>
+
+			<section class="shell section closing"><p class="eyebrow">STATUS / TWO CARTRIDGES LIVE</p><h2>Insert sats.<br />Receive a tiny piece of the Internet.</h2><p>Lightning checkout is live and verified end to end. Choose the smallest plan that fits the job; every cartridge is temporary by design.</p><a class="button primary" href="#machines">Choose a cartridge</a></section>
 		</main>
+
 		<dialog id="checkout" class="checkout">
 			<form id="checkout-form" method="dialog">
-				<div class="card-title"><h3 id="checkout-title">Dispense</h3><button id="checkout-close" type="button" class="button ghost">Close</button></div>
-				<label>Cartridge <select name="planId"><option value="spark">Spark · 4 sats</option><option value="standard">Standard · 42 sats</option></select></label>
-				<label id="whisper-note-field" hidden>Message <textarea id="whisper-note" maxlength="15000" rows="7" placeholder="Encrypted in this browser before upload"></textarea></label>
-				<button class="button primary" type="submit">Create invoice</button>
-				<p id="checkout-status">Choose a cartridge.</p>
+				<div class="checkout-head"><div><p class="eyebrow">LIGHTNING CHECKOUT</p><h3 id="checkout-title">Dispense</h3></div><button id="checkout-close" type="button" class="button ghost">Close</button></div>
+				<p id="checkout-intro" class="checkout-intro"></p>
+				<fieldset><legend>Choose a plan</legend><div id="checkout-plans" class="checkout-plans"></div></fieldset>
+				<label id="whisper-note-field" hidden><span>Message</span><textarea id="whisper-note" maxlength="15000" rows="7" placeholder="Encrypted in this browser before upload"></textarea><small>Plaintext stays in this browser. Maximum 15,000 characters.</small></label>
+				<div id="checkout-summary" class="checkout-summary"></div>
+				<button id="checkout-submit" class="button primary" type="submit">Create Lightning invoice</button>
+				<p id="checkout-status" class="checkout-status">Choose a plan before paying.</p>
 				<textarea id="checkout-output" rows="8" readonly hidden aria-label="Invoice or dispensed credentials"></textarea>
 			</form>
 		</dialog>
 
-		<footer class="footer shell">
-			<span>THE402MACHINE.COM</span>
-			<span>PAYMENT REQUIRED / TAKEN LITERALLY</span>
-			<span>© 2026</span>
-		</footer>
-		<script type="module" src="/assets/checkout.js"></script>
+		<footer class="footer shell"><span>THE402MACHINE.COM</span><span>PAYMENT REQUIRED / TAKEN LITERALLY</span><span>© 2026</span></footer>
+		<script type="module" src="/assets/checkout.js?v=2"></script>
 	</body>
 </html>

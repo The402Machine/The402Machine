@@ -19,7 +19,7 @@ CATCH accepts bounded POST requests and never forwards, executes, or calls back 
 When LNbits payments are enabled, the public flow is:
 
 ```text
-POST /api/payments/catch        Idempotency-Key: <8-128 chars>  {"planId":"spark"}
+POST /api/payments/catch        Idempotency-Key: <8-128 chars>  {"planId":"spark|standard|long"}
 GET  /api/payments/<order-id>   returns 402 while pending, then the CATCH credentials
 ```
 
@@ -37,7 +37,15 @@ The402Machine sells closed functions, never general computing capability. It wil
 
 ## Current status
 
-The public landing page is online. CATCH and WHISPER are implemented, including bounded ingestion, encrypted read-once delivery, private access, transactional quotas, expiry cleanup, and PostgreSQL persistence. Public purchasing remains disabled until the dedicated Lightning credentials are installed and an explicitly authorized purchase is tested.
+The public landing page and Lightning checkout are online. CATCH and WHISPER are implemented, including bounded ingestion, encrypted read-once delivery, private access, transactional quotas, expiry cleanup, and PostgreSQL persistence. The first external CATCH purchase has been verified end to end.
+
+Current plan ladder:
+
+- Spark: 42 sats
+- Standard: 402 sats
+- Long: 4,002 sats
+
+CATCH uses lifetimes of 4h 02m, 30 days, and 4 months + 2 days while scaling request and storage quotas. WHISPER uses longer unread windows of 7, 42, and 402 days; every plan remains one-read, client-encrypted, and limited to the same bounded ciphertext size.
 
 ## CATCH guarantees
 

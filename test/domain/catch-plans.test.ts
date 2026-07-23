@@ -25,14 +25,14 @@ describe("CATCH plan catalogue", () => {
 		});
 	});
 
-	it("defines Long as initially unavailable with a calendar duration", () => {
+	it("defines Long as a purchasable calendar-duration plan", () => {
 		expect(CATCH_PLANS.long).toEqual({
 			id: "long",
 			duration: { kind: "calendar", months: 4, days: 2 },
 			requestLimit: 40_200,
 			storageLimitBytes: 200 * 1024 * 1024,
 			maxBytesPerRequest: 16 * 1024,
-			available: false,
+			available: true,
 		});
 	});
 });

@@ -5,7 +5,7 @@ import type { PaymentQuote } from "../../src/payment/payment-service.js";
 
 describe("public payment API", () => {
 	it("returns a Lightning invoice with HTTP 402 and reuses the idempotency key", async () => {
-		const quote: PaymentQuote = { orderId: "order-1", product: "catch", planId: "spark", amountSats: 4, bolt11: "lnbc4n1test", paymentHash: "a".repeat(64) };
+		const quote: PaymentQuote = { orderId: "order-1", product: "catch", planId: "spark", amountSats: 42, bolt11: "lnbc42n1test", paymentHash: "a".repeat(64) };
 		const calls: unknown[] = [];
 		const app = buildApp({ payment: {
 			quote: (input) => { calls.push(input); return Promise.resolve(quote); },
@@ -20,7 +20,7 @@ describe("public payment API", () => {
 	});
 
 	it("parses checkout JSON when CATCH ingestion is installed in the same app", async () => {
-		const quote: PaymentQuote = { orderId: "order-combined", product: "catch", planId: "spark", amountSats: 4, bolt11: "lnbc4n1combined", paymentHash: "e".repeat(64) };
+		const quote: PaymentQuote = { orderId: "order-combined", product: "catch", planId: "spark", amountSats: 42, bolt11: "lnbc42n1combined", paymentHash: "e".repeat(64) };
 		const calls: unknown[] = [];
 		const repository = {
 			provision: () => Promise.reject(new Error("not used")), getCredentialHashes: () => Promise.resolve(null),
@@ -38,7 +38,7 @@ describe("public payment API", () => {
 	});
 
 	it("quotes a client-encrypted WHISPER without accepting plaintext media types", async () => {
-		const quote: PaymentQuote = { orderId: "order-whisper", product: "whisper", planId: "spark", amountSats: 4, bolt11: "lnbc4n1whisper", paymentHash: "d".repeat(64) };
+		const quote: PaymentQuote = { orderId: "order-whisper", product: "whisper", planId: "spark", amountSats: 42, bolt11: "lnbc42n1whisper", paymentHash: "d".repeat(64) };
 		const calls: unknown[] = [];
 		const app = buildApp({ payment: {
 			quote: (input) => { calls.push(input); return Promise.resolve(quote); },
@@ -71,22 +71,32 @@ describe("public payment API", () => {
 		await app.close();
 	});
 
-	it("rejects Long while it remains unavailable", async () => {
-		const app = buildApp({ payment: { quote: () => Promise.reject(new Error("not used")), fulfill: () => Promise.resolve({ settled: false }) } });
+	it("accepts Long for both products", async () => {
+		const calls: unknown[] = [];
+		const quote: PaymentQuote = { orderId: "order-long", product: "catch", planId: "long", amountSats: 4_002, bolt11: "lnbc4002n1long", paymentHash: "b".repeat(64) };
+		const app = buildApp({ payment: { quote: (input) => { calls.push(input); return Promise.resolve(quote); }, fulfill: () => Promise.resolve({ settled: false }) } });
 		const response = await app.inject({ method: "POST", url: "/api/payments/catch", headers: { "idempotency-key": "idempotency-public-2" }, payload: { planId: "long" } });
-		expect(response.statusCode).toBe(400);
+		expect(response.statusCode).toBe(402);
+		expect(calls).toEqual([{ idempotencyKey: "idempotency-public-2", product: "catch", planId: "long", productPayload: null }]);
 		await app.close();
 	});
 
-	it("publishes a machine-readable tiny-sats catalogue", async () => {
+	it("publishes detailed product-specific comparison data", async () => {
 		const app = buildApp({ payment: { quote: () => Promise.reject(new Error("not used")), fulfill: () => Promise.resolve({ settled: false }) } });
 		const response = await app.inject({ method: "GET", url: "/api/catalog" });
 		expect(response.statusCode).toBe(200);
-		expect(response.json()).toMatchObject({ checkoutEnabled: true, currency: "sat", products: { catch: [
-			{ planId: "spark", priceSats: 4, available: true },
-			{ planId: "standard", priceSats: 42, available: true },
-			{ planId: "long", priceSats: 402, available: false },
-		] } });
+		expect(response.json()).toMatchObject({ checkoutEnabled: true, currency: "sat", products: {
+			catch: { plans: [
+				{ planId: "spark", priceSats: 42, durationLabel: "4h 02m", requestLimit: 402, storageLimitBytes: 2 * 1024 * 1024, available: true },
+				{ planId: "standard", priceSats: 402, durationLabel: "30 days", requestLimit: 4_020, storageLimitBytes: 20 * 1024 * 1024, available: true },
+				{ planId: "long", priceSats: 4_002, durationLabel: "4 months + 2 days", requestLimit: 40_200, storageLimitBytes: 200 * 1024 * 1024, available: true },
+			] },
+			whisper: { plans: [
+				{ planId: "spark", priceSats: 42, durationLabel: "7 days", readOnce: true, available: true },
+				{ planId: "standard", priceSats: 402, durationLabel: "42 days", readOnce: true, available: true },
+				{ planId: "long", priceSats: 4_002, durationLabel: "402 days", readOnce: true, available: true },
+			] },
+		} });
 		await app.close();
 	});
 
@@ -94,7 +104,7 @@ describe("public payment API", () => {
 		let quotes = 0;
 		let fulfillments = 0;
 		const app = buildApp({ payment: {
-			quote: () => { quotes += 1; return Promise.resolve({ orderId: "order-rate", product: "catch", planId: "spark", amountSats: 4, bolt11: "lnbc4n1rate", paymentHash: "f".repeat(64) }); },
+			quote: () => { quotes += 1; return Promise.resolve({ orderId: "order-rate", product: "catch", planId: "spark", amountSats: 42, bolt11: "lnbc42n1rate", paymentHash: "f".repeat(64) }); },
 			fulfill: () => { fulfillments += 1; return Promise.resolve({ settled: false }); },
 		} });
 		let quoteStatus = 0;

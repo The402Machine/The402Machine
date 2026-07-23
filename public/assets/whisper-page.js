@@ -20,6 +20,7 @@ button.addEventListener("click", async () => {
 		message.textContent = await openWhisper(new Uint8Array(await response.arrayBuffer()), fragmentKey());
 		message.hidden = false;
 		status.textContent = "Decrypted locally. Reloading cannot retrieve it again.";
+		button.hidden = true;
 	} catch (error) {
 		status.textContent = error instanceof Error ? error.message : "Could not open WHISPER.";
 	}
