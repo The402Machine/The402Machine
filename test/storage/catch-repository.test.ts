@@ -122,6 +122,17 @@ describe("CatchRepository", () => {
 		expect(loaded?.status).toBe("expired");
 	});
 
+	it("does not return credentials after database-time expiry even before cleanup", async () => {
+		const resource = await provisionSpark();
+		await sql`
+			update catch_resources
+			set created_at = clock_timestamp() - interval '2 seconds', expires_at = clock_timestamp() - interval '1 second'
+			where id = ${resource.id}
+		`;
+
+		expect(await repository.getCredentialHashes(resource.publicId)).toBeNull();
+	});
+
 	it("uses the database clock for expiry rather than the application clock", async () => {
 		const resource = await provisionSpark();
 		await sql`

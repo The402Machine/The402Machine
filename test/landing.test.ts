@@ -24,6 +24,8 @@ describe("public landing page", () => {
 		expect(response.body).toContain("4 months + 2 days");
 		expect(response.body).toContain("CATCH");
 		expect(response.body).toContain("BURN");
+		expect(response.body).toContain("CATCH CORE ONLINE");
+		expect(response.body).toContain("automatic erasure");
 	});
 
 	it("exposes the landing stylesheet", async () => {

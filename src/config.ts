@@ -38,6 +38,13 @@ export const loadConfig = (environment: NodeJS.ProcessEnv = process.env): AppCon
 		provisioningSecret: environment.CATCH_PROVISIONING_SECRET,
 		publicBaseUrl: environment.PUBLIC_BASE_URL,
 	};
+	const hasDatabaseUrl = catchConfig.databaseUrl !== undefined && catchConfig.databaseUrl.length > 0;
+	const hasTokenPepper = catchConfig.tokenPepper !== undefined && catchConfig.tokenPepper.length > 0;
+
+	if (hasDatabaseUrl !== hasTokenPepper) {
+		if (!hasDatabaseUrl) throw new Error("DATABASE_URL is required when CATCH_TOKEN_PEPPER is configured");
+		throw new Error("CATCH_TOKEN_PEPPER is required when DATABASE_URL is configured");
+	}
 
 	if (catchConfig.internalProvisioning) {
 		if (catchConfig.provisioningSecret === undefined || catchConfig.provisioningSecret.length === 0) throw new Error("CATCH_PROVISIONING_SECRET is required when CATCH_INTERNAL_PROVISIONING is enabled");

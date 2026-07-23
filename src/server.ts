@@ -6,10 +6,11 @@ import { CatchRepository } from "./storage/catch-repository.js";
 
 const config = loadConfig();
 const database = config.catch.databaseUrl === undefined ? undefined : postgres(config.catch.databaseUrl);
-const catchOptions = database === undefined || config.catch.tokenPepper === undefined
+const catchRepository = database === undefined ? undefined : new CatchRepository(database);
+const catchOptions = catchRepository === undefined || config.catch.tokenPepper === undefined
 	? undefined
 	: {
-		repository: new CatchRepository(database),
+		repository: catchRepository,
 		tokenPepper: config.catch.tokenPepper,
 		provisioningEnabled: config.catch.internalProvisioning,
 		...(config.catch.provisioningSecret === undefined ? {} : { provisioningSecret: config.catch.provisioningSecret }),

@@ -109,7 +109,11 @@ export class CatchRepository {
 
 	public async getCredentialHashes(publicId: string): Promise<CatchCredentialHashes | null> {
 		const [row] = await this.sql<CredentialRow[]>`
-			select owner_token_hash, ingest_token_hash from catch_resources where public_id = ${publicId}
+			select owner_token_hash, ingest_token_hash
+			from catch_resources
+			where public_id = ${publicId}
+				and status in ('active', 'exhausted', 'suspended')
+				and clock_timestamp() < expires_at
 		`;
 		if (row === undefined) return null;
 		return { ownerTokenHash: row.owner_token_hash, ingestTokenHash: row.ingest_token_hash };
@@ -202,6 +206,33 @@ export class CatchRepository {
 				where id = ${resource.id}
 			`;
 			return true;
+		});
+	}
+
+	public async expireDueResources(requestedLimit = 100): Promise<number> {
+		const limit = Math.max(1, Math.min(1_000, requestedLimit));
+		return this.sql.begin(async (tx) => {
+			const resources = await tx<{ id: string }[]>`
+				select id
+				from catch_resources
+				where status in ('active', 'exhausted', 'suspended')
+					and clock_timestamp() >= expires_at
+				order by expires_at asc
+				limit ${limit}
+				for update skip locked
+			`;
+			if (resources.length === 0) return 0;
+
+			const resourceIds = resources.map((resource) => resource.id);
+			await tx`delete from catch_events where resource_id in ${tx(resourceIds)}`;
+			const expired = await tx`
+				update catch_resources
+				set status = 'expired', expired_at = coalesce(expired_at, clock_timestamp()),
+					owner_token_hash = null, ingest_token_hash = null, stored_bytes = 0,
+					updated_at = clock_timestamp()
+				where id in ${tx(resourceIds)}
+			`;
+			return expired.count;
 		});
 	}
 

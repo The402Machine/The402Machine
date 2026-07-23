@@ -10,8 +10,10 @@ import { generateIngestToken, generateOwnerToken, hashToken, verifyToken } from 
 import type { AcceptEventInput, AcceptEventResult, CatchCredentialHashes, CatchEvent, CatchResource, ProvisionInput } from "./storage/catch-repository.js";
 
 const MAX_INGEST_BYTES = 16 * 1024;
+const MAX_RATE_LIMIT_BUCKETS = 10_000;
 const ALLOWED_CONTENT_TYPES = new Set(["application/json", "text/plain", "application/x-www-form-urlencoded"]);
 const ALLOWED_HEADERS = new Set(["content-type", "user-agent", "x-request-id", "x-github-event", "x-github-delivery", "stripe-signature"]);
+type RateLimitBucket = { count: number; resetsAt: number };
 
 export interface CatchApiRepository {
 	provision(input: ProvisionInput): Promise<CatchResource>;
@@ -40,6 +42,7 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
 		logger: options.logger ?? false,
 		bodyLimit: MAX_INGEST_BYTES,
 		logController: new LogController({ disableRequestLogging: true }),
+		trustProxy: true,
 	});
 
 	void app.register(helmet, {
@@ -51,7 +54,6 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
 		crossOriginEmbedderPolicy: false,
 	});
 	void app.register(fastifyStatic, { root: join(import.meta.dirname, "..", "public"), index: "index.html", cacheControl: true, maxAge: "1h" });
-
 	app.get("/health", () => ({ service: "the402machine", status: "ok" }));
 
 	if (options.catch !== undefined) registerCatchRoutes(app, options.catch);
@@ -59,6 +61,8 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
 };
 
 function registerCatchRoutes(app: FastifyInstance, options: CatchAppOptions): void {
+	const ingestionRateLimits = new Map<string, RateLimitBucket>();
+	const provisioningRateLimits = new Map<string, RateLimitBucket>();
 	for (const contentType of ALLOWED_CONTENT_TYPES) {
 		app.addContentTypeParser(contentType, { parseAs: "buffer" }, (_request, body, done) => done(null, body));
 	}
@@ -66,6 +70,7 @@ function registerCatchRoutes(app: FastifyInstance, options: CatchAppOptions): vo
 	if (options.provisioningEnabled === true && nonEmpty(options.provisioningSecret)) {
 		const provisioningSecret = options.provisioningSecret;
 		app.post<{ Body: { planId?: unknown } }>("/internal/catch/provision", async (request, reply) => {
+			if (!consumeRateLimit(provisioningRateLimits, request.ip, 10, 60_000)) return rateLimited(reply);
 			if (!safeSecretMatches(bearerToken(request), provisioningSecret)) return reply.code(401).send({ error: "unauthorized" });
 			const planId = provisionPlanId(request.body);
 			if (planId !== "spark" && planId !== "standard") return reply.code(400).send({ error: "invalid plan" });
@@ -85,6 +90,7 @@ function registerCatchRoutes(app: FastifyInstance, options: CatchAppOptions): vo
 	}
 
 	app.post<{ Params: { publicId: string } }>("/c/:publicId", async (request, reply) => {
+		if (!consumeRateLimit(ingestionRateLimits, `${request.ip}:${request.params.publicId}`, 60, 60_000)) return rateLimited(reply);
 		const contentType = normalizedContentType(request.headers["content-type"]);
 		if (contentType === undefined || !ALLOWED_CONTENT_TYPES.has(contentType) || !identityEncoding(request.headers["content-encoding"])) return reply.code(400).send({ error: "invalid request" });
 		const credentials = await options.repository.getCredentialHashes(request.params.publicId);
@@ -129,6 +135,31 @@ async function authorizeOwner(request: FastifyRequest<{ Params: { publicId: stri
 
 function unauthorized(reply: { header(name: string, value: string): typeof reply; code(statusCode: number): typeof reply; send(payload: object): unknown }): unknown {
 	return reply.header("Cache-Control", "no-store").code(401).send({ error: "unauthorized" });
+}
+
+function rateLimited(reply: { header(name: string, value: string): typeof reply; code(statusCode: number): typeof reply; send(payload: object): unknown }): unknown {
+	return reply.header("Retry-After", "60").code(429).send({ error: "too many requests" });
+}
+
+function consumeRateLimit(buckets: Map<string, RateLimitBucket>, key: string, max: number, windowMs: number): boolean {
+	const now = Date.now();
+	if (buckets.size >= MAX_RATE_LIMIT_BUCKETS && !buckets.has(key)) {
+		for (const [bucketKey, bucket] of buckets) {
+			if (now >= bucket.resetsAt) buckets.delete(bucketKey);
+		}
+		if (buckets.size >= MAX_RATE_LIMIT_BUCKETS) {
+			const oldestKey = buckets.keys().next().value;
+			if (oldestKey !== undefined) buckets.delete(oldestKey);
+		}
+	}
+	const current = buckets.get(key);
+	if (current === undefined || now >= current.resetsAt) {
+		buckets.set(key, { count: 1, resetsAt: now + windowMs });
+		return true;
+	}
+	if (current.count >= max) return false;
+	current.count += 1;
+	return true;
 }
 
 function bearerToken(request: FastifyRequest): string | undefined {

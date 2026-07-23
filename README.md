@@ -26,7 +26,16 @@ The402Machine sells closed functions, never general computing capability. It wil
 
 ## Current status
 
-The public landing page and API health check are under active development. Payment and disposable-resource endpoints will be released only after their abuse controls and lifecycle guarantees are tested.
+The public landing page is online. The first CATCH implementation now includes bounded ingestion, private owner access, transactional quotas, expiry cleanup, and PostgreSQL persistence. Public purchasing remains disabled until Lightning fulfilment is connected and tested.
+
+## CATCH guarantees
+
+- Accepts only bounded `POST` bodies in JSON, text, or simple form format.
+- Returns a fixed `204 No Content` response after successful ingestion.
+- Uses separate ingest and owner credentials.
+- Never executes code, forwards requests, calls user destinations, or exposes stored events publicly.
+- Stops accepting data when its request, storage, lifetime, suspension, or destruction fuse is reached.
+- Erases stored events and credentials when the cartridge expires or is destroyed.
 
 ## Local development
 
@@ -34,6 +43,7 @@ Requirements:
 
 - Node.js 22
 - npm
+- Docker, for PostgreSQL integration tests and the production stack
 
 ```bash
 npm ci
@@ -57,7 +67,7 @@ npm run build
 
 ## Configuration
 
-Copy `.env.example` to `.env` for local development. Never commit payment credentials, wallet material, private keys, macaroons, or deployment secrets.
+Copy `.env.example` to `.env` for local development. Production Compose uses an untracked `.env.production` file and runs PostgreSQL, migrations, the web service, and the expiry worker. Never commit payment credentials, database passwords, token peppers, wallet material, private keys, macaroons, or deployment secrets.
 
 ## Security
 

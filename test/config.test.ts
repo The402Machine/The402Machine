@@ -19,4 +19,9 @@ describe("CATCH configuration", () => {
 			publicBaseUrl: "https://catch.example",
 		});
 	});
+
+	it("fails closed when only one CATCH runtime credential is configured", () => {
+		expect(() => loadConfig({ DATABASE_URL: "postgres://example" })).toThrow(/CATCH_TOKEN_PEPPER/);
+		expect(() => loadConfig({ CATCH_TOKEN_PEPPER: "pepper" })).toThrow(/DATABASE_URL/);
+	});
 });

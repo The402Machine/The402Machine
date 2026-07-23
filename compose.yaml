@@ -1,13 +1,56 @@
 services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      POSTGRES_DB: the402machine
+      POSTGRES_USER: the402machine
+    volumes:
+      - catch-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U the402machine -d the402machine"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - catch-backend
+
+  migrate:
+    build:
+      context: .
+    restart: "no"
+    env_file:
+      - .env.production
+    command: ["node", "scripts/migrate.mjs"]
+    depends_on:
+      db:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - catch-backend
+
   web:
     build:
       context: .
     container_name: the402machine-web
     restart: unless-stopped
+    env_file:
+      - .env.production
     environment:
       HOST: 0.0.0.0
       PORT: 4020
       LOG_LEVEL: info
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:4020:4020"
     read_only: true
@@ -23,3 +66,34 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    networks:
+      - catch-backend
+      - web-edge
+
+  expiry-worker:
+    build:
+      context: .
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    command: ["node", "dist/worker.js"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - catch-backend
+
+volumes:
+  catch-postgres:
+
+networks:
+  catch-backend:
+    internal: true
+  web-edge:

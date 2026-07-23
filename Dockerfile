@@ -16,6 +16,8 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build --chown=app:app /app/dist ./dist
 COPY --chown=app:app public ./public
+COPY --chown=app:app migrations ./migrations
+COPY --chown=app:app scripts ./scripts
 USER app
 EXPOSE 4020
 CMD ["node", "dist/server.js"]

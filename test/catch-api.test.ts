@@ -130,6 +130,24 @@ describe("CATCH HTTP API", () => {
 		expect(repository.accepted).toHaveLength(0);
 	});
 
+	it("rate-limits repeated ingestion attempts before unbounded database work", async () => {
+		const { app } = buildCatchApp();
+		let throttled = false;
+		for (let attempt = 0; attempt < 70; attempt += 1) {
+			const response = await app.inject({
+				method: "POST",
+				url: "/c/catch_test-public-id",
+				headers: { ...bearer("catch_ing_wrong-token"), "content-type": "text/plain" },
+				payload: "x",
+			});
+			if (response.statusCode === 429) {
+				throttled = true;
+				break;
+			}
+		}
+		expect(throttled).toBe(true);
+	});
+
 	it("protects admin data, avoids token leaks, and irreversibly destroys resources", async () => {
 		const { app, repository } = buildCatchApp();
 		const denied = await app.inject({ method: "GET", url: "/api/catch/catch_test-public-id", headers: bearer(ingestToken) });
