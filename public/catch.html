@@ -7,7 +7,7 @@
 		<meta name="referrer" content="no-referrer" />
 		<meta name="theme-color" content="#080a08" />
 		<title>CATCH portal — The402Machine</title>
-		<link rel="stylesheet" href="/assets/styles.css?v=9" />
+		<link rel="stylesheet" href="/assets/styles.css?v=10" />
 	</head>
 	<body class="portal-body">
 		<div class="noise" aria-hidden="true"></div>
@@ -56,9 +56,10 @@
 
 				<section class="portal-grid">
 					<article class="portal-card portal-ingest-card">
-						<div class="portal-card-head"><div><p class="eyebrow">SEND EVENTS HERE</p><h2>Ingest endpoint</h2></div><span>POST ONLY</span></div>
+						<div class="portal-card-head"><div><p class="eyebrow">SEND EVENTS HERE</p><h2>Ingest endpoint</h2></div><span>ANY VERB</span></div>
 						<label><span>URL</span><input id="portal-ingest-url" readonly /></label>
-						<div class="portal-code-row"><code id="portal-auth-preview">Authorization: Bearer ••••••••</code></div>
+						<div class="portal-code-row"><code id="portal-auth-preview">Authorization: Bearer ••••••</code></div>
+						<div class="portal-auth-setting"><div><strong>Require ingest authentication</strong><small>Recommended. Disable only when the webhook provider cannot send headers.</small></div><button id="portal-ingest-auth" class="button" type="button">Checking…</button></div>
 						<div class="portal-actions">
 							<button id="portal-copy-endpoint" class="button primary" type="button">Copy endpoint</button>
 							<button id="portal-copy-auth" class="button" type="button">Copy auth header</button>
@@ -68,9 +69,17 @@
 					</article>
 
 					<article class="portal-card portal-events-card">
-						<div class="portal-card-head"><div><p class="eyebrow">LATEST 50</p><h2>Events</h2></div><button id="portal-refresh" class="button ghost" type="button">Refresh</button></div>
+						<div class="portal-card-head"><div><p class="eyebrow">FILTERED FEED</p><h2>Events</h2></div><button id="portal-refresh" class="button ghost" type="button">Refresh</button></div>
+						<div class="portal-event-filters">
+							<label><span>Access</span><select id="portal-event-access"><option value="">All</option><option value="public">Public</option><option value="authenticated">Authenticated</option></select></label>
+							<label><span>Method</span><select id="portal-event-method"><option value="">All</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>GET</option><option>HEAD</option><option>OPTIONS</option></select></label>
+							<label><span>Content type</span><select id="portal-event-content-type"><option value="">All</option><option value="application/json">application/json</option><option value="text/plain">text/plain</option><option value="application/x-www-form-urlencoded">form-urlencoded</option></select></label>
+							<label class="portal-event-search"><span>Search body</span><input id="portal-event-search" type="search" maxlength="120" placeholder="canary, event name…" /></label>
+							<label><span>Page size</span><select id="portal-event-page-size"><option>10</option><option selected>20</option><option>50</option></select></label>
+						</div>
 						<p id="portal-events-status" class="portal-hint">Loading events…</p>
 						<div id="portal-events" class="portal-events" aria-live="polite"></div>
+						<div class="portal-pagination"><button id="portal-events-prev" class="button ghost" type="button">Previous</button><span id="portal-events-page">Page 1</span><button id="portal-events-next" class="button ghost" type="button">Next</button></div>
 					</article>
 				</section>
 
@@ -82,6 +91,6 @@
 		</main>
 
 		<footer class="footer shell"><span>THE402MACHINE.COM</span><span>OWNER CAPABILITY / KEEP PRIVATE</span><span>NO ACCOUNT RECOVERY</span></footer>
-		<script type="module" src="/assets/catch-portal.js?v=1"></script>
+		<script type="module" src="/assets/catch-portal.js?v=2"></script>
 	</body>
 </html>

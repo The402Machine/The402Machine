@@ -19,11 +19,19 @@ describe("CATCH owner portal", () => {
 
 		expect(response.statusCode).toBe(200);
 		expect(response.body).toContain("Your CATCH<br /><em>portal.</em>");
-		expect(response.body).toContain('href="/assets/styles.css?v=9"');
-		expect(response.body).toContain('src="/assets/catch-portal.js?v=1"');
+		expect(response.body).toContain('href="/assets/styles.css?v=10"');
+		expect(response.body).toContain('src="/assets/catch-portal.js?v=2"');
 		expect(response.body).toContain('id="portal-import"');
 		expect(response.body).toContain('id="portal-import-submit"');
 		expect(response.body).toContain('id="portal-link-card" class="portal-link-card" hidden');
+		expect(response.body).toContain('id="portal-ingest-auth"');
+		expect(response.body).toContain('id="portal-event-access"');
+		expect(response.body).toContain('id="portal-event-method"');
+		expect(response.body).toContain('id="portal-event-content-type"');
+		expect(response.body).toContain('id="portal-event-search"');
+		expect(response.body).toContain('id="portal-event-page-size"');
+		expect(response.body).toContain('id="portal-events-prev"');
+		expect(response.body).toContain('id="portal-events-next"');
 		expect(response.body).not.toContain("catch_own_");
 		expect(response.body).not.toContain("catch_ing_");
 	});
@@ -38,7 +46,11 @@ describe("CATCH owner portal", () => {
 		expect(source).toContain("linkCard.hidden = false");
 		expect(source).toContain('authorization: `Bearer ${capability.ownerToken}`');
 		expect(source).toContain("/api/catch/${encodeURIComponent(capability.publicId)}");
-		expect(source).toContain("/events?limit=50");
+		expect(source).toContain("URLSearchParams");
+		expect(source).toContain('parameters.set("cursor"');
+		expect(source).toContain('parameters.set("access"');
+		expect(source).toContain('parameters.set("method"');
+		expect(source).toContain('`${apiUrl()}/settings`');
 		expect(source).toContain('method: "DELETE"');
 		expect(source).not.toContain("localStorage");
 		expect(source).not.toContain("sessionStorage");

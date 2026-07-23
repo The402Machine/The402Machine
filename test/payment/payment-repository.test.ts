@@ -39,7 +39,7 @@ beforeAll(async () => {
 	databaseUrl = `postgresql://postgres:${password}@127.0.0.1:${port}/the402machine_test`;
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 12 });
-	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql"]) {
+	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${migrationName}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}

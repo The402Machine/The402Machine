@@ -53,8 +53,17 @@ describe("public landing page", () => {
 		expect(response.body).toContain('data-buy="catch"');
 		expect(response.body).toContain('data-buy="whisper"');
 		expect(response.body).toContain('data-plan="long"');
-		expect(response.body).toContain('href="/assets/styles.css?v=9"');
+		expect(response.body).toContain('href="/assets/styles.css?v=10"');
 		expect(response.body).toContain('src="/assets/checkout.js?v=14"');
+		expect(response.body).toContain('href="#api"');
+		expect(response.body).toContain('id="api"');
+		expect(response.body).toContain("API / COMPLETE FLOW");
+		expect(response.body).toContain("POST /api/payments/catch");
+		expect(response.body).toContain("GET /api/payments/{orderId}");
+		expect(response.body).toContain("POST|PUT|PATCH|DELETE|GET|HEAD|OPTIONS /c/{publicId}");
+		expect(response.body).toContain("GET /api/catch/{publicId}/events");
+		expect(response.body).toContain("Idempotency-Key");
+		expect(response.body).toContain("bodyEncoding");
 		expect(response.body).toContain('id="checkout-payment"');
 		expect(response.body).toContain('id="checkout-qr"');
 		expect(response.body).toContain('id="checkout-wallet"');

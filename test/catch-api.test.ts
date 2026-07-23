@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildApp, type CatchApiRepository } from "../src/app.js";
 import { hashToken } from "../src/security/tokens.js";
@@ -14,6 +14,7 @@ const resource = (): CatchResource => ({
 	publicId: "catch_test-public-id",
 	planId: "spark",
 	status: "active",
+	ingestAuthRequired: true,
 	requestLimit: 402,
 	storageLimitBytes: 2 * 1024 * 1024,
 	maxBytesPerRequest: 64 * 1024,
@@ -29,6 +30,7 @@ class FakeCatchRepository implements CatchApiRepository {
 	public readonly deletedEvents: string[] = [];
 	public destroyed = false;
 	public credentialLookups = 0;
+	public ingestAuthRequired = true;
 	public credentials = {
 		ownerTokenHash: hashToken("owner", ownerToken, pepper),
 		ingestTokenHash: hashToken("ingest", ingestToken, pepper),
@@ -43,9 +45,9 @@ class FakeCatchRepository implements CatchApiRepository {
 		return Promise.resolve(publicId === resource().publicId ? resource() : null);
 	}
 
-	public getCredentialHashes(publicId: string): Promise<{ ownerTokenHash: string | null; ingestTokenHash: string | null } | null> {
+	public getCredentialHashes(publicId: string): Promise<{ ownerTokenHash: string | null; ingestTokenHash: string | null; ingestAuthRequired: boolean } | null> {
 		this.credentialLookups += 1;
-		return Promise.resolve(publicId === resource().publicId ? this.credentials : null);
+		return Promise.resolve(publicId === resource().publicId ? { ...this.credentials, ingestAuthRequired: this.ingestAuthRequired } : null);
 	}
 
 	public acceptEvent(input: Parameters<CatchApiRepository["acceptEvent"]>[0]): Promise<{ accepted: true; eventId: string; sequenceNumber: number }> {
@@ -53,7 +55,8 @@ class FakeCatchRepository implements CatchApiRepository {
 		return Promise.resolve({ accepted: true, eventId: "event-1", sequenceNumber: 1 });
 	}
 
-	public listEvents(): Promise<never[]> { return Promise.resolve<never[]>([]); }
+	public listEvents(): ReturnType<CatchApiRepository["listEvents"]> { return Promise.resolve({ events: [], nextCursor: null }); }
+	public setIngestAuthRequired(_publicId: string, required: boolean): Promise<boolean> { this.ingestAuthRequired = required; return Promise.resolve(true); }
 	public deleteEvent(_publicId: string, eventId: string): Promise<boolean> { this.deletedEvents.push(eventId); return Promise.resolve(true); }
 	public destroy(): Promise<boolean> { this.destroyed = true; return Promise.resolve(true); }
 }
@@ -124,6 +127,31 @@ describe("CATCH HTTP API", () => {
 		expect(response.statusCode).toBe(204);
 		expect(response.body).toBe("");
 		expect(repository.accepted[0]?.[0]).toMatchObject({ body: Buffer.from("hello"), headers: { "content-type": "text/plain", "user-agent": "test", "x-request-id": "request-1" } });
+	});
+
+	it("keeps ingest authenticated by default, can enable public ingest, and records webhook methods", async () => {
+		const { app, repository } = buildCatchApp();
+		expect((await app.inject({ method: "POST", url: "/c/catch_test-public-id", headers: { "content-type": "text/plain" }, payload: "denied" })).statusCode).toBe(401);
+		const enabled = await app.inject({ method: "PATCH", url: "/api/catch/catch_test-public-id/settings", headers: bearer(ownerToken), payload: { ingestAuthRequired: false } });
+		expect(enabled.statusCode).toBe(200);
+		expect(enabled.json()).toMatchObject({ ingestAuthRequired: false });
+
+		for (const method of ["POST", "PUT", "PATCH", "DELETE", "GET", "HEAD", "OPTIONS"] as const) {
+			const response = await app.inject(method === "GET" || method === "HEAD" || method === "OPTIONS"
+				? { method, url: "/c/catch_test-public-id?canary=1", headers: { "content-type": "text/plain" } }
+				: { method, url: "/c/catch_test-public-id?canary=1", headers: { "content-type": "text/plain" }, payload: method });
+			expect(response.statusCode).toBe(204);
+		}
+		expect(repository.accepted.map(([event]) => event.method)).toEqual(["POST", "PUT", "PATCH", "DELETE", "GET", "HEAD", "OPTIONS"]);
+		expect(repository.accepted.every(([event]) => event.authenticated === false)).toBe(true);
+	});
+
+	it("marks token-backed events authenticated when public ingest is enabled", async () => {
+		const { app, repository } = buildCatchApp();
+		repository.ingestAuthRequired = false;
+		const response = await app.inject({ method: "PUT", url: "/c/catch_test-public-id", headers: { ...bearer(ingestToken), "content-type": "application/json" }, payload: { ok: true } });
+		expect(response.statusCode).toBe(204);
+		expect(repository.accepted[0]?.[0]).toMatchObject({ method: "PUT", authenticated: true });
 	});
 
 	it("accepts a Spark payload above the former 16 KiB ceiling", async () => {
@@ -270,5 +298,13 @@ describe("CATCH HTTP API", () => {
 		const destroyed = await app.inject({ method: "DELETE", url: "/api/catch/catch_test-public-id", headers: bearer(ownerToken) });
 		expect(destroyed.statusCode).toBe(204);
 		expect(repository.destroyed).toBe(true);
+	});
+
+	it("passes bounded event filters and cursors to the repository", async () => {
+		const { app, repository } = buildCatchApp();
+		const listEvents = vi.spyOn(repository, "listEvents");
+		const response = await app.inject({ method: "GET", url: "/api/catch/catch_test-public-id/events?limit=20&cursor=40&access=public&method=PUT&contentType=application%2Fjson&q=needle", headers: bearer(ownerToken) });
+		expect(response.statusCode).toBe(200);
+		expect(listEvents).toHaveBeenCalledWith("catch_test-public-id", { limit: 20, cursor: 40, access: "public", method: "PUT", contentType: "application/json", query: "needle" });
 	});
 });

@@ -6,13 +6,14 @@
 		<meta name="description" content="Buy a temporary webhook or an encrypted read-once message with Bitcoin over Lightning. No account, no subscription, hard limits." />
 		<meta name="theme-color" content="#080a08" />
 		<title>The402Machine — Disposable Internet Infrastructure</title>
-		<link rel="stylesheet" href="/assets/styles.css?v=9" />
+		<link rel="stylesheet" href="/assets/styles.css?v=10" />
 	</head>
 	<body>
 		<div class="noise" aria-hidden="true"></div>
 		<header class="topbar">
 			<a class="brand" href="#top" aria-label="The402Machine home"><span class="brand-mark">402</span><span>The402Machine</span></a>
 			<nav aria-label="Main navigation">
+				<a href="#api">API</a>
 				<a href="#machines">Cartridges</a>
 				<a href="#compare">Compare</a>
 				<a href="#principles">Safety</a>
@@ -45,6 +46,38 @@
 
 			<section class="manifesto-band"><div class="shell band-inner"><span>INSERT SATS</span><i>→</i><span>RECEIVE A CAPABILITY</span><i>→</i><span>WATCH IT DISAPPEAR</span></div></section>
 
+			<section class="api-section" id="api">
+				<div class="shell section">
+					<header class="api-heading"><div><p class="eyebrow">API / COMPLETE FLOW</p><h2>Buy, pay, receive,<br />inspect, erase.</h2></div><p>Everything the checkout does is available over HTTP. Payment settlement is verified server-side; never treat a wallet callback as proof of payment.</p></header>
+					<div class="api-flow" aria-label="API payment flow"><span>1 · Catalogue</span><i>→</i><span>2 · HTTP 402 quote</span><i>→</i><span>3 · Pay BOLT11</span><i>→</i><span>4 · Poll order</span><i>→</i><span>5 · Capability</span></div>
+					<div class="api-grid">
+						<article><p class="eyebrow">DISCOVER + PAY</p><h3>Lightning checkout</h3><code>GET /api/catalog</code><code>POST /api/payments/catch</code><code>POST /api/payments/whisper</code><code>GET /api/payments/{orderId}</code><p>Send a unique <b>Idempotency-Key</b> with every purchase request. A quote returns HTTP 402 with <code>orderId</code>, amount and BOLT11. Pay it, then poll the order endpoint. Credentials are returned only after server-side settlement.</p><details><summary>CATCH purchase example</summary><pre>curl -i -X POST https://the402machine.com/api/payments/catch \
+  -H 'Idempotency-Key: your-unique-key' \
+  -H 'Content-Type: application/json' \
+  --data '{"planId":"spark"}'
+
+# Pay the returned BOLT11, then poll:
+curl https://the402machine.com/api/payments/{orderId}</pre></details><p class="api-note">WHISPER accepts client-encrypted <code>application/octet-stream</code> plus <code>X-Whisper-Plan</code>. Never upload plaintext.</p></article>
+						<article><p class="eyebrow">CATCH / INGEST</p><h3>Receive any webhook verb</h3><code>POST|PUT|PATCH|DELETE|GET|HEAD|OPTIONS /c/{publicId}</code><p>CATCH records the HTTP method, content type, allow-listed headers, raw body and whether the ingest token authenticated the request. Protected ingest is the default. Owner settings may enable public ingest for providers that cannot send headers.</p><details><summary>Authenticated event example</summary><pre>curl -X PUT https://the402machine.com/c/{publicId} \
+  -H 'Authorization: Bearer {ingestToken}' \
+  -H 'Content-Type: application/json' \
+  --data '{"event":"canary"}'</pre></details><p class="api-note">Public ingest makes the URL itself a write capability. Anyone who learns it can consume quota. Owner APIs remain authenticated.</p></article>
+						<article><p class="eyebrow">CATCH / OWNER</p><h3>Inspect and manage</h3><code>GET /api/catch/{publicId}</code><code>GET /api/catch/{publicId}/events</code><code>PATCH /api/catch/{publicId}/settings</code><code>DELETE /api/catch/{publicId}/events/{eventId}</code><code>DELETE /api/catch/{publicId}</code><p>Use <code>Authorization: Bearer {ownerToken}</code>. Event listing supports <code>limit</code>, <code>cursor</code>, <code>access=public|authenticated</code>, <code>method</code>, <code>contentType</code> and <code>q</code>. Bodies use <code>bodyEncoding: "base64"</code>.</p><details><summary>Paginated listing example</summary><pre>curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;access=authenticated&amp;method=POST' \
+  -H 'Authorization: Bearer {ownerToken}'
+
+# Continue with nextCursor:
+curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;cursor={nextCursor}' \
+  -H 'Authorization: Bearer {ownerToken}'</pre></details></article>
+						<article><p class="eyebrow">WHISPER / READ ONCE</p><h3>Encrypt before upload</h3><code>POST /api/payments/whisper</code><code>GET /w/{publicId}</code><p>Generate a 32-byte AES-256-GCM key locally. Upload <code>application/octet-stream</code> as <code>[0x01][12-byte nonce][ciphertext + tag]</code>, with <code>X-Whisper-Plan</code> and <code>Idempotency-Key</code>. After settlement, keep the key outside the API response.</p><details><summary>Read-once retrieval</summary><pre>curl https://the402machine.com/w/{publicId} \
+  -H 'Authorization: Bearer {readToken}' \
+  --output encrypted.bin
+
+# Decrypt locally with the separately retained AES-256-GCM key.
+# The first successful read permanently consumes the WHISPER.</pre></details><p class="api-note">The service never needs the plaintext or encryption key. Put the key in a URL fragment only when building a human-readable sharing link.</p></article>
+					</div>
+				</div>
+			</section>
+
 			<section class="shell section" id="machines">
 				<header class="catalogue-heading">
 					<div class="catalogue-meta"><p class="eyebrow">CARTRIDGE CATALOGUE</p><div class="catalogue-count"><strong>02</strong><span>available cartridges</span></div></div>
@@ -63,7 +96,7 @@
 						<div class="card-index">A1</div>
 						<div class="card-body">
 							<div class="card-title"><div class="product-heading"><svg class="product-icon" viewBox="0 0 72 72" role="img"><title>CATCH webhook inbox</title><rect x="9" y="30" width="54" height="33" rx="3"/><path d="M9 42h16l6 8h10l6-8h16M36 8v26m-9-9 9 9 9-9"/><rect x="13" y="9" width="10" height="10"/><rect x="49" y="9" width="10" height="10"/></svg><div><p class="product-kicker">INBOUND-ONLY WEBHOOK</p><h3>CATCH</h3></div></div><span>LIVE</span></div>
-							<p class="product-line">Receive POSTs. Inspect. Erase.</p>
+							<p class="product-line">Receive requests. Inspect. Erase.</p>
 							<div class="feature-strip"><span>Inbound only</span><span>Raw bytes</span><span>Hard stop</span></div>
 							<div class="plan-grid" aria-label="CATCH plan comparison">
 								<article class="plan-card"><header><small>SPARK</small><div class="plan-price"><strong>42</strong><span>SATS</span></div><b class="plan-duration">4h 02m</b></header><dl><div><dt>Requests</dt><dd>402</dd></div><div><dt>Storage</dt><dd>2 MiB</dd></div><div><dt>Payload</dt><dd>64 KiB</dd></div></dl><button class="button plan-buy" data-buy="catch" data-plan="spark">Choose Spark</button></article>
@@ -93,7 +126,7 @@
 				<div class="shell section compare-inner">
 					<div class="compact-heading"><p class="eyebrow">DECISION GUIDE</p><h2>Machine or human?</h2></div>
 					<div class="decision-cards">
-						<article><svg viewBox="0 0 72 72" aria-hidden="true"><rect x="9" y="30" width="54" height="33" rx="3"/><path d="M9 42h16l6 8h10l6-8h16M36 8v26m-9-9 9 9 9-9"/></svg><div><p class="product-kicker">MACHINE → INBOX</p><h3>CATCH</h3><span>POSTs in · owner key out · time or quota ends it</span></div></article>
+						<article><svg viewBox="0 0 72 72" aria-hidden="true"><rect x="9" y="30" width="54" height="33" rx="3"/><path d="M9 42h16l6 8h10l6-8h16M36 8v26m-9-9 9 9 9-9"/></svg><div><p class="product-kicker">MACHINE → INBOX</p><h3>CATCH</h3><span>requests in · owner key out · time or quota ends it</span></div></article>
 						<article><svg viewBox="0 0 72 72" aria-hidden="true"><rect x="9" y="16" width="54" height="43" rx="4"/><path d="m9 22 27 22 27-22M9 59l20-20m34 20L43 39"/></svg><div><p class="product-kicker">HUMAN → ONE READ</p><h3>WHISPER</h3><span>Encrypt · share link · first read destroys it</span></div></article>
 					</div>
 				</div>

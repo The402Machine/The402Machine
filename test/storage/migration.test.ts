@@ -54,7 +54,7 @@ beforeAll(async () => {
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 4 });
 
-	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql"]) {
+	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -195,5 +195,19 @@ describe("CATCH migration", () => {
 		expect(event?.headers).toEqual({ "x-request-id": "ok" });
 		expect(await sql`select id from catch_events where resource_id = ${resource!.id}`).toHaveLength(1);
 		expect(stored).toMatchObject({ status: "exhausted", stored_bytes: "23" });
+	});
+
+	it("adds protected ingest defaults and event method provenance", async () => {
+		const [resourceColumn] = await sql<{ column_default: string; is_nullable: string }[]>`
+			select column_default, is_nullable from information_schema.columns
+			where table_name = 'catch_resources' and column_name = 'ingest_auth_required'
+		`;
+		const eventColumns = await sql<{ column_name: string; column_default: string }[]>`
+			select column_name, column_default from information_schema.columns
+			where table_name = 'catch_events' and column_name in ('method', 'authenticated') order by column_name
+		`;
+		expect(resourceColumn).toMatchObject({ column_default: "true", is_nullable: "NO" });
+		expect(eventColumns.map(({ column_name }) => column_name)).toEqual(["authenticated", "method"]);
+		expect((await sql`select version from schema_migrations where version = '0008_catch_flexible_ingest'`)).toHaveLength(1);
 	});
 });

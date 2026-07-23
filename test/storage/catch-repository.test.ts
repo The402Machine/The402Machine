@@ -39,7 +39,7 @@ beforeAll(async () => {
 	databaseUrl = `postgresql://postgres:${password}@127.0.0.1:${port}/the402machine_test`;
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 12 });
-	for (const file of ["0001_catch.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql"]) {
+	for (const file of ["0001_catch.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0008_catch_flexible_ingest.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -118,8 +118,8 @@ describe("CatchRepository", () => {
 		});
 
 		expect(result).toEqual({ accepted: false, reason: "exhausted" });
-		const events = await repository.listEvents(resource.publicId, 50);
-		expect(events).toEqual([]);
+		const events = await repository.listEvents(resource.publicId, { limit: 50 });
+		expect(events).toEqual({ events: [], nextCursor: null });
 	});
 
 	it("serializes concurrent accepts and never exceeds the byte quota", async () => {
@@ -234,7 +234,7 @@ describe("CatchRepository", () => {
 		await repository.acceptEvent({ publicId: resource.publicId, contentType: "text/plain", headers: {}, body: Buffer.from("stored") });
 		await sql`update catch_resources set created_at = clock_timestamp() - interval '2 seconds', expires_at = clock_timestamp() - interval '1 second' where id = ${resource.id}`;
 
-		expect(await repository.listEvents(resource.publicId, 50)).toEqual([]);
+		expect(await repository.listEvents(resource.publicId, { limit: 50 })).toEqual({ events: [], nextCursor: null });
 		expect(await rawResource(resource.publicId)).toMatchObject({ status: "expired", owner_token_hash: null, ingest_token_hash: null, stored_bytes: "0" });
 		expect(await eventCount(resource.id)).toBe(0);
 	});
@@ -267,14 +267,18 @@ describe("CatchRepository", () => {
 		await repository.acceptEvent({ publicId: resource.publicId, contentType: "text/plain", headers: {}, body: Buffer.from("one") });
 		await repository.acceptEvent({ publicId: resource.publicId, contentType: "text/plain", headers: {}, body: Buffer.from("two") });
 
-		const events = await repository.listEvents(resource.publicId, 1);
-		expect(events).toHaveLength(1);
-		expect(events[0]?.body.toString()).toBe("two");
-		await repository.deleteEvent(resource.publicId, events[0]!.id);
-		expect(await repository.listEvents(resource.publicId, 50)).toHaveLength(1);
+		const firstPage = await repository.listEvents(resource.publicId, { limit: 1 });
+		expect(firstPage.events).toHaveLength(1);
+		expect(firstPage.events[0]?.body.toString()).toBe("two");
+		expect(firstPage.nextCursor).toBe(2);
+		if (firstPage.nextCursor === null) throw new Error("Expected another event page");
+		const secondPage = await repository.listEvents(resource.publicId, { limit: 1, cursor: firstPage.nextCursor });
+		expect(secondPage.events[0]?.body.toString()).toBe("one");
+		await repository.deleteEvent(resource.publicId, firstPage.events[0]!.id);
+		expect((await repository.listEvents(resource.publicId, { limit: 50 })).events).toHaveLength(1);
 
 		await repository.destroy(resource.publicId);
-		expect(await repository.listEvents(resource.publicId, 50)).toEqual([]);
+		expect(await repository.listEvents(resource.publicId, { limit: 50 })).toEqual({ events: [], nextCursor: null });
 		expect((await repository.getResource(resource.publicId))?.status).toBe("manually_destroyed");
 		expect(await rawResource(resource.publicId)).toMatchObject({ status: "manually_destroyed", owner_token_hash: null, ingest_token_hash: null, stored_bytes: "0" });
 		expect(await eventCount(resource.id)).toBe(0);
@@ -300,5 +304,37 @@ describe("CatchRepository", () => {
 		`;
 		expect(await repository.destroy(suspended.publicId)).toBe(true);
 		expect((await repository.getResource(suspended.publicId))?.status).toBe("deleted");
+	});
+
+	it("filters and paginates public and authenticated events", async () => {
+		const resource = await provisionSpark();
+		await repository.setIngestAuthRequired(resource.publicId, false);
+		await repository.acceptEvent({ publicId: resource.publicId, method: "POST", authenticated: false, contentType: "text/plain", headers: {}, body: Buffer.from("public needle") });
+		await repository.acceptEvent({ publicId: resource.publicId, method: "PUT", authenticated: true, contentType: "application/json", headers: {}, body: Buffer.from('{"needle":true}') });
+		await repository.acceptEvent({ publicId: resource.publicId, method: "DELETE", authenticated: false, contentType: "text/plain", headers: {}, body: Buffer.from("other") });
+
+		const authenticated = await repository.listEvents(resource.publicId, { limit: 10, access: "authenticated" });
+		expect(authenticated.events.map((event) => event.method)).toEqual(["PUT"]);
+		const publicNeedle = await repository.listEvents(resource.publicId, { limit: 10, access: "public", query: "needle" });
+		expect(publicNeedle.events.map((event) => event.method)).toEqual(["POST"]);
+		const json = await repository.listEvents(resource.publicId, { limit: 10, method: "PUT", contentType: "application/json" });
+		expect(json.events).toHaveLength(1);
+	});
+
+	it("rechecks protected ingest atomically before storing an unauthenticated event", async () => {
+		const resource = await provisionSpark();
+		await repository.setIngestAuthRequired(resource.publicId, true);
+
+		const result = await repository.acceptEvent({
+			publicId: resource.publicId,
+			method: "POST",
+			authenticated: false,
+			contentType: "text/plain",
+			headers: {},
+			body: Buffer.from("raced public event"),
+		});
+
+		expect(result).toEqual({ accepted: false, reason: "unauthorized" });
+		expect(await eventCount(resource.id)).toBe(0);
 	});
 });

@@ -11,7 +11,7 @@ import { CATCH_PRICES_SATS, WHISPER_PRICES_SATS } from "./payment/payment-domain
 import type { DispensedResource } from "./payment/payment-repository.js";
 import type { PaymentQuote } from "./payment/payment-service.js";
 import { generateIngestToken, generateOwnerToken, hashToken, verifyToken } from "./security/tokens.js";
-import type { AcceptEventInput, AcceptEventResult, CatchCredentialHashes, CatchEvent, CatchResource, ProvisionInput } from "./storage/catch-repository.js";
+import type { AcceptEventInput, AcceptEventResult, CatchCredentialHashes, CatchEvent, CatchEventListOptions, CatchEventPage, CatchResource, ProvisionInput } from "./storage/catch-repository.js";
 import type { CreateWhisperInput } from "./whisper/whisper-repository.js";
 
 const MAX_INGEST_BYTES = Math.max(...Object.values(CATCH_PLANS).map((plan) => plan.maxBytesPerRequest));
@@ -26,7 +26,8 @@ export interface CatchApiRepository {
 	getResource(publicId: string): Promise<CatchResource | null>;
 	getCredentialHashes(publicId: string): Promise<CatchCredentialHashes | null>;
 	acceptEvent(input: AcceptEventInput): Promise<AcceptEventResult>;
-	listEvents(publicId: string, requestedLimit: number): Promise<CatchEvent[]>;
+	listEvents(publicId: string, options: CatchEventListOptions): Promise<CatchEventPage>;
+	setIngestAuthRequired(publicId: string, required: boolean): Promise<boolean>;
 	deleteEvent(publicId: string, eventId: string): Promise<boolean>;
 	destroy(publicId: string): Promise<boolean>;
 }
@@ -241,17 +242,22 @@ function registerCatchRoutes(app: FastifyInstance, options: CatchAppOptions): vo
 		});
 	}
 
-	app.post<{ Params: { publicId: string } }>("/c/:publicId", async (request, reply) => {
+	const ingestHandler = async (request: FastifyRequest<{ Params: { publicId: string } }>, reply: Parameters<Parameters<FastifyInstance["route"]>[0]["handler"]>[1]) => {
 		if (!consumeRateLimit(ingestionRateLimits, `${request.ip}:${request.params.publicId}`, 60, 60_000)) return rateLimited(reply);
-		const contentType = normalizedContentType(request.headers["content-type"]);
-		if (contentType === undefined || !ALLOWED_CONTENT_TYPES.has(contentType) || !identityEncoding(request.headers["content-encoding"])) return reply.code(400).send({ error: "invalid request" });
+		const contentType = normalizedContentType(request.headers["content-type"]) ?? "text/plain";
+		if (!ALLOWED_CONTENT_TYPES.has(contentType) || !identityEncoding(request.headers["content-encoding"])) return reply.code(400).send({ error: "invalid request" });
 		const credentials = await options.repository.getCredentialHashes(request.params.publicId);
-		if (credentials?.ingestTokenHash === null || credentials === null || !verifyToken("ingest", bearerToken(request) ?? "", credentials.ingestTokenHash, options.tokenPepper)) return reply.code(401).send({ error: "unauthorized" });
-		if (!Buffer.isBuffer(request.body) || request.body.byteLength > MAX_INGEST_BYTES) return reply.code(400).send({ error: "invalid request" });
-		const accepted = await options.repository.acceptEvent({ publicId: request.params.publicId, contentType, headers: filteredHeaders(request), body: request.body });
+		if (credentials === null || credentials.ingestTokenHash === null) return reply.code(401).send({ error: "unauthorized" });
+		const authenticated = verifyToken("ingest", bearerToken(request) ?? "", credentials.ingestTokenHash, options.tokenPepper);
+		if (credentials.ingestAuthRequired && !authenticated) return reply.code(401).send({ error: "unauthorized" });
+		const body = Buffer.isBuffer(request.body) ? request.body : Buffer.alloc(0);
+		if (body.byteLength > MAX_INGEST_BYTES) return reply.code(400).send({ error: "invalid request" });
+		const accepted = await options.repository.acceptEvent({ publicId: request.params.publicId, method: request.method, authenticated, contentType, headers: filteredHeaders(request), body });
+		if (!accepted.accepted && accepted.reason === "unauthorized") return reply.code(401).send({ error: "unauthorized" });
 		if (!accepted.accepted) return reply.code(400).send({ error: "invalid request" });
 		return reply.code(204).send();
-	});
+	};
+	for (const method of ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] as const) app.route({ method, url: "/c/:publicId", handler: ingestHandler });
 
 	app.get<{ Params: { publicId: string } }>("/api/catch/:publicId", async (request, reply) => {
 		if (!consumeRateLimit(ownerRateLimits, request.ip, 30, 60_000)) return rateLimited(reply);
@@ -261,12 +267,21 @@ function registerCatchRoutes(app: FastifyInstance, options: CatchAppOptions): vo
 		return reply.header("Cache-Control", "no-store").send(resourceStatus(resource));
 	});
 
-	app.get<{ Params: { publicId: string }; Querystring: { limit?: string } }>("/api/catch/:publicId/events", async (request, reply) => {
+	app.get<{ Params: { publicId: string }; Querystring: { limit?: string; cursor?: string; access?: string; method?: string; contentType?: string; q?: string } }>("/api/catch/:publicId/events", async (request, reply) => {
 		if (!consumeRateLimit(ownerRateLimits, request.ip, 30, 60_000)) return rateLimited(reply);
 		if (!await authorizeOwner(request, options)) return unauthorized(reply);
-		const limit = parseLimit(request.query.limit);
-		const events = await options.repository.listEvents(request.params.publicId, limit);
-		return reply.header("Cache-Control", "no-store").send({ events: events.map(eventResponse) });
+		const page = await options.repository.listEvents(request.params.publicId, parseEventOptions(request.query));
+		return reply.header("Cache-Control", "no-store").send({ events: page.events.map(eventResponse), nextCursor: page.nextCursor });
+	});
+
+	app.patch<{ Params: { publicId: string } }>("/api/catch/:publicId/settings", async (request, reply) => {
+		if (!consumeRateLimit(ownerRateLimits, request.ip, 30, 60_000)) return rateLimited(reply);
+		if (!await authorizeOwner(request, options)) return unauthorized(reply);
+		const body = Buffer.isBuffer(request.body) ? parseJsonBuffer(request.body) : request.body;
+		const ingestAuthRequired = typeof body === "object" && body !== null ? (body as { ingestAuthRequired?: unknown }).ingestAuthRequired : undefined;
+		if (typeof ingestAuthRequired !== "boolean") return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid request" });
+		const updated = await options.repository.setIngestAuthRequired(request.params.publicId, ingestAuthRequired);
+		return updated ? reply.header("Cache-Control", "no-store").send({ ingestAuthRequired }) : reply.header("Cache-Control", "no-store").code(404).send({ error: "not found" });
 	});
 
 	app.delete<{ Params: { publicId: string; eventId: string } }>("/api/catch/:publicId/events/:eventId", async (request, reply) => {
@@ -339,17 +354,33 @@ function filteredHeaders(request: FastifyRequest): Record<string, string> {
 	return Object.fromEntries(Object.entries(request.headers).flatMap(([name, value]) => ALLOWED_HEADERS.has(name) && typeof value === "string" ? [[name, value]] : []));
 }
 function parseLimit(value: string | undefined): number { const parsed = Number(value ?? "50"); return Number.isInteger(parsed) ? Math.max(1, Math.min(50, parsed)) : 50; }
+function parseEventOptions(query: { limit?: string; cursor?: string; access?: string; method?: string; contentType?: string; q?: string }): CatchEventListOptions {
+	const cursor = Number(query.cursor);
+	return {
+		limit: parseLimit(query.limit),
+		...(Number.isInteger(cursor) && cursor > 0 ? { cursor } : {}),
+		...(query.access === "public" || query.access === "authenticated" ? { access: query.access } : {}),
+		...(typeof query.method === "string" && ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].includes(query.method.toUpperCase()) ? { method: query.method.toUpperCase() } : {}),
+		...(typeof query.contentType === "string" && query.contentType.length > 0 ? { contentType: query.contentType.slice(0, 120) } : {}),
+		...(typeof query.q === "string" && query.q.trim().length > 0 ? { query: query.q.trim().slice(0, 120) } : {}),
+	};
+}
 function resourceStatus(resource: CatchResource): object {
-	return { publicId: resource.publicId, planId: resource.planId, status: resource.status, requestLimit: resource.requestLimit, storageLimitBytes: resource.storageLimitBytes, maxBytesPerRequest: resource.maxBytesPerRequest, acceptedRequestCount: resource.acceptedRequestCount, storedBytes: resource.storedBytes, createdAt: resource.createdAt.toISOString(), expiresAt: resource.expiresAt.toISOString() };
+	return { publicId: resource.publicId, planId: resource.planId, status: resource.status, ingestAuthRequired: resource.ingestAuthRequired, requestLimit: resource.requestLimit, storageLimitBytes: resource.storageLimitBytes, maxBytesPerRequest: resource.maxBytesPerRequest, acceptedRequestCount: resource.acceptedRequestCount, storedBytes: resource.storedBytes, createdAt: resource.createdAt.toISOString(), expiresAt: resource.expiresAt.toISOString() };
 }
 function eventResponse(event: CatchEvent): object {
-	return { id: event.id, sequenceNumber: event.sequenceNumber, contentType: event.contentType, headers: event.headers, body: event.body.toString("base64"), bodyEncoding: "base64", receivedAt: event.receivedAt.toISOString() };
+	return { id: event.id, sequenceNumber: event.sequenceNumber, method: event.method, authenticated: event.authenticated, access: event.authenticated ? "authenticated" : "public", contentType: event.contentType, headers: event.headers, body: event.body.toString("base64"), bodyEncoding: "base64", receivedAt: event.receivedAt.toISOString() };
 }
 
 function provisionPlanId(body: unknown): unknown {
 	if (Buffer.isBuffer(body)) {
-		try { return (JSON.parse(body.toString("utf8")) as { planId?: unknown }).planId; } catch { return undefined; }
+		const parsed = parseJsonBuffer(body);
+		return typeof parsed === "object" && parsed !== null ? (parsed as { planId?: unknown }).planId : undefined;
 	}
 	if (typeof body === "object" && body !== null) return (body as { planId?: unknown }).planId;
 	return undefined;
+}
+
+function parseJsonBuffer(body: Buffer): unknown {
+	try { return JSON.parse(body.toString("utf8")); } catch { return null; }
 }
