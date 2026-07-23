@@ -42,7 +42,11 @@ CREATE TABLE IF NOT EXISTS catch_resources (
 	CHECK (expires_at > created_at),
 	CHECK (accepted_request_count <= request_limit),
 	CHECK (stored_bytes <= storage_limit_bytes),
-	CHECK ((status IN ('active', 'exhausted', 'suspended')) OR (owner_token_hash IS NULL AND ingest_token_hash IS NULL))
+	CHECK (
+		(status IN ('active', 'exhausted', 'suspended') AND owner_token_hash IS NOT NULL AND ingest_token_hash IS NOT NULL)
+		OR
+		(status IN ('expired', 'manually_destroyed', 'deleted') AND owner_token_hash IS NULL AND ingest_token_hash IS NULL)
+	)
 );
 
 CREATE INDEX IF NOT EXISTS catch_resources_expiry_candidates_idx

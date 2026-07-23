@@ -1,7 +1,16 @@
+export type CatchConfig = {
+	databaseUrl: string | undefined;
+	tokenPepper: string | undefined;
+	internalProvisioning: boolean;
+	provisioningSecret: string | undefined;
+	publicBaseUrl: string | undefined;
+};
+
 export type AppConfig = {
 	host: string;
 	port: number;
 	logLevel: string;
+	catch: CatchConfig;
 };
 
 const parsePort = (value: string | undefined): number => {
@@ -14,8 +23,32 @@ const parsePort = (value: string | undefined): number => {
 	return port;
 };
 
-export const loadConfig = (environment: NodeJS.ProcessEnv = process.env): AppConfig => ({
-	host: environment.HOST ?? "127.0.0.1",
-	port: parsePort(environment.PORT),
-	logLevel: environment.LOG_LEVEL ?? "info",
-});
+const parseBoolean = (name: string, value: string | undefined, defaultValue: boolean): boolean => {
+	if (value === undefined) return defaultValue;
+	if (value === "true") return true;
+	if (value === "false") return false;
+	throw new Error(`${name} must be true or false`);
+};
+
+export const loadConfig = (environment: NodeJS.ProcessEnv = process.env): AppConfig => {
+	const catchConfig: CatchConfig = {
+		databaseUrl: environment.DATABASE_URL,
+		tokenPepper: environment.CATCH_TOKEN_PEPPER,
+		internalProvisioning: parseBoolean("CATCH_INTERNAL_PROVISIONING", environment.CATCH_INTERNAL_PROVISIONING, false),
+		provisioningSecret: environment.CATCH_PROVISIONING_SECRET,
+		publicBaseUrl: environment.PUBLIC_BASE_URL,
+	};
+
+	if (catchConfig.internalProvisioning) {
+		if (catchConfig.provisioningSecret === undefined || catchConfig.provisioningSecret.length === 0) throw new Error("CATCH_PROVISIONING_SECRET is required when CATCH_INTERNAL_PROVISIONING is enabled");
+		if (catchConfig.tokenPepper === undefined || catchConfig.tokenPepper.length === 0) throw new Error("CATCH_TOKEN_PEPPER is required when CATCH_INTERNAL_PROVISIONING is enabled");
+		if (catchConfig.databaseUrl === undefined || catchConfig.databaseUrl.length === 0) throw new Error("DATABASE_URL is required when CATCH_INTERNAL_PROVISIONING is enabled");
+	}
+
+	return {
+		host: environment.HOST ?? "127.0.0.1",
+		port: parsePort(environment.PORT),
+		logLevel: environment.LOG_LEVEL ?? "info",
+		catch: catchConfig,
+	};
+};

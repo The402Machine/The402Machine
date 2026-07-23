@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 import postgres from "postgres";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { calculatePlanExpiry, CATCH_PLANS } from "../../src/domain/catch-plans.js";
 import { CatchRepository } from "../../src/storage/catch-repository.js";
@@ -120,6 +120,29 @@ describe("CatchRepository", () => {
 		expect(result).toEqual({ accepted: false, reason: "expired" });
 		const loaded = await repository.getResource(resource.publicId);
 		expect(loaded?.status).toBe("expired");
+	});
+
+	it("uses the database clock for expiry rather than the application clock", async () => {
+		const resource = await provisionSpark();
+		await sql`
+			update catch_resources
+			set created_at = clock_timestamp() - interval '2 seconds', expires_at = clock_timestamp() - interval '1 second'
+			where id = ${resource.id}
+		`;
+		const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(new Date("2000-01-01T00:00:00.000Z").getTime());
+
+		try {
+			const result = await repository.acceptEvent({
+				publicId: resource.publicId,
+				contentType: "text/plain",
+				headers: {},
+				body: Buffer.from("late"),
+			});
+
+			expect(result).toEqual({ accepted: false, reason: "expired" });
+		} finally {
+			dateNowSpy.mockRestore();
+		}
 	});
 
 	it("lists bounded events, deletes one, and destroys the resource irreversibly", async () => {

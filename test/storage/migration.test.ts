@@ -97,15 +97,31 @@ describe("CATCH migration", () => {
 		`).rejects.toMatchObject({ code: "23514" });
 	});
 
-	it("requires terminal resources to have their credentials erased", async () => {
-		await expect(sql`
-			insert into catch_resources (
-				public_id, plan_id, status, owner_token_hash, ingest_token_hash,
-				request_limit, storage_limit_bytes, max_bytes_per_request, expires_at
-			) values (
-				${`catch_${"b".repeat(22)}`}, 'spark', 'expired', 'owner', 'ingest',
-				402, ${2 * 1024 * 1024}, ${16 * 1024}, clock_timestamp() + interval '1 hour'
-			)
-		`).rejects.toMatchObject({ code: "23514" });
+	it("requires live and readable resources to retain both credentials", async () => {
+		for (const status of ["active", "exhausted", "suspended"]) {
+			await expect(sql`
+				insert into catch_resources (
+					public_id, plan_id, status, owner_token_hash, ingest_token_hash,
+					request_limit, storage_limit_bytes, max_bytes_per_request, expires_at
+				) values (
+					${`catch_${status}_${randomUUID().replaceAll("-", "")}`}, 'spark', ${status}::catch_resource_status, null, null,
+					402, ${2 * 1024 * 1024}, ${16 * 1024}, clock_timestamp() + interval '1 hour'
+				)
+			`).rejects.toMatchObject({ code: "23514" });
+		}
+	});
+
+	it("requires terminal resources to have both credentials erased", async () => {
+		for (const status of ["expired", "manually_destroyed", "deleted"]) {
+			await expect(sql`
+				insert into catch_resources (
+					public_id, plan_id, status, owner_token_hash, ingest_token_hash,
+					request_limit, storage_limit_bytes, max_bytes_per_request, expires_at
+				) values (
+					${`catch_${status}_${randomUUID().replaceAll("-", "")}`}, 'spark', ${status}::catch_resource_status, 'owner', 'ingest',
+					402, ${2 * 1024 * 1024}, ${16 * 1024}, clock_timestamp() + interval '1 hour'
+				)
+			`).rejects.toMatchObject({ code: "23514" });
+		}
 	});
 });

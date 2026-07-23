@@ -26,7 +26,18 @@ export type CatchEvent = {
 	receivedAt: Date;
 };
 
+export type CatchCredentialHashes = {
+	ownerTokenHash: string | null;
+	ingestTokenHash: string | null;
+};
+
+type CredentialRow = {
+	owner_token_hash: string | null;
+	ingest_token_hash: string | null;
+};
+
 type ResourceRow = {
+	is_expired: boolean;
 	id: string;
 	public_id: string;
 	plan_id: CatchPlanId;
@@ -49,7 +60,7 @@ type EventRow = {
 	received_at: Date;
 };
 
-type ProvisionInput = {
+export type ProvisionInput = {
 	publicId: string;
 	planId: CatchPlanId;
 	ownerTokenHash: string;
@@ -60,7 +71,7 @@ type ProvisionInput = {
 	expiresAt: Date;
 };
 
-type AcceptEventInput = {
+export type AcceptEventInput = {
 	publicId: string;
 	contentType: string;
 	headers: Record<string, string>;
@@ -96,15 +107,25 @@ export class CatchRepository {
 		return row === undefined ? null : mapResource(row);
 	}
 
+	public async getCredentialHashes(publicId: string): Promise<CatchCredentialHashes | null> {
+		const [row] = await this.sql<CredentialRow[]>`
+			select owner_token_hash, ingest_token_hash from catch_resources where public_id = ${publicId}
+		`;
+		if (row === undefined) return null;
+		return { ownerTokenHash: row.owner_token_hash, ingestTokenHash: row.ingest_token_hash };
+	}
+
 	public async acceptEvent(input: AcceptEventInput): Promise<AcceptEventResult> {
 		return this.sql.begin(async (tx) => {
 			const [resource] = await tx<ResourceRow[]>`
-				select * from catch_resources where public_id = ${input.publicId} for update
+				select *, clock_timestamp() >= expires_at as is_expired
+				from catch_resources
+				where public_id = ${input.publicId}
+				for update
 			`;
 			if (resource === undefined) return { accepted: false, reason: "not_found" };
 
-			const now = new Date();
-			if (now.getTime() >= resource.expires_at.getTime()) {
+			if (resource.is_expired) {
 				if (resource.status === "active" || resource.status === "exhausted" || resource.status === "suspended") {
 					await tx`
 						update catch_resources
