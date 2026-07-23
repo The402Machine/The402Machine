@@ -22,7 +22,7 @@ export class LnbitsPaymentAdapter implements PaymentAdapter {
 
 	public constructor(options: LnbitsAdapterOptions) {
 		this.baseUrl = options.baseUrl.replace(/\/+$/u, "");
-		if (!isLoopbackHttpUrl(this.baseUrl)) throw new Error("LNbits API URL must be loopback HTTP");
+		if (!isPrivatePaymentBridgeUrl(this.baseUrl)) throw new Error("LNbits API URL must use the private payment bridge");
 		if (options.invoiceKey.length === 0) throw new Error("LNbits invoice key is required");
 		this.invoiceKey = options.invoiceKey;
 		this.invoiceExpirySeconds = options.invoiceExpirySeconds ?? 600;
@@ -110,10 +110,13 @@ function isListedInvoice(value: unknown, input: { orderId: string; amountSats: n
 	return payment.external_id === input.orderId && typeof payment.amount === "number" && Math.abs(payment.amount) === input.amountSats * 1_000;
 }
 
-function isLoopbackHttpUrl(value: string): boolean {
+function isPrivatePaymentBridgeUrl(value: string): boolean {
 	try {
 		const url = new URL(value);
-		return url.protocol === "http:" && (url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "[::1]");
+		return url.protocol === "http:" && (
+			url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "[::1]" ||
+			(url.hostname === "172.30.240.1" && url.port === "2180")
+		);
 	} catch {
 		return false;
 	}

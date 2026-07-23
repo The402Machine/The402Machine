@@ -64,7 +64,7 @@ export const loadConfig = (environment: NodeJS.ProcessEnv = process.env): AppCon
 	};
 	if (payment.provider === "lnbits") {
 		if (!nonEmpty(payment.apiUrl)) throw new Error("PAYMENT_API_URL is required when LNbits payments are enabled");
-		if (!isLoopbackHttpUrl(payment.apiUrl)) throw new Error("PAYMENT_API_URL must be loopback HTTP");
+		if (!isPrivatePaymentBridgeUrl(payment.apiUrl)) throw new Error("PAYMENT_API_URL must use the private payment bridge");
 		if (!nonEmpty(payment.apiKey)) throw new Error("PAYMENT_API_KEY is required when LNbits payments are enabled");
 		if (!nonEmpty(payment.deliveryKey) || Buffer.from(payment.deliveryKey, "base64url").byteLength !== 32) throw new Error("PAYMENT_DELIVERY_KEY must contain 32 base64url-encoded bytes");
 		if (!hasDatabaseUrl || !hasTokenPepper) throw new Error("DATABASE_URL and CATCH_TOKEN_PEPPER are required when LNbits payments are enabled");
@@ -84,10 +84,13 @@ function nonEmpty(value: string | undefined): value is string {
 	return value !== undefined && value.length > 0;
 }
 
-function isLoopbackHttpUrl(value: string): boolean {
+function isPrivatePaymentBridgeUrl(value: string): boolean {
 	try {
-		const url = new URL(value);
-		return url.protocol === "http:" && (url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "[::1]");
+			const url = new URL(value);
+			return url.protocol === "http:" && (
+				url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "[::1]" ||
+				(url.hostname === "172.30.240.1" && url.port === "2180")
+			);
 	} catch {
 		return false;
 	}

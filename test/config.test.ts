@@ -33,7 +33,7 @@ describe("CATCH configuration", () => {
 
 	it("enables payments only with loopback LNbits, an invoice key, and a 32-byte delivery key", () => {
 		expect(() => loadConfig({ PAYMENT_PROVIDER: "lnbits" })).toThrow(/PAYMENT_API_URL/);
-		expect(() => loadConfig({ PAYMENT_PROVIDER: "lnbits", PAYMENT_API_URL: "https://lnbits.example" })).toThrow(/loopback/);
+		expect(() => loadConfig({ PAYMENT_PROVIDER: "lnbits", PAYMENT_API_URL: "https://lnbits.example" })).toThrow(/private payment bridge/);
 		expect(() => loadConfig({ PAYMENT_PROVIDER: "lnbits", PAYMENT_API_URL: "http://127.0.0.1:2180" })).toThrow(/PAYMENT_API_KEY/);
 		expect(() => loadConfig({ PAYMENT_PROVIDER: "lnbits", PAYMENT_API_URL: "http://127.0.0.1:2180", PAYMENT_API_KEY: "invoice" })).toThrow(/PAYMENT_DELIVERY_KEY/);
 		const config = loadConfig({
@@ -42,5 +42,14 @@ describe("CATCH configuration", () => {
 			PAYMENT_DELIVERY_KEY: Buffer.alloc(32, 1).toString("base64url"),
 		});
 		expect(config.payment.provider).toBe("lnbits");
+	});
+
+	it("accepts only loopback or the pinned Docker gateway for LNbits", () => {
+		const base = {
+			DATABASE_URL: "postgres://example", CATCH_TOKEN_PEPPER: "pepper", PAYMENT_PROVIDER: "lnbits",
+			PAYMENT_API_KEY: "invoice", PAYMENT_DELIVERY_KEY: Buffer.alloc(32, 1).toString("base64url"),
+		};
+		expect(loadConfig({ ...base, PAYMENT_API_URL: "http://172.30.240.1:2180" }).payment.apiUrl).toBe("http://172.30.240.1:2180");
+		expect(() => loadConfig({ ...base, PAYMENT_API_URL: "http://10.22.2.16:5000" })).toThrow(/private payment bridge/);
 	});
 });

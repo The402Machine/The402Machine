@@ -3,6 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 import { LnbitsPaymentAdapter } from "../../src/payment/lnbits-adapter.js";
 
 describe("LNbits payment adapter", () => {
+	it("accepts only loopback or the pinned Docker gateway", () => {
+		expect(() => new LnbitsPaymentAdapter({ baseUrl: "http://172.30.240.1:2180", invoiceKey: "invoice-key" })).not.toThrow();
+		expect(() => new LnbitsPaymentAdapter({ baseUrl: "http://10.22.2.16:5000", invoiceKey: "invoice-key" })).toThrow(/private payment bridge/);
+	});
+
 	it("creates a short-lived invoice with the invoice-only key", async () => {
 		const fetchImplementation = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
 			payment_hash: "a".repeat(64),
