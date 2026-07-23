@@ -11,7 +11,7 @@ The402Machine is a source-available vending machine for temporary Internet appli
 A private, inbound-only webhook inbox with hard request, storage, and lifetime limits.
 
 - **Spark:** 4 hours 2 minutes, 402 requests, 2 MiB total, 64 KiB per request — **42 sats**.
-- **Standard:** 30 days, 4,020 requests, 20 MiB total, 256 KiB per request — **402 sats**.
+- **Standard:** 40 days 2 hours, 4,020 requests, 20 MiB total, 256 KiB per request — **402 sats**.
 - **Long:** 4 months 2 days, 40,200 requests, 200 MiB total, 1 MiB per request — **4,002 sats**.
 
 CATCH accepts bounded POST requests and never forwards, executes, or calls back into user-provided destinations.
@@ -45,7 +45,7 @@ Current plan ladder:
 - Standard: 402 sats
 - Long: 4,002 sats
 
-CATCH uses lifetimes of 4h 02m, 30 days, and 4 months + 2 days while scaling request, storage, and per-request payload quotas. WHISPER uses longer unread windows of 7, 42, and 402 days; every plan remains one-read, client-encrypted, and limited to the same bounded ciphertext size.
+CATCH uses lifetimes of 4h 02m, 40d 02h, and 4 months + 2 days while scaling request, storage, and per-request payload quotas. WHISPER uses unread windows of 7, 42, and 402 days; every plan remains one-read, client-encrypted, and holds up to 4.02 MiB of ciphertext.
 
 ## CATCH guarantees
 

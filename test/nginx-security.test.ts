@@ -19,6 +19,8 @@ describe("Nginx security boundary", () => {
 		expect(realIp).toContain("real_ip_header CF-Connecting-IP;");
 		expect(site).toContain("location ^~ /api/catch/");
 		expect(site).toContain("client_max_body_size 1m;");
+		expect(site).toContain("location = /api/payments/whisper");
+		expect(site).toContain("client_max_body_size 5m;");
 		expect(site).toContain("limit_req zone=the402_owner");
 		expect(site).toContain("location = /api/payments/catch");
 		expect(site).toContain("limit_req zone=the402_payment_quote");

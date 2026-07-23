@@ -74,7 +74,7 @@ describe("PaymentService", () => {
 
 	it("dispenses one CATCH resource only after settlement", async () => {
 		const store = new FakeOrderStore(); const adapter = new FakeAdapter(); adapter.settled = true;
-		const provisioned = { product: "catch" as const, publicId: "catch_once", planId: "spark" as const, ownerTokenHash: "owner-hash", ingestTokenHash: "ingest-hash", requestLimit: 402, storageLimitBytes: 2 * 1024 * 1024, maxBytesPerRequest: 16 * 1024, ownerToken: "owner-once", ingestToken: "ingest-once", expiresAt: new Date("2026-07-23T12:00:00.000Z") };
+		const provisioned = { product: "catch" as const, publicId: "catch_once", planId: "spark" as const, ownerTokenHash: "owner-hash", ingestTokenHash: "ingest-hash", requestLimit: 402, storageLimitBytes: 2 * 1024 * 1024, maxBytesPerRequest: 64 * 1024, ownerToken: "owner-once", ingestToken: "ingest-once", expiresAt: new Date("2026-07-23T12:00:00.000Z") };
 		const service = new PaymentService(store, adapter, () => Promise.resolve(provisioned));
 		const quote = await service.quote({ idempotencyKey: "idempotency-3", product: "catch", planId: "spark", productPayload: null });
 		expect(await service.fulfill(quote.orderId)).toEqual({ settled: true, resource: { product: "catch", resourceId: "resource-1", publicId: "catch_once", ownerToken: "owner-once", ingestToken: "ingest-once", expiresAt: provisioned.expiresAt } });

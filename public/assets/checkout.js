@@ -86,7 +86,7 @@ function renderPlanChoices(plans) {
 		input.checked = plan.planId === selectedPlanId;
 		input.addEventListener("change", () => { selectedPlanId = plan.planId; updateSummary(); });
 		const copy = document.createElement("span");
-		copy.innerHTML = `<b>${plan.planId.toUpperCase()}</b><strong>${formatSats(plan.priceSats)} sats</strong><small>${plan.durationLabel} · ${plan.bestFor}</small>`;
+		copy.innerHTML = `<b>${plan.planId.toUpperCase()}</b><strong>${formatSats(plan.priceSats)} <small>SATS</small></strong><small>${plan.durationLabel} · ${plan.bestFor}</small>`;
 		label.append(input, copy);
 		return label;
 	}));
@@ -164,4 +164,4 @@ async function pollDelivery(orderId) {
 function isPlanId(value) { return value === "spark" || value === "standard" || value === "long"; }
 function formatSats(value) { return new Intl.NumberFormat("en-US").format(value); }
 function formatNumber(value) { return new Intl.NumberFormat("en-US").format(value); }
-function formatBytes(value) { return value >= 1024 * 1024 ? `${value / (1024 * 1024)} MiB` : `${value / 1024} KiB`; }
+function formatBytes(value) { return value >= 1024 * 1024 ? `${Number((value / (1024 * 1024)).toFixed(2))} MiB` : `${value / 1024} KiB`; }

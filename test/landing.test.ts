@@ -20,17 +20,20 @@ describe("public landing page", () => {
 		expect(response.statusCode).toBe(200);
 		expect(response.headers["content-type"]).toContain("text/html");
 		expect(response.body).toContain("Rent less internet");
-		expect(response.body).toContain("30 days");
+		expect(response.body).toContain("40d 02h");
 		expect(response.body).toContain("4 months + 2 days");
 		expect(response.body).toContain("CATCH");
 		expect(response.body).toContain("WHISPER");
-		expect(response.body).toContain("SPARK · 42 SATS");
-		expect(response.body).toContain("STANDARD · 402 SATS");
-		expect(response.body).toContain("LONG · 4,002 SATS");
+		expect(response.body).toContain('<div class="plan-price"><strong>42</strong><span>SATS</span>');
+		expect(response.body).toContain('<div class="plan-price"><strong>402</strong><span>SATS</span>');
+		expect(response.body).toContain('<div class="plan-price"><strong>4,002</strong><span>SATS</span>');
 		expect(response.body).toContain("7 days");
 		expect(response.body).toContain("42 days");
 		expect(response.body).toContain("402 days");
-		expect(response.body).toContain("Plans change only how long an unread WHISPER waits");
+		expect(response.body).toContain("Every plan holds up to 4.02 MiB encrypted");
+		expect(response.body).toContain("plan-price");
+		expect(response.body).not.toContain("Start with the job, then pick the fuse");
+		expect(response.body).not.toContain("A1 · MACHINE INPUT");
 		expect(response.body).toContain("64 KiB");
 		expect(response.body).toContain("256 KiB");
 		expect(response.body).toContain("1 MiB");
@@ -42,7 +45,7 @@ describe("public landing page", () => {
 		expect(response.body).toContain('data-buy="catch"');
 		expect(response.body).toContain('data-buy="whisper"');
 		expect(response.body).toContain('data-plan="long"');
-		expect(response.body).toContain('src="/assets/checkout.js?v=4"');
+		expect(response.body).toContain('src="/assets/checkout.js?v=5"');
 	});
 
 	it("exposes the landing stylesheet", async () => {

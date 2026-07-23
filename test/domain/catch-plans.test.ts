@@ -17,7 +17,7 @@ describe("CATCH plan catalogue", () => {
 	it("defines the public Standard plan limits and duration", () => {
 		expect(CATCH_PLANS.standard).toEqual({
 			id: "standard",
-			duration: { kind: "fixed", seconds: 2_592_000 },
+			duration: { kind: "fixed", seconds: 3_463_200 },
 			requestLimit: 4_020,
 			storageLimitBytes: 20 * 1024 * 1024,
 			maxBytesPerRequest: 256 * 1024,
@@ -48,7 +48,7 @@ describe("CATCH plan expiry", () => {
 		const activatedAt = new Date("2026-07-23T00:00:00.000Z");
 
 		expect(calculatePlanExpiry("spark", activatedAt).toISOString()).toBe("2026-07-23T04:02:00.000Z");
-		expect(calculatePlanExpiry("standard", activatedAt).toISOString()).toBe("2026-08-22T00:00:00.000Z");
+		expect(calculatePlanExpiry("standard", activatedAt).toISOString()).toBe("2026-09-01T02:00:00.000Z");
 		expect(activatedAt.toISOString()).toBe("2026-07-23T00:00:00.000Z");
 	});
 

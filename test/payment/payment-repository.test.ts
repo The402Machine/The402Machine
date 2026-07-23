@@ -39,7 +39,7 @@ beforeAll(async () => {
 	databaseUrl = `postgresql://postgres:${password}@127.0.0.1:${port}/the402machine_test`;
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 12 });
-	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0006_payment_pricing_v2.sql"]) {
+	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${migrationName}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -93,7 +93,7 @@ describe("PaymentRepository", () => {
 			return Promise.resolve({
 				product: "catch" as const,
 				publicId: "catch_payment_repository_once", planId: "spark", ownerTokenHash: "owner-hash", ingestTokenHash: "ingest-hash",
-				requestLimit: 402, storageLimitBytes: 2 * 1024 * 1024, maxBytesPerRequest: 16 * 1024,
+				requestLimit: 402, storageLimitBytes: 2 * 1024 * 1024, maxBytesPerRequest: 64 * 1024,
 				ownerToken: "owner-once", ingestToken: "ingest-once", expiresAt: new Date(Date.now() + 60_000),
 			});
 		})));
@@ -117,5 +117,13 @@ describe("PaymentRepository", () => {
 		expect(results.every((result) => result?.product === "whisper" && result.readToken === "read-once")).toBe(true);
 		const rows = await sql<{ count: number }[]>`select count(*)::int as count from whispers where public_id = 'whisper_payment_once_abcdefghijklmnopqrstuv'`;
 		expect(rows[0]?.count).toBe(1);
+	});
+
+	it("stores a WHISPER payment payload near 4.02 MiB", async () => {
+		const ciphertext = Buffer.alloc(4_215_276, 7);
+		ciphertext[0] = 1;
+		const order = await repository.createOrder({ idempotencyKey: "idem-whisper-large", product: "whisper", planId: "spark", productPayload: ciphertext });
+		expect(order.productPayload?.byteLength).toBe(4_215_276);
+		await expect(repository.createOrder({ idempotencyKey: "idem-whisper-too-large", product: "whisper", planId: "spark", productPayload: Buffer.alloc(4_215_277, 7) })).rejects.toThrow("WHISPER ciphertext is invalid");
 	});
 });

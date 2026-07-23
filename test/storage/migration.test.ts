@@ -54,7 +54,7 @@ beforeAll(async () => {
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 4 });
 
-	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql"]) {
+	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -96,6 +96,31 @@ describe("CATCH migration", () => {
 		await expect(sql`
 			insert into payment_orders (idempotency_key, product, plan_id, amount_sats)
 			values ('pricing-invalid', 'catch', 'spark', 402)
+		`).rejects.toMatchObject({ code: "23514" });
+	});
+
+	it("accepts WHISPER ciphertext up to 4.02 MiB in orders and resources", async () => {
+		const legacyLimits = await sql<{ table_name: string; definition: string }[]>`
+			select conrelid::regclass::text as table_name, pg_get_constraintdef(oid) as definition
+			from pg_constraint
+			where conrelid in ('payment_orders'::regclass, 'whispers'::regclass)
+				and contype = 'c'
+				and (pg_get_constraintdef(oid) like '%octet_length(product_payload)%' or pg_get_constraintdef(oid) like '%octet_length(ciphertext)%')
+		`;
+		expect(legacyLimits).toHaveLength(2);
+		expect(legacyLimits.every(({ definition }) => definition.includes("4215276") && !definition.includes("16384"))).toBe(true);
+		const ciphertext = Buffer.alloc(4_215_276, 7);
+		await expect(sql`
+			insert into payment_orders (idempotency_key, product, plan_id, product_payload, amount_sats)
+			values ('whisper-large-order', 'whisper', 'spark', ${ciphertext}, 42)
+		`).resolves.toBeDefined();
+		await expect(sql`
+			insert into whispers (public_id, plan_id, read_token_hash, ciphertext, expires_at)
+			values (${`whisper_${"w".repeat(22)}`}, 'spark', 'read-hash', ${ciphertext}, clock_timestamp() + interval '7 days')
+		`).resolves.toBeDefined();
+		await expect(sql`
+			insert into payment_orders (idempotency_key, product, plan_id, product_payload, amount_sats)
+			values ('whisper-oversized-order', 'whisper', 'spark', ${Buffer.alloc(4_215_277, 7)}, 42)
 		`).rejects.toMatchObject({ code: "23514" });
 	});
 

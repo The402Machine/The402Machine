@@ -24,7 +24,7 @@ export const CATCH_PLANS: Readonly<Record<CatchPlanId, CatchPlan>> = {
 	},
 	standard: {
 		id: "standard",
-		duration: { kind: "fixed", seconds: 2_592_000 },
+		duration: { kind: "fixed", seconds: 3_463_200 },
 		requestLimit: 4_020,
 		storageLimitBytes: 20 * 1024 * 1024,
 		maxBytesPerRequest: 256 * 1024,

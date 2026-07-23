@@ -6,7 +6,7 @@ import fastifyStatic from "@fastify/static";
 import Fastify, { LogController, type FastifyInstance, type FastifyRequest } from "fastify";
 
 import { calculatePlanExpiry, CATCH_PLANS } from "./domain/catch-plans.js";
-import { calculateWhisperExpiry, WHISPER_PLANS } from "./domain/whisper-plans.js";
+import { calculateWhisperExpiry, MAX_WHISPER_CIPHERTEXT_BYTES, WHISPER_PLANS } from "./domain/whisper-plans.js";
 import { CATCH_PRICES_SATS, WHISPER_PRICES_SATS } from "./payment/payment-domain.js";
 import type { DispensedResource } from "./payment/payment-repository.js";
 import type { PaymentQuote } from "./payment/payment-service.js";
@@ -15,7 +15,7 @@ import type { AcceptEventInput, AcceptEventResult, CatchCredentialHashes, CatchE
 import type { CreateWhisperInput } from "./whisper/whisper-repository.js";
 
 const MAX_INGEST_BYTES = Math.max(...Object.values(CATCH_PLANS).map((plan) => plan.maxBytesPerRequest));
-const MAX_WHISPER_BYTES = 16 * 1024;
+const MAX_WHISPER_BYTES = MAX_WHISPER_CIPHERTEXT_BYTES;
 const MAX_RATE_LIMIT_BUCKETS = 10_000;
 const ALLOWED_CONTENT_TYPES = new Set(["application/json", "text/plain", "application/x-www-form-urlencoded"]);
 const ALLOWED_HEADERS = new Set(["content-type", "user-agent", "x-request-id", "x-github-event", "x-github-delivery", "stripe-signature"]);
@@ -138,7 +138,7 @@ function paymentCatalogue() {
 				description: "Private inbound-only webhook inbox with fixed quotas.",
 				plans: [
 					catchPlan("spark", "4h 02m", "Quick tests and short-lived integrations"),
-					catchPlan("standard", "30 days", "Temporary projects and real workflows"),
+					catchPlan("standard", "40d 02h", "Temporary projects and real workflows"),
 					catchPlan("long", "4 months + 2 days", "Long-running missions with a hard stop"),
 				],
 			},

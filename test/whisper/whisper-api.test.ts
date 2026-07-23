@@ -78,7 +78,7 @@ describe("WHISPER HTTP API", () => {
 		apps.push(app);
 		const plaintext = await app.inject({ method: "POST", url: "/internal/whisper/provision", headers: { ...bearer(provisioningSecret), "content-type": "text/plain", "x-whisper-plan": "spark" }, payload: "secret" });
 		expect(plaintext.statusCode).toBe(400);
-		const oversized = await app.inject({ method: "POST", url: "/internal/whisper/provision", headers: { ...bearer(provisioningSecret), "content-type": "application/octet-stream", "x-whisper-plan": "spark" }, payload: Buffer.alloc(16 * 1024 + 1) });
+		const oversized = await app.inject({ method: "POST", url: "/internal/whisper/provision", headers: { ...bearer(provisioningSecret), "content-type": "application/octet-stream", "x-whisper-plan": "spark" }, payload: Buffer.alloc(4_215_276 + 1) });
 		expect(oversized.statusCode).toBeGreaterThanOrEqual(400);
 		expect(repository.created).toBeNull();
 	});

@@ -54,6 +54,20 @@ describe("public payment API", () => {
 		await app.close();
 	});
 
+	it("accepts a WHISPER note near 4.02 MiB and rejects a larger ciphertext", async () => {
+		const calls: unknown[] = [];
+		const quote: PaymentQuote = { orderId: "order-whisper-large", product: "whisper", planId: "spark", amountSats: 42, bolt11: "lnbc42n1large", paymentHash: "c".repeat(64) };
+		const app = buildApp({ payment: { quote: (input) => { calls.push(input); return Promise.resolve(quote); }, fulfill: () => Promise.resolve({ settled: false }) } });
+		const accepted = Buffer.alloc(4_215_276, 7);
+		accepted[0] = 1;
+		const response = await app.inject({ method: "POST", url: "/api/payments/whisper", headers: { "idempotency-key": "idempotency-whisper-large", "x-whisper-plan": "spark", "content-type": "application/octet-stream" }, payload: accepted });
+		expect(response.statusCode).toBe(402);
+		expect(calls).toHaveLength(1);
+		const oversized = await app.inject({ method: "POST", url: "/api/payments/whisper", headers: { "idempotency-key": "idempotency-whisper-too-large", "x-whisper-plan": "spark", "content-type": "application/octet-stream" }, payload: Buffer.alloc(4_215_277, 7) });
+		expect(oversized.statusCode).toBeGreaterThanOrEqual(400);
+		await app.close();
+	});
+
 	it("does not expose credentials before payment and returns them after fulfillment", async () => {
 		const resource = { product: "catch" as const, resourceId: "resource-1", publicId: "catch_once", ownerToken: "owner-token", ingestToken: "ingest-token", expiresAt: new Date("2026-07-23T12:00:00.000Z") };
 		let settled = false;
@@ -88,13 +102,13 @@ describe("public payment API", () => {
 		expect(response.json()).toMatchObject({ checkoutEnabled: true, currency: "sat", products: {
 			catch: { plans: [
 				{ planId: "spark", priceSats: 42, durationLabel: "4h 02m", requestLimit: 402, storageLimitBytes: 2 * 1024 * 1024, maxBytesPerRequest: 64 * 1024, available: true },
-				{ planId: "standard", priceSats: 402, durationLabel: "30 days", requestLimit: 4_020, storageLimitBytes: 20 * 1024 * 1024, maxBytesPerRequest: 256 * 1024, available: true },
+				{ planId: "standard", priceSats: 402, durationLabel: "40d 02h", requestLimit: 4_020, storageLimitBytes: 20 * 1024 * 1024, maxBytesPerRequest: 256 * 1024, available: true },
 				{ planId: "long", priceSats: 4_002, durationLabel: "4 months + 2 days", requestLimit: 40_200, storageLimitBytes: 200 * 1024 * 1024, maxBytesPerRequest: 1024 * 1024, available: true },
 			] },
 			whisper: { plans: [
-				{ planId: "spark", priceSats: 42, durationLabel: "7 days", readOnce: true, available: true },
-				{ planId: "standard", priceSats: 402, durationLabel: "42 days", readOnce: true, available: true },
-				{ planId: "long", priceSats: 4_002, durationLabel: "402 days", readOnce: true, available: true },
+				{ planId: "spark", priceSats: 42, durationLabel: "7 days", readOnce: true, maxCiphertextBytes: 4_215_276, available: true },
+				{ planId: "standard", priceSats: 402, durationLabel: "42 days", readOnce: true, maxCiphertextBytes: 4_215_276, available: true },
+				{ planId: "long", priceSats: 4_002, durationLabel: "402 days", readOnce: true, maxCiphertextBytes: 4_215_276, available: true },
 			] },
 		} });
 		await app.close();

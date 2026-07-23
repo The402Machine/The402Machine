@@ -6,7 +6,7 @@
 		<meta name="description" content="Buy a temporary webhook or an encrypted read-once message with Bitcoin over Lightning. No account, no subscription, hard limits." />
 		<meta name="theme-color" content="#080a08" />
 		<title>The402Machine — Disposable Internet Infrastructure</title>
-		<link rel="stylesheet" href="/assets/styles.css?v=4" />
+		<link rel="stylesheet" href="/assets/styles.css?v=5" />
 	</head>
 	<body>
 		<div class="noise" aria-hidden="true"></div>
@@ -48,7 +48,7 @@
 			<section class="shell section" id="machines">
 				<header class="catalogue-heading">
 					<div class="catalogue-meta"><p class="eyebrow">CARTRIDGE CATALOGUE</p><div class="catalogue-count"><strong>02</strong><span>available cartridges</span></div></div>
-					<div class="catalogue-copy"><h2>Choose what the internet should forget.</h2><div class="catalogue-side"><p class="section-intro">Start with the job, then pick the fuse. CATCH scales payload, requests, storage, and time. WHISPER scales only the unread waiting window.</p><div class="catalogue-slots"><a href="#catch"><small>A1 · MACHINE INPUT</small><b>CATCH</b></a><a href="#whisper"><small>B1 · HUMAN HANDOFF</small><b>WHISPER</b></a></div></div></div>
+					<div class="catalogue-copy"><h2>Choose what the internet should forget.</h2><p class="section-intro">Two temporary tools. One receives machine events. One carries a secret to a person. Both disappear on schedule.</p></div>
 				</header>
 
 				<div class="product-stack">
@@ -59,9 +59,9 @@
 							<p>A private webhook inbox that accepts bounded POST requests, returns an empty 204, and never forwards or executes anything. Separate credentials keep sending and inspection apart.</p>
 							<div class="feature-strip"><span>Opaque payloads</span><span>Hard quotas</span><span>Manual destroy</span><span>Automatic erasure</span></div>
 							<div class="plan-grid" aria-label="CATCH plan comparison">
-								<article class="plan-card"><header><small>SPARK · 42 SATS</small><strong>4h 02m</strong></header><p>Fast debugging and compact webhook events.</p><dl><div><dt>Requests</dt><dd>402</dd></div><div><dt>Storage</dt><dd>2 MiB</dd></div><div><dt>Payload</dt><dd>64 KiB</dd></div></dl><button class="button plan-buy" data-buy="catch" data-plan="spark">Choose Spark</button></article>
-								<article class="plan-card recommended"><div class="recommendation">MOST USEFUL</div><header><small>STANDARD · 402 SATS</small><strong>30 days</strong></header><p>Real temporary workflows with room for richer events.</p><dl><div><dt>Requests</dt><dd>4,020</dd></div><div><dt>Storage</dt><dd>20 MiB</dd></div><div><dt>Payload</dt><dd>256 KiB</dd></div></dl><button class="button plan-buy primary" data-buy="catch" data-plan="standard">Choose Standard</button></article>
-								<article class="plan-card"><header><small>LONG · 4,002 SATS</small><strong>4 months + 2 days</strong></header><p>Long-running missions and occasional large JSON payloads.</p><dl><div><dt>Requests</dt><dd>40,200</dd></div><div><dt>Storage</dt><dd>200 MiB</dd></div><div><dt>Payload</dt><dd>1 MiB</dd></div></dl><button class="button plan-buy" data-buy="catch" data-plan="long">Choose Long</button></article>
+								<article class="plan-card"><header><small>SPARK</small><div class="plan-price"><strong>42</strong><span>SATS</span></div><b class="plan-duration">4h 02m</b></header><p>Fast debugging and compact webhook events.</p><dl><div><dt>Requests</dt><dd>402</dd></div><div><dt>Storage</dt><dd>2 MiB</dd></div><div><dt>Payload</dt><dd>64 KiB</dd></div></dl><button class="button plan-buy" data-buy="catch" data-plan="spark">Choose Spark</button></article>
+								<article class="plan-card recommended"><div class="recommendation">MOST USEFUL</div><header><small>STANDARD</small><div class="plan-price"><strong>402</strong><span>SATS</span></div><b class="plan-duration">40d 02h</b></header><p>Real temporary workflows with room for richer events.</p><dl><div><dt>Requests</dt><dd>4,020</dd></div><div><dt>Storage</dt><dd>20 MiB</dd></div><div><dt>Payload</dt><dd>256 KiB</dd></div></dl><button class="button plan-buy primary" data-buy="catch" data-plan="standard">Choose Standard</button></article>
+								<article class="plan-card"><header><small>LONG</small><div class="plan-price"><strong>4,002</strong><span>SATS</span></div><b class="plan-duration">4 months + 2 days</b></header><p>Long-running missions and occasional large JSON payloads.</p><dl><div><dt>Requests</dt><dd>40,200</dd></div><div><dt>Storage</dt><dd>200 MiB</dd></div><div><dt>Payload</dt><dd>1 MiB</dd></div></dl><button class="button plan-buy" data-buy="catch" data-plan="long">Choose Long</button></article>
 							</div>
 						</div>
 					</article>
@@ -71,11 +71,11 @@
 						<div class="card-body">
 							<div class="card-title"><div><p class="product-kicker">CLIENT-ENCRYPTED DEAD DROP</p><h3>WHISPER</h3></div><span>LIVE</span></div>
 							<p>Write a message in the browser. It is encrypted before upload; the decryption key stays in the URL fragment and never reaches the server. The first successful read destroys the ciphertext.</p>
-							<div class="whisper-rule"><b>One read on every plan.</b><span>Plans change only how long an unread WHISPER waits. The 16 KiB encrypted payload limit and read-once destruction are identical.</span></div>
+							<div class="whisper-rule"><b>One read on every plan.</b><span>Every plan holds up to 4.02 MiB encrypted. Only the unread waiting window changes.</span></div>
 							<div class="plan-grid" aria-label="WHISPER plan comparison">
-								<article class="plan-card"><header><small>SPARK · 42 SATS</small><strong>7 days</strong></header><p>A quick secret handoff with a full week to be opened.</p><dl><div><dt>Reads</dt><dd>1</dd></div><div><dt>Encrypted size</dt><dd>16 KiB</dd></div><div><dt>Key location</dt><dd>URL fragment</dd></div></dl><button class="button plan-buy" data-buy="whisper" data-plan="spark">Choose Spark</button></article>
-								<article class="plan-card recommended"><div class="recommendation">BEST BALANCE</div><header><small>STANDARD · 402 SATS</small><strong>42 days</strong></header><p>Enough time for travel, async teams, and delayed delivery.</p><dl><div><dt>Reads</dt><dd>1</dd></div><div><dt>Encrypted size</dt><dd>16 KiB</dd></div><div><dt>Key location</dt><dd>URL fragment</dd></div></dl><button class="button plan-buy primary" data-buy="whisper" data-plan="standard">Choose Standard</button></article>
-								<article class="plan-card"><header><small>LONG · 4,002 SATS</small><strong>402 days</strong></header><p>A long-term dead drop that still vanishes after one read.</p><dl><div><dt>Reads</dt><dd>1</dd></div><div><dt>Encrypted size</dt><dd>16 KiB</dd></div><div><dt>Key location</dt><dd>URL fragment</dd></div></dl><button class="button plan-buy" data-buy="whisper" data-plan="long">Choose Long</button></article>
+								<article class="plan-card"><header><small>SPARK</small><div class="plan-price"><strong>42</strong><span>SATS</span></div><b class="plan-duration">7 days</b></header><p>A quick secret handoff with a full week to be opened.</p><dl><div><dt>Reads</dt><dd>1</dd></div><div><dt>Encrypted size</dt><dd>4.02 MiB</dd></div><div><dt>Key location</dt><dd>URL fragment</dd></div></dl><button class="button plan-buy" data-buy="whisper" data-plan="spark">Choose Spark</button></article>
+								<article class="plan-card recommended"><div class="recommendation">BEST BALANCE</div><header><small>STANDARD</small><div class="plan-price"><strong>402</strong><span>SATS</span></div><b class="plan-duration">42 days</b></header><p>Enough time for travel, async teams, and delayed delivery.</p><dl><div><dt>Reads</dt><dd>1</dd></div><div><dt>Encrypted size</dt><dd>4.02 MiB</dd></div><div><dt>Key location</dt><dd>URL fragment</dd></div></dl><button class="button plan-buy primary" data-buy="whisper" data-plan="standard">Choose Standard</button></article>
+								<article class="plan-card"><header><small>LONG</small><div class="plan-price"><strong>4,002</strong><span>SATS</span></div><b class="plan-duration">402 days</b></header><p>A long-term dead drop that still vanishes after one read.</p><dl><div><dt>Reads</dt><dd>1</dd></div><div><dt>Encrypted size</dt><dd>4.02 MiB</dd></div><div><dt>Key location</dt><dd>URL fragment</dd></div></dl><button class="button plan-buy" data-buy="whisper" data-plan="long">Choose Long</button></article>
 							</div>
 						</div>
 					</article>
@@ -104,7 +104,7 @@
 				<div class="checkout-head"><div><p class="eyebrow">LIGHTNING CHECKOUT</p><h3 id="checkout-title">Dispense</h3></div><button id="checkout-close" type="button" class="button ghost">Close</button></div>
 				<p id="checkout-intro" class="checkout-intro"></p>
 				<fieldset><legend>Choose a plan</legend><div id="checkout-plans" class="checkout-plans"></div></fieldset>
-				<label id="whisper-note-field" hidden><span>Message</span><textarea id="whisper-note" maxlength="15000" rows="7" placeholder="Encrypted in this browser before upload"></textarea><small>Plaintext stays in this browser. Maximum 15,000 characters.</small></label>
+				<label id="whisper-note-field" hidden><span>Message</span><textarea id="whisper-note" maxlength="4000000" rows="7" placeholder="Encrypted in this browser before upload"></textarea><small>Plaintext stays in this browser. Up to 4,000,000 characters; encrypted payload must fit within 4.02 MiB.</small></label>
 				<div id="checkout-summary" class="checkout-summary"></div>
 				<button id="checkout-submit" class="button primary" type="submit">Create Lightning invoice</button>
 				<p id="checkout-status" class="checkout-status">Choose a plan before paying.</p>
@@ -113,6 +113,6 @@
 		</dialog>
 
 		<footer class="footer shell"><span>THE402MACHINE.COM</span><span>PAYMENT REQUIRED / TAKEN LITERALLY</span><span>© 2026</span></footer>
-		<script type="module" src="/assets/checkout.js?v=4"></script>
+		<script type="module" src="/assets/checkout.js?v=5"></script>
 	</body>
 </html>
