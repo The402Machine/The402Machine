@@ -36,6 +36,7 @@ let encryptionKey = "";
 let currentInvoice = "";
 let currentPortalUrl = "";
 let checkoutSession = 0;
+let deliveryDispensed = false;
 
 void configureCheckout();
 
@@ -91,6 +92,7 @@ function openCheckout() {
 	copyPortalButton.textContent = "Copy portal link";
 	paymentPanel.hidden = true;
 	currentInvoice = "";
+	deliveryDispensed = false;
 	setPaymentStage("review");
 	encryptionKey = "";
 	renderPlanChoices(productData.plans);
@@ -126,8 +128,7 @@ function updateSummary() {
 }
 
 closeButton.addEventListener("click", () => closeCheckout());
-dialog.addEventListener("click", (event) => { if (event.target === dialog) closeCheckout(); });
-dialog.addEventListener("cancel", (event) => { event.preventDefault(); closeCheckout(); });
+dialog.addEventListener("cancel", (event) => { event.preventDefault(); });
 copyButton.addEventListener("click", async () => {
 	if (currentInvoice.length === 0) return;
 	try {
@@ -225,6 +226,7 @@ async function pollDelivery(orderId, session) {
 			output.value = JSON.stringify({ portalUrl: portalUrl, ingestUrl: `${location.origin}/c/${resource.publicId}`, ingestToken: resource.ingestToken, ownerToken: resource.ownerToken, eventsUrl: `${location.origin}/api/catch/${resource.publicId}/events`, expiresAt: resource.expiresAt }, null, 2);
 		}
 		output.hidden = false;
+		deliveryDispensed = true;
 		status.textContent = resource.product === "catch" ? "Dispensed. Open or save the private portal link now; no account can recover it for you." : "Dispensed. Copy this now; no account can recover it for you.";
 		return;
 	}
@@ -258,6 +260,7 @@ function setPaymentStage(stage) {
 }
 
 function closeCheckout() {
+	if (deliveryDispensed && !window.confirm("Close this delivery? Once closed, this private link and its credentials cannot be recovered.")) return;
 	checkoutSession += 1;
 	dialog.close();
 }

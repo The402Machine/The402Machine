@@ -72,4 +72,12 @@ describe("CATCH owner portal", () => {
 		expect(checkout).toContain("portalLink.href = portalUrl");
 		expect(checkout).toContain("deliveryActions.hidden = false");
 	});
+
+	it("does not let backdrop clicks discard a newly dispensed CATCH owner link", async () => {
+		const checkout = await readFile(new URL("../public/assets/checkout.js", import.meta.url), "utf8");
+
+		expect(checkout).not.toContain("event.target === dialog");
+		expect(checkout).toContain("deliveryDispensed = true");
+		expect(checkout).toContain("closeButton.addEventListener");
+	});
 });

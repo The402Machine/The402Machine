@@ -13,12 +13,12 @@
 			<section class="whisper-panel">
 				<p class="eyebrow">WHISPER / CLIENT-SIDE DECRYPTION</p>
 				<h1>One read.<br /><em>Then silence.</em></h1>
-				<p id="status" class="lede">The server holds only opaque ciphertext. Opening it consumes the stored message; decryption happens locally with the key in this link.</p>
-				<div class="whisper-warning"><strong>This action is final.</strong> Copy anything you need before closing or reloading the page.</div>
+				<p id="status" class="lede">The server holds only opaque ciphertext. Confirm before opening: this WHISPER can only be read once.</p>
+				<div class="whisper-warning"><strong>This action is final.</strong> After confirmation, the encrypted message is consumed and deleted from the server, then decrypted locally. Copy anything you need before closing or reloading the page.</div>
 				<pre id="message" class="whisper-message" hidden></pre>
 				<div class="reader-actions"><button id="open" class="button primary">Open and destroy whisper</button><a class="button ghost" href="/">What is WHISPER?</a></div>
 			</section>
 		</main>
-		<script type="module" src="/assets/whisper-page.js?v=2"></script>
+		<script type="module" src="/assets/whisper-page.js?v=3"></script>
 	</body>
 </html>

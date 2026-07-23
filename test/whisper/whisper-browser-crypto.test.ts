@@ -10,4 +10,14 @@ describe("WHISPER browser cryptography", () => {
 		expect(source).toContain("location.hash");
 		expect(source).not.toContain("?key=");
 	});
+
+	it("does not request the destructive read until the recipient confirms", async () => {
+		const source = await readFile(new URL("../../public/assets/whisper-page.js", import.meta.url), "utf8");
+		const confirmation = source.indexOf("window.confirm");
+		const consume = source.indexOf("fetch(`/w/");
+
+		expect(confirmation).toBeGreaterThanOrEqual(0);
+		expect(consume).toBeGreaterThan(confirmation);
+		expect(source).toContain("button.disabled = false");
+	});
 });

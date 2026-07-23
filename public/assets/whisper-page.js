@@ -9,6 +9,7 @@ if (!(button instanceof HTMLButtonElement) || !(status instanceof HTMLElement) |
 }
 
 button.addEventListener("click", async () => {
+	if (!window.confirm("Open this WHISPER now? It can only be read once and will be deleted from the server immediately after this confirmed read.")) return;
 	button.disabled = true;
 	try {
 		const query = new URLSearchParams(location.search);
@@ -23,5 +24,6 @@ button.addEventListener("click", async () => {
 		button.hidden = true;
 	} catch (error) {
 		status.textContent = error instanceof Error ? error.message : "Could not open WHISPER.";
+		button.disabled = false;
 	}
 });

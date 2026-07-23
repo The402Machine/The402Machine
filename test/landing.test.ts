@@ -54,7 +54,7 @@ describe("public landing page", () => {
 		expect(response.body).toContain('data-buy="whisper"');
 		expect(response.body).toContain('data-plan="long"');
 		expect(response.body).toContain('href="/assets/styles.css?v=10"');
-		expect(response.body).toContain('src="/assets/checkout.js?v=14"');
+		expect(response.body).toContain('src="/assets/checkout.js?v=15"');
 		expect(response.body).toContain('href="#api"');
 		expect(response.body).toContain('id="api"');
 		expect(response.body).toContain("API / COMPLETE FLOW");
@@ -89,7 +89,7 @@ describe("public landing page", () => {
 		const response = await app.inject({ method: "GET", url: "/whisper.html" });
 
 		expect(response.statusCode).toBe(200);
-		expect(response.body).toContain('src="/assets/whisper-page.js?v=2"');
+		expect(response.body).toContain('src="/assets/whisper-page.js?v=3"');
 		expect(response.headers["content-security-policy"]).toContain("script-src 'self'");
 		expect(response.headers["content-security-policy"]).not.toContain("script-src 'none'");
 	});
@@ -159,5 +159,28 @@ describe("public landing page", () => {
 		expect(qrBundle).toContain("Lightning invoice QR code");
 		expect(webLnBundle.length).toBeGreaterThan(1_000);
 		expect(webLnBundle).toContain("requestProvider");
+	});
+
+	it("keeps checkout open on backdrop and Escape, and confirms X after dispensing credentials", async () => {
+		const source = await readFile(new URL("../public/assets/checkout.js", import.meta.url), "utf8");
+
+		expect(source).not.toContain('dialog.addEventListener("click"');
+		expect(source).toContain('dialog.addEventListener("cancel", (event) => { event.preventDefault(); });');
+		expect(source).toContain("deliveryDispensed = true");
+		expect(source).toContain("window.confirm");
+		expect(source).toContain("cannot be recovered");
+	});
+
+	it("asks for explicit confirmation before consuming and decrypting a WHISPER", async () => {
+		const [html, source] = await Promise.all([
+			readFile(new URL("../public/whisper.html", import.meta.url), "utf8"),
+			readFile(new URL("../public/assets/whisper-page.js", import.meta.url), "utf8"),
+		]);
+
+		expect(html).toContain("Confirm before opening");
+		expect(html).toContain("only be read once");
+		expect(source).toContain("window.confirm");
+		expect(source).toContain("will be deleted from the server");
+		expect(source.indexOf("window.confirm")).toBeLessThan(source.indexOf("fetch(`/w/"));
 	});
 });
