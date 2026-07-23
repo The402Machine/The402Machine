@@ -48,8 +48,8 @@ services:
       HOST: 0.0.0.0
       PORT: 4020
       LOG_LEVEL: info
-      # Docker sees the host-side Nginx connection through the web-edge bridge gateway.
-      TRUSTED_PROXY: 172.24.0.1
+      # Docker sees the host-side Nginx connection through the pinned web-edge bridge gateway.
+      TRUSTED_PROXY: 172.30.240.1
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -71,7 +71,7 @@ services:
     networks:
       catch-backend:
       web-edge:
-        ipv4_address: 172.24.0.2
+        ipv4_address: 172.30.240.2
 
   expiry-worker:
     build:
@@ -102,5 +102,5 @@ networks:
   web-edge:
     ipam:
       config:
-        - subnet: 172.24.0.0/24
-          gateway: 172.24.0.1
+        - subnet: 172.30.240.0/24
+          gateway: 172.30.240.1
