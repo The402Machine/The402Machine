@@ -6,7 +6,7 @@
 		<meta name="description" content="Buy a temporary webhook or an encrypted read-once message with Bitcoin over Lightning. No account, no subscription, hard limits." />
 		<meta name="theme-color" content="#080a08" />
 		<title>The402Machine — Disposable Internet Infrastructure</title>
-		<link rel="stylesheet" href="/assets/styles.css?v=5" />
+		<link rel="stylesheet" href="/assets/styles.css?v=7" />
 	</head>
 	<body>
 		<div class="noise" aria-hidden="true"></div>
@@ -48,20 +48,27 @@
 			<section class="shell section" id="machines">
 				<header class="catalogue-heading">
 					<div class="catalogue-meta"><p class="eyebrow">CARTRIDGE CATALOGUE</p><div class="catalogue-count"><strong>02</strong><span>available cartridges</span></div></div>
-					<div class="catalogue-copy"><h2>Choose what the internet should forget.</h2><p class="section-intro">Two temporary tools. One receives machine events. One carries a secret to a person. Both disappear on schedule.</p></div>
+					<div class="catalogue-copy">
+						<div><h2>Pick a fuse.</h2><p class="section-intro">CATCH receives. WHISPER reveals once. Both erase themselves.</p></div>
+						<svg class="catalogue-illustration" viewBox="0 0 460 230" aria-hidden="true" focusable="false">
+							<g class="illustration-catch"><rect x="22" y="54" width="168" height="132" rx="5"/><path d="M22 91h48l16 20h40l16-20h48"/><rect x="50" y="26" width="28" height="28" rx="3"/><rect x="92" y="26" width="28" height="28" rx="3"/><rect x="134" y="26" width="28" height="28" rx="3"/><path d="M106 121v40m-15-15 15 15 15-15"/></g>
+							<path class="illustration-divider" d="M230 24v182"/>
+							<g class="illustration-whisper"><rect x="270" y="54" width="168" height="132" rx="5"/><path d="m286 78 68 54 68-54M286 168l52-48m84 48-52-48"/><circle cx="354" cy="34" r="15"/><path d="M354 25v18m-9-9h18"/><path d="M354 149v28m-11-11 11 11 11-11"/></g>
+						</svg>
+					</div>
 				</header>
 
 				<div class="product-stack">
 					<article class="product-card featured" id="catch">
 						<div class="card-index">A1</div>
 						<div class="card-body">
-							<div class="card-title"><div><p class="product-kicker">INBOUND-ONLY WEBHOOK</p><h3>CATCH</h3></div><span>LIVE</span></div>
-							<p>A private webhook inbox that accepts bounded POST requests, returns an empty 204, and never forwards or executes anything. Separate credentials keep sending and inspection apart.</p>
-							<div class="feature-strip"><span>Opaque payloads</span><span>Hard quotas</span><span>Manual destroy</span><span>Automatic erasure</span></div>
+							<div class="card-title"><div class="product-heading"><svg class="product-icon" viewBox="0 0 72 72" role="img"><title>CATCH webhook inbox</title><rect x="9" y="30" width="54" height="33" rx="3"/><path d="M9 42h16l6 8h10l6-8h16M36 8v26m-9-9 9 9 9-9"/><rect x="13" y="9" width="10" height="10"/><rect x="49" y="9" width="10" height="10"/></svg><div><p class="product-kicker">INBOUND-ONLY WEBHOOK</p><h3>CATCH</h3></div></div><span>LIVE</span></div>
+							<p class="product-line">Receive POSTs. Inspect. Erase.</p>
+							<div class="feature-strip"><span>Inbound only</span><span>Raw bytes</span><span>Hard stop</span></div>
 							<div class="plan-grid" aria-label="CATCH plan comparison">
-								<article class="plan-card"><header><small>SPARK</small><div class="plan-price"><strong>42</strong><span>SATS</span></div><b class="plan-duration">4h 02m</b></header><p>Fast debugging and compact webhook events.</p><dl><div><dt>Requests</dt><dd>402</dd></div><div><dt>Storage</dt><dd>2 MiB</dd></div><div><dt>Payload</dt><dd>64 KiB</dd></div></dl><button class="button plan-buy" data-buy="catch" data-plan="spark">Choose Spark</button></article>
-								<article class="plan-card recommended"><div class="recommendation">MOST USEFUL</div><header><small>STANDARD</small><div class="plan-price"><strong>402</strong><span>SATS</span></div><b class="plan-duration">40d 02h</b></header><p>Real temporary workflows with room for richer events.</p><dl><div><dt>Requests</dt><dd>4,020</dd></div><div><dt>Storage</dt><dd>20 MiB</dd></div><div><dt>Payload</dt><dd>256 KiB</dd></div></dl><button class="button plan-buy primary" data-buy="catch" data-plan="standard">Choose Standard</button></article>
-								<article class="plan-card"><header><small>LONG</small><div class="plan-price"><strong>4,002</strong><span>SATS</span></div><b class="plan-duration">4 months + 2 days</b></header><p>Long-running missions and occasional large JSON payloads.</p><dl><div><dt>Requests</dt><dd>40,200</dd></div><div><dt>Storage</dt><dd>200 MiB</dd></div><div><dt>Payload</dt><dd>1 MiB</dd></div></dl><button class="button plan-buy" data-buy="catch" data-plan="long">Choose Long</button></article>
+								<article class="plan-card"><header><small>SPARK</small><div class="plan-price"><strong>42</strong><span>SATS</span></div><b class="plan-duration">4h 02m</b></header><dl><div><dt>Requests</dt><dd>402</dd></div><div><dt>Storage</dt><dd>2 MiB</dd></div><div><dt>Payload</dt><dd>64 KiB</dd></div></dl><button class="button plan-buy" data-buy="catch" data-plan="spark">Choose Spark</button></article>
+								<article class="plan-card recommended"><div class="recommendation">MOST USEFUL</div><header><small>STANDARD</small><div class="plan-price"><strong>402</strong><span>SATS</span></div><b class="plan-duration">40d 02h</b></header><dl><div><dt>Requests</dt><dd>4,020</dd></div><div><dt>Storage</dt><dd>20 MiB</dd></div><div><dt>Payload</dt><dd>256 KiB</dd></div></dl><button class="button plan-buy primary" data-buy="catch" data-plan="standard">Choose Standard</button></article>
+								<article class="plan-card"><header><small>LONG</small><div class="plan-price"><strong>4,002</strong><span>SATS</span></div><b class="plan-duration">4 months + 2 days</b></header><dl><div><dt>Requests</dt><dd>40,200</dd></div><div><dt>Storage</dt><dd>200 MiB</dd></div><div><dt>Payload</dt><dd>1 MiB</dd></div></dl><button class="button plan-buy" data-buy="catch" data-plan="long">Choose Long</button></article>
 							</div>
 						</div>
 					</article>
@@ -69,13 +76,13 @@
 					<article class="product-card whisper-card" id="whisper">
 						<div class="card-index">B1</div>
 						<div class="card-body">
-							<div class="card-title"><div><p class="product-kicker">CLIENT-ENCRYPTED DEAD DROP</p><h3>WHISPER</h3></div><span>LIVE</span></div>
-							<p>Write a message in the browser. It is encrypted before upload; the decryption key stays in the URL fragment and never reaches the server. The first successful read destroys the ciphertext.</p>
-							<div class="whisper-rule"><b>One read on every plan.</b><span>Every plan holds up to 4.02 MiB encrypted. Only the unread waiting window changes.</span></div>
+							<div class="card-title"><div class="product-heading"><svg class="product-icon" viewBox="0 0 72 72" role="img"><title>WHISPER read-once note</title><rect x="9" y="16" width="54" height="43" rx="4"/><path d="m9 22 27 22 27-22M9 59l20-20m34 20L43 39"/><path d="M51 9v14m-7-7h14"/></svg><div><p class="product-kicker">CLIENT-ENCRYPTED DEAD DROP</p><h3>WHISPER</h3></div></div><span>LIVE</span></div>
+							<p class="product-line">Encrypt here. Share once. Gone after reading.</p>
+							<div class="whisper-rule"><b>1 read</b><span>4.02 MiB encrypted</span><small>KEY / URL FRAGMENT</small></div>
 							<div class="plan-grid" aria-label="WHISPER plan comparison">
-								<article class="plan-card"><header><small>SPARK</small><div class="plan-price"><strong>42</strong><span>SATS</span></div><b class="plan-duration">7 days</b></header><p>A quick secret handoff with a full week to be opened.</p><dl><div><dt>Reads</dt><dd>1</dd></div><div><dt>Encrypted size</dt><dd>4.02 MiB</dd></div><div><dt>Key location</dt><dd>URL fragment</dd></div></dl><button class="button plan-buy" data-buy="whisper" data-plan="spark">Choose Spark</button></article>
-								<article class="plan-card recommended"><div class="recommendation">BEST BALANCE</div><header><small>STANDARD</small><div class="plan-price"><strong>402</strong><span>SATS</span></div><b class="plan-duration">42 days</b></header><p>Enough time for travel, async teams, and delayed delivery.</p><dl><div><dt>Reads</dt><dd>1</dd></div><div><dt>Encrypted size</dt><dd>4.02 MiB</dd></div><div><dt>Key location</dt><dd>URL fragment</dd></div></dl><button class="button plan-buy primary" data-buy="whisper" data-plan="standard">Choose Standard</button></article>
-								<article class="plan-card"><header><small>LONG</small><div class="plan-price"><strong>4,002</strong><span>SATS</span></div><b class="plan-duration">402 days</b></header><p>A long-term dead drop that still vanishes after one read.</p><dl><div><dt>Reads</dt><dd>1</dd></div><div><dt>Encrypted size</dt><dd>4.02 MiB</dd></div><div><dt>Key location</dt><dd>URL fragment</dd></div></dl><button class="button plan-buy" data-buy="whisper" data-plan="long">Choose Long</button></article>
+								<article class="plan-card"><header><small>SPARK</small><div class="plan-price"><strong>42</strong><span>SATS</span></div><b class="plan-duration">7 days</b></header><dl><div><dt>Reads</dt><dd>1</dd></div><div><dt>Encrypted size</dt><dd>4.02 MiB</dd></div><div><dt>Key location</dt><dd>URL fragment</dd></div></dl><button class="button plan-buy" data-buy="whisper" data-plan="spark">Choose Spark</button></article>
+								<article class="plan-card recommended"><div class="recommendation">BEST BALANCE</div><header><small>STANDARD</small><div class="plan-price"><strong>402</strong><span>SATS</span></div><b class="plan-duration">42 days</b></header><dl><div><dt>Reads</dt><dd>1</dd></div><div><dt>Encrypted size</dt><dd>4.02 MiB</dd></div><div><dt>Key location</dt><dd>URL fragment</dd></div></dl><button class="button plan-buy primary" data-buy="whisper" data-plan="standard">Choose Standard</button></article>
+								<article class="plan-card"><header><small>LONG</small><div class="plan-price"><strong>4,002</strong><span>SATS</span></div><b class="plan-duration">402 days</b></header><dl><div><dt>Reads</dt><dd>1</dd></div><div><dt>Encrypted size</dt><dd>4.02 MiB</dd></div><div><dt>Key location</dt><dd>URL fragment</dd></div></dl><button class="button plan-buy" data-buy="whisper" data-plan="long">Choose Long</button></article>
 							</div>
 						</div>
 					</article>
@@ -83,13 +90,11 @@
 			</section>
 
 			<section class="compare-section" id="compare">
-				<div class="shell section">
-					<div class="section-heading"><p class="eyebrow">DECISION GUIDE</p><div><h2>Two jobs. No feature fog.</h2><p class="section-intro">Choose CATCH when a machine needs to send data. Choose WHISPER when a person needs to read a secret exactly once.</p></div></div>
-					<div class="compare-grid">
-						<div class="compare-label">What do you receive?</div><div><b>CATCH</b><span>Webhook URL + ingest key + owner key</span></div><div><b>WHISPER</b><span>One shareable, client-encrypted link</span></div>
-						<div class="compare-label">What selects the plan?</div><div><span>Lifetime, request quota, and storage quota</span></div><div><span>How long the unread message waits</span></div>
-						<div class="compare-label">What destroys it?</div><div><span>Expiry, quota exhaustion, or manual destroy</span></div><div><span>First successful read or expiry</span></div>
-						<div class="compare-label">What it never does</div><div><span>Forward traffic or execute payloads</span></div><div><span>Send the decryption key to the server</span></div>
+				<div class="shell section compare-inner">
+					<div class="compact-heading"><p class="eyebrow">DECISION GUIDE</p><h2>Machine or human?</h2></div>
+					<div class="decision-cards">
+						<article><svg viewBox="0 0 72 72" aria-hidden="true"><rect x="9" y="30" width="54" height="33" rx="3"/><path d="M9 42h16l6 8h10l6-8h16M36 8v26m-9-9 9 9 9-9"/></svg><div><p class="product-kicker">MACHINE → INBOX</p><h3>CATCH</h3><span>POSTs in · owner key out · time or quota ends it</span></div></article>
+						<article><svg viewBox="0 0 72 72" aria-hidden="true"><rect x="9" y="16" width="54" height="43" rx="4"/><path d="m9 22 27 22 27-22M9 59l20-20m34 20L43 39"/></svg><div><p class="product-kicker">HUMAN → ONE READ</p><h3>WHISPER</h3><span>Encrypt · share link · first read destroys it</span></div></article>
 					</div>
 				</div>
 			</section>

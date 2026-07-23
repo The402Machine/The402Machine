@@ -30,10 +30,18 @@ describe("public landing page", () => {
 		expect(response.body).toContain("7 days");
 		expect(response.body).toContain("42 days");
 		expect(response.body).toContain("402 days");
-		expect(response.body).toContain("Every plan holds up to 4.02 MiB encrypted");
+		expect(response.body).toContain("4.02 MiB encrypted");
+		expect(response.body).toContain("KEY / URL FRAGMENT");
+		expect(response.body).toContain('class="catalogue-illustration"');
+		expect(response.body).toContain('class="product-icon"');
+		expect(response.body).toContain("<title>CATCH webhook inbox</title>");
+		expect(response.body).toContain("<title>WHISPER read-once note</title>");
 		expect(response.body).toContain("plan-price");
 		expect(response.body).not.toContain("Start with the job, then pick the fuse");
 		expect(response.body).not.toContain("A1 · MACHINE INPUT");
+		expect(response.body).not.toContain("A private webhook inbox that accepts bounded POST requests");
+		expect(response.body).not.toContain("Write a message in the browser. It is encrypted before upload");
+		expect(response.body).not.toContain("Fast debugging and compact webhook events");
 		expect(response.body).toContain("64 KiB");
 		expect(response.body).toContain("256 KiB");
 		expect(response.body).toContain("1 MiB");
@@ -45,6 +53,7 @@ describe("public landing page", () => {
 		expect(response.body).toContain('data-buy="catch"');
 		expect(response.body).toContain('data-buy="whisper"');
 		expect(response.body).toContain('data-plan="long"');
+		expect(response.body).toContain('href="/assets/styles.css?v=7"');
 		expect(response.body).toContain('src="/assets/checkout.js?v=5"');
 	});
 
