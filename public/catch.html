@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex,nofollow,noarchive" />
+		<meta name="referrer" content="no-referrer" />
+		<meta name="theme-color" content="#080a08" />
+		<title>CATCH portal — The402Machine</title>
+		<link rel="stylesheet" href="/assets/styles.css?v=9" />
+	</head>
+	<body class="portal-body">
+		<div class="noise" aria-hidden="true"></div>
+		<header class="topbar portal-topbar">
+			<a class="brand" href="/" aria-label="The402Machine home"><span class="brand-mark">402</span><span>The402Machine</span></a>
+			<div class="portal-top-actions"><span id="portal-connection" class="portal-connection">CONNECTING</span><a class="button ghost" href="/">Home</a></div>
+		</header>
+
+		<main class="shell portal-shell">
+			<section class="portal-hero">
+				<div>
+					<p class="eyebrow">CATCH / OWNER CAPABILITY</p>
+					<h1>Your CATCH<br /><em>portal.</em></h1>
+					<p class="lede">Watch incoming events, inspect usage, and keep the fuse visible. This bookmark is the key: anyone with the full link can manage this CATCH.</p>
+				</div>
+				<div id="portal-link-card" class="portal-link-card" hidden>
+					<p class="eyebrow">SAVE THIS ACCESS LINK</p>
+					<strong>Bookmark or copy this page now.</strong>
+					<p>The owner capability stays in the URL fragment, so it is not sent in HTTP requests. Do not share the full link.</p>
+					<button id="portal-copy-link" class="button primary" type="button">Copy portal link</button>
+				</div>
+			</section>
+
+			<section id="portal-error" class="portal-error" hidden>
+				<p class="eyebrow">PORTAL UNAVAILABLE</p>
+				<h2>This link cannot open a CATCH.</h2>
+				<p id="portal-error-copy">Use the complete portal URL dispensed after payment.</p>
+				<label class="portal-import-field"><span>Already have the dispensed JSON?</span><textarea id="portal-import" rows="7" placeholder="Paste the complete CATCH JSON here"></textarea><small>Converted locally into a private, bookmarkable portal link. Nothing is uploaded until the portal authenticates.</small></label>
+				<button id="portal-import-submit" class="button primary" type="button">Create portal link</button>
+				<a class="button primary" href="/#machines">Get a CATCH</a>
+			</section>
+
+			<div id="portal-content" hidden>
+				<section class="portal-status-panel">
+					<div class="portal-status-head">
+						<div><p class="eyebrow">LIVE RESOURCE</p><h2 id="portal-title">CATCH</h2></div>
+						<span id="portal-status" class="portal-status-badge">CHECKING</span>
+					</div>
+					<div class="portal-countdown"><span>TIME REMAINING</span><strong id="portal-remaining">—</strong><small id="portal-expiry">—</small></div>
+					<div class="portal-metrics">
+						<article><span>REQUESTS USED</span><strong id="portal-requests">—</strong><div class="portal-meter"><i id="portal-requests-meter"></i></div><small id="portal-requests-detail">—</small></article>
+						<article><span>STORAGE USED</span><strong id="portal-storage">—</strong><div class="portal-meter"><i id="portal-storage-meter"></i></div><small id="portal-storage-detail">—</small></article>
+						<article><span>PER REQUEST</span><strong id="portal-payload">—</strong><small>Hard payload ceiling</small></article>
+					</div>
+				</section>
+
+				<section class="portal-grid">
+					<article class="portal-card portal-ingest-card">
+						<div class="portal-card-head"><div><p class="eyebrow">SEND EVENTS HERE</p><h2>Ingest endpoint</h2></div><span>POST ONLY</span></div>
+						<label><span>URL</span><input id="portal-ingest-url" readonly /></label>
+						<div class="portal-code-row"><code id="portal-auth-preview">Authorization: Bearer ••••••••</code></div>
+						<div class="portal-actions">
+							<button id="portal-copy-endpoint" class="button primary" type="button">Copy endpoint</button>
+							<button id="portal-copy-auth" class="button" type="button">Copy auth header</button>
+							<button id="portal-copy-curl" class="button ghost" type="button">Copy cURL example</button>
+						</div>
+						<p class="portal-hint">The ingest token is hidden on screen. Copy actions place it on your clipboard only when requested.</p>
+					</article>
+
+					<article class="portal-card portal-events-card">
+						<div class="portal-card-head"><div><p class="eyebrow">LATEST 50</p><h2>Events</h2></div><button id="portal-refresh" class="button ghost" type="button">Refresh</button></div>
+						<p id="portal-events-status" class="portal-hint">Loading events…</p>
+						<div id="portal-events" class="portal-events" aria-live="polite"></div>
+					</article>
+				</section>
+
+				<section class="portal-danger">
+					<div><p class="eyebrow">DANGER / IRREVERSIBLE</p><h2>Destroy this CATCH now.</h2><p>Deletes every stored event, invalidates both capabilities, and ends the resource immediately.</p></div>
+					<button id="portal-destroy" class="button danger" type="button">Destroy CATCH</button>
+				</section>
+			</div>
+		</main>
+
+		<footer class="footer shell"><span>THE402MACHINE.COM</span><span>OWNER CAPABILITY / KEEP PRIVATE</span><span>NO ACCOUNT RECOVERY</span></footer>
+		<script type="module" src="/assets/catch-portal.js?v=1"></script>
+	</body>
+</html>

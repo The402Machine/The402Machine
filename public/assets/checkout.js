@@ -23,14 +23,18 @@ const walletLink = document.querySelector("#checkout-wallet");
 const webLnButton = document.querySelector("#checkout-webln");
 const copyButton = document.querySelector("#checkout-copy");
 const invoice = document.querySelector("#checkout-invoice");
+const deliveryActions = document.querySelector("#checkout-delivery-actions");
+const portalLink = document.querySelector("#checkout-portal");
+const copyPortalButton = document.querySelector("#checkout-copy-portal");
 
-if (!(dialog instanceof HTMLDialogElement) || !(form instanceof HTMLFormElement) || !(title instanceof HTMLElement) || !(intro instanceof HTMLElement) || !(planChoices instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(noteField instanceof HTMLElement) || !(note instanceof HTMLTextAreaElement) || !(status instanceof HTMLElement) || !(output instanceof HTMLTextAreaElement) || !(closeButton instanceof HTMLButtonElement) || !(submitButton instanceof HTMLButtonElement) || !(indicator instanceof HTMLElement) || !(paymentPanel instanceof HTMLElement) || !(progress instanceof HTMLElement) || !(qr instanceof HTMLElement) || !(amount instanceof HTMLElement) || !(walletLink instanceof HTMLAnchorElement) || !(webLnButton instanceof HTMLButtonElement) || !(copyButton instanceof HTMLButtonElement) || !(invoice instanceof HTMLTextAreaElement)) throw new Error("Checkout is incomplete");
+if (!(dialog instanceof HTMLDialogElement) || !(form instanceof HTMLFormElement) || !(title instanceof HTMLElement) || !(intro instanceof HTMLElement) || !(planChoices instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(noteField instanceof HTMLElement) || !(note instanceof HTMLTextAreaElement) || !(status instanceof HTMLElement) || !(output instanceof HTMLTextAreaElement) || !(closeButton instanceof HTMLButtonElement) || !(submitButton instanceof HTMLButtonElement) || !(indicator instanceof HTMLElement) || !(paymentPanel instanceof HTMLElement) || !(progress instanceof HTMLElement) || !(qr instanceof HTMLElement) || !(amount instanceof HTMLElement) || !(walletLink instanceof HTMLAnchorElement) || !(webLnButton instanceof HTMLButtonElement) || !(copyButton instanceof HTMLButtonElement) || !(invoice instanceof HTMLTextAreaElement) || !(deliveryActions instanceof HTMLElement) || !(portalLink instanceof HTMLAnchorElement) || !(copyPortalButton instanceof HTMLButtonElement)) throw new Error("Checkout is incomplete");
 
 let catalog = null;
 let product = "catch";
 let selectedPlanId = "standard";
 let encryptionKey = "";
 let currentInvoice = "";
+let currentPortalUrl = "";
 let checkoutSession = 0;
 
 void configureCheckout();
@@ -81,6 +85,10 @@ function openCheckout() {
 	note.required = product === "whisper";
 	output.hidden = true;
 	output.value = "";
+	deliveryActions.hidden = true;
+	currentPortalUrl = "";
+	portalLink.href = "#";
+	copyPortalButton.textContent = "Copy portal link";
 	paymentPanel.hidden = true;
 	currentInvoice = "";
 	setPaymentStage("review");
@@ -129,6 +137,15 @@ copyButton.addEventListener("click", async () => {
 		invoice.focus();
 		invoice.select();
 		status.textContent = "Copy the selected BOLT11 invoice manually.";
+	}
+});
+copyPortalButton.addEventListener("click", async () => {
+	if (currentPortalUrl.length === 0) return;
+	try {
+		await navigator.clipboard.writeText(currentPortalUrl);
+		copyPortalButton.textContent = "Portal link copied";
+	} catch {
+		status.textContent = "Could not copy the portal link. Open it and bookmark the page instead.";
 	}
 });
 webLnButton.addEventListener("click", async () => {
@@ -198,11 +215,17 @@ async function pollDelivery(orderId, session) {
 		const resource = result.resource;
 		setPaymentStage("paid");
 		paymentPanel.hidden = true;
-		output.value = resource.product === "whisper"
-			? whisperLink(location.origin, resource.publicId, resource.readToken, encryptionKey)
-			: JSON.stringify({ ingestUrl: `${location.origin}/c/${resource.publicId}`, ingestToken: resource.ingestToken, ownerToken: resource.ownerToken, eventsUrl: `${location.origin}/api/catch/${resource.publicId}/events`, expiresAt: resource.expiresAt }, null, 2);
+		if (resource.product === "whisper") {
+			output.value = whisperLink(location.origin, resource.publicId, resource.readToken, encryptionKey);
+		} else {
+			const portalUrl = catchPortalLink(location.origin, resource.publicId, resource.ownerToken, resource.ingestToken);
+			currentPortalUrl = portalUrl;
+			portalLink.href = portalUrl;
+			deliveryActions.hidden = false;
+			output.value = JSON.stringify({ portalUrl: portalUrl, ingestUrl: `${location.origin}/c/${resource.publicId}`, ingestToken: resource.ingestToken, ownerToken: resource.ownerToken, eventsUrl: `${location.origin}/api/catch/${resource.publicId}/events`, expiresAt: resource.expiresAt }, null, 2);
+		}
 		output.hidden = false;
-		status.textContent = "Dispensed. Copy this now; no account can recover it for you.";
+		status.textContent = resource.product === "catch" ? "Dispensed. Open or save the private portal link now; no account can recover it for you." : "Dispensed. Copy this now; no account can recover it for you.";
 		return;
 	}
 	if (session === checkoutSession && dialog.open) throw new Error("Invoice still unpaid or expired.");
@@ -240,6 +263,12 @@ function closeCheckout() {
 }
 
 function isPlanId(value) { return value === "spark" || value === "standard" || value === "long"; }
+function catchPortalLink(origin, publicId, ownerToken, ingestToken) {
+	const payload = new TextEncoder().encode(JSON.stringify({ publicId, ownerToken, ingestToken }));
+	let binary = "";
+	for (const byte of payload) binary += String.fromCharCode(byte);
+	return `${origin}/catch.html#${btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "")}`;
+}
 function formatSats(value) { return new Intl.NumberFormat("en-US").format(value); }
 function formatNumber(value) { return new Intl.NumberFormat("en-US").format(value); }
 function formatBytes(value) { return value >= 1024 * 1024 ? `${Number((value / (1024 * 1024)).toFixed(2))} MiB` : `${value / 1024} KiB`; }

@@ -53,8 +53,8 @@ describe("public landing page", () => {
 		expect(response.body).toContain('data-buy="catch"');
 		expect(response.body).toContain('data-buy="whisper"');
 		expect(response.body).toContain('data-plan="long"');
-		expect(response.body).toContain('href="/assets/styles.css?v=8"');
-		expect(response.body).toContain('src="/assets/checkout.js?v=13"');
+		expect(response.body).toContain('href="/assets/styles.css?v=9"');
+		expect(response.body).toContain('src="/assets/checkout.js?v=14"');
 		expect(response.body).toContain('id="checkout-payment"');
 		expect(response.body).toContain('id="checkout-qr"');
 		expect(response.body).toContain('id="checkout-wallet"');

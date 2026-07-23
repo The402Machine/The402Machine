@@ -6,7 +6,7 @@
 		<meta name="description" content="Buy a temporary webhook or an encrypted read-once message with Bitcoin over Lightning. No account, no subscription, hard limits." />
 		<meta name="theme-color" content="#080a08" />
 		<title>The402Machine — Disposable Internet Infrastructure</title>
-		<link rel="stylesheet" href="/assets/styles.css?v=8" />
+		<link rel="stylesheet" href="/assets/styles.css?v=9" />
 	</head>
 	<body>
 		<div class="noise" aria-hidden="true"></div>
@@ -133,10 +133,15 @@
 				</section>
 				<p id="checkout-status" class="checkout-status" role="status">Choose a plan before paying.</p>
 				<textarea id="checkout-output" rows="8" readonly hidden aria-label="Invoice or dispensed credentials"></textarea>
+				<div id="checkout-delivery-actions" class="checkout-delivery-actions" hidden>
+					<a id="checkout-portal" class="button primary" href="#" target="_blank" rel="noreferrer">Open CATCH portal</a>
+					<button id="checkout-copy-portal" class="button ghost" type="button">Copy portal link</button>
+					<small>Bookmark the portal link. It is the private owner capability for this CATCH.</small>
+				</div>
 			</form>
 		</dialog>
 
 		<footer class="footer shell"><span>THE402MACHINE.COM</span><span>PAYMENT REQUIRED / TAKEN LITERALLY</span><span>© 2026</span></footer>
-		<script type="module" src="/assets/checkout.js?v=13"></script>
+		<script type="module" src="/assets/checkout.js?v=14"></script>
 	</body>
 </html>
