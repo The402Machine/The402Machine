@@ -124,7 +124,12 @@ function registerPaymentRoutes(app: FastifyInstance, payment: PaymentAppOptions)
 		return reply.header("Cache-Control", "no-store").send({ settled: true, resource });
 	});
 
-	app.get("/api/catalog", async (_request, reply) => reply.header("Cache-Control", "public, max-age=60").send({
+	app.get("/api/catalog", async (_request, reply) => reply.header("Cache-Control", "public, max-age=60").send(paymentCatalogue()));
+}
+
+function paymentCatalogue() {
+	return {
+		checkoutEnabled: true,
 		currency: "sat",
 		products: {
 			catch: [
@@ -132,9 +137,9 @@ function registerPaymentRoutes(app: FastifyInstance, payment: PaymentAppOptions)
 				{ planId: "standard", priceSats: 42, available: true },
 				{ planId: "long", priceSats: 402, available: false },
 			],
-			whisper: { status: "preview", clientEncryption: "AES-256-GCM", readOnce: true },
-		},
-	}));
+			whisper: { status: "available", clientEncryption: "AES-256-GCM", readOnce: true },
+			},
+	};
 }
 
 function registerWhisperRoutes(app: FastifyInstance, options: WhisperAppOptions): void {

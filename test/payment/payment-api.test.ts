@@ -64,7 +64,7 @@ describe("public payment API", () => {
 		const app = buildApp({ payment: { quote: () => Promise.reject(new Error("not used")), fulfill: () => Promise.resolve({ settled: false }) } });
 		const response = await app.inject({ method: "GET", url: "/api/catalog" });
 		expect(response.statusCode).toBe(200);
-		expect(response.json()).toMatchObject({ currency: "sat", products: { catch: [
+		expect(response.json()).toMatchObject({ checkoutEnabled: true, currency: "sat", products: { catch: [
 			{ planId: "spark", priceSats: 4, available: true },
 			{ planId: "standard", priceSats: 42, available: true },
 			{ planId: "long", priceSats: 402, available: false },

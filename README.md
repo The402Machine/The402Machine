@@ -2,7 +2,7 @@
 
 > **Insert sats. Receive a tiny piece of the Internet. Use it. Watch it disappear.**
 
-The402Machine is an open-source vending machine for temporary Internet appliances paid with Bitcoin over Lightning. No account, subscription, credit balance, or custodial payment processor.
+The402Machine is a source-available vending machine for temporary Internet appliances designed to be paid with Bitcoin over Lightning. No account, subscription, credit balance, or custodial payment processor.
 
 ## First cartridges
 
@@ -37,7 +37,7 @@ The402Machine sells closed functions, never general computing capability. It wil
 
 ## Current status
 
-The public landing page is online. The first CATCH implementation now includes bounded ingestion, private owner access, transactional quotas, expiry cleanup, and PostgreSQL persistence. Public purchasing remains disabled until Lightning fulfilment is connected and tested.
+The public landing page is online. CATCH and WHISPER are implemented, including bounded ingestion, encrypted read-once delivery, private access, transactional quotas, expiry cleanup, and PostgreSQL persistence. Public purchasing remains disabled until the dedicated Lightning credentials are installed and an explicitly authorized purchase is tested.
 
 ## CATCH guarantees
 

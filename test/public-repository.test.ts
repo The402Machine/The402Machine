@@ -10,6 +10,8 @@ describe("public repository boundary", () => {
 
 		expect(readme).toContain("Product boundary");
 		expect(readme).toContain("Never commit payment credentials");
+		expect(readme).toContain("source-available");
+		expect(readme).not.toContain("is an open-source");
 	});
 
 	it("does not publish internal planning or agent instruction files", async () => {

@@ -14,6 +14,27 @@ if (!(dialog instanceof HTMLDialogElement) || !(form instanceof HTMLFormElement)
 let product = "catch";
 let encryptionKey = "";
 
+void configureCheckout();
+
+async function configureCheckout() {
+	try {
+		const response = await fetch("/api/catalog", { cache: "no-store" });
+		const catalog = await response.json();
+		if (!response.ok || catalog.checkoutEnabled !== true) disableCheckout();
+	} catch {
+		disableCheckout();
+	}
+}
+
+function disableCheckout() {
+	document.querySelectorAll("[data-buy]").forEach((button) => {
+		if (button instanceof HTMLButtonElement) {
+			button.disabled = true;
+			button.textContent = "Checkout disabled";
+		}
+	});
+}
+
 document.querySelectorAll("[data-buy]").forEach((button) => button.addEventListener("click", () => {
 	product = button.getAttribute("data-buy") === "whisper" ? "whisper" : "catch";
 	title.textContent = `Dispense ${product.toUpperCase()}`;
@@ -33,6 +54,9 @@ form.addEventListener("submit", async (event) => {
 	const idempotencyKey = crypto.randomUUID();
 	let response;
 	try {
+		const catalogResponse = await fetch("/api/catalog", { cache: "no-store" });
+		const catalog = await catalogResponse.json();
+		if (!catalogResponse.ok || catalog.checkoutEnabled !== true) throw new Error("Public Lightning checkout is currently disabled.");
 		status.textContent = "Requesting a Lightning invoice…";
 		if (product === "whisper") {
 			const sealed = await sealWhisper(note.value);
