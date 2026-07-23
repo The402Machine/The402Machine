@@ -91,7 +91,7 @@ describe("PaymentRepository", () => {
 				product: "catch" as const,
 				publicId: "catch_payment_repository_once", planId: "spark", ownerTokenHash: "owner-hash", ingestTokenHash: "ingest-hash",
 				requestLimit: 402, storageLimitBytes: 2 * 1024 * 1024, maxBytesPerRequest: 16 * 1024,
-				ownerToken: "owner-once", ingestToken: "ingest-once", expiresAt: new Date("2026-07-23T12:00:00.000Z"),
+				ownerToken: "owner-once", ingestToken: "ingest-once", expiresAt: new Date(Date.now() + 60_000),
 			});
 		})));
 
@@ -109,7 +109,7 @@ describe("PaymentRepository", () => {
 		await repository.markPaid(order.id);
 		const results = await Promise.all(Array.from({ length: 4 }, () => repository.dispensePaidOrder(order.id, () => Promise.resolve({
 			product: "whisper", publicId: "whisper_payment_once_abcdefghijklmnopqrstuv", planId: "spark", readTokenHash: "read-hash",
-			ciphertext, readToken: "read-once", expiresAt: new Date("2026-07-23T12:00:00.000Z"),
+			ciphertext, readToken: "read-once", expiresAt: new Date(Date.now() + 60_000),
 		}))));
 		expect(results.every((result) => result?.product === "whisper" && result.readToken === "read-once")).toBe(true);
 		const rows = await sql<{ count: number }[]>`select count(*)::int as count from whispers where public_id = 'whisper_payment_once_abcdefghijklmnopqrstuv'`;
