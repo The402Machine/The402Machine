@@ -264,10 +264,7 @@ h2 { font-size: clamp(42px, 6vw, 78px); line-height: .98; letter-spacing: -.065e
 .portal-ingest-card label span { color: var(--muted); font: 500 9px var(--mono); letter-spacing: .1em; }
 .portal-ingest-card input { width: 100%; padding: 13px; color: var(--ink); background: #070907; border: 1px solid var(--line); font: 400 11px var(--mono); }
 .portal-code-row { margin-top: 10px; padding: 13px; overflow-wrap: anywhere; border: 1px solid var(--line); background: #070907; color: var(--cream); font: 400 10px var(--mono); }
-.portal-auth-setting { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 14px; align-items: center; margin-top: 14px; padding: 14px; border: 1px solid var(--line); background: #0a0d09; }
-.portal-auth-setting strong, .portal-auth-setting small { display: block; }
-.portal-auth-setting small { margin-top: 4px; color: var(--muted); font: 400 9px/1.5 var(--mono); }
-.portal-auth-setting .button[data-public="true"] { color: var(--orange); border-color: var(--orange); }
+
 .portal-actions { display: grid; gap: 8px; margin-top: 18px; }
 .portal-actions .button { width: 100%; }
 .portal-hint { margin: 16px 0 0; color: var(--muted); font: 400 10px/1.6 var(--mono); }
@@ -284,6 +281,7 @@ h2 { font-size: clamp(42px, 6vw, 78px); line-height: .98; letter-spacing: -.065e
 .portal-event-head > div { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .portal-event-head strong { color: var(--acid); font: 500 18px var(--mono); }
 .portal-event-head span, .portal-event-head time { color: var(--muted); font: 400 9px var(--mono); }
+.portal-event-location { color: var(--cream) !important; }
 .portal-event-method, .portal-event-access { padding: 4px 6px; font: 500 8px var(--mono); letter-spacing: .07em; }
 .portal-event-method { color: var(--black); background: var(--acid); }
 .portal-event-access.authenticated { color: #bde8ff; border: 1px solid #48748b; }
@@ -351,7 +349,7 @@ h2 { font-size: clamp(42px, 6vw, 78px); line-height: .98; letter-spacing: -.065e
 	.portal-metrics article { border-right: 0; border-bottom: 1px solid var(--line); }
 	.portal-metrics article:last-child { border-bottom: 0; }
 	.portal-ingest-card { position: static; }
-	.portal-auth-setting { grid-template-columns: 1fr; }
+
 	.portal-event-filters { grid-template-columns: 1fr; }
 	.portal-event-search { grid-column: auto; }
 	.portal-danger { align-items: stretch; flex-direction: column; }

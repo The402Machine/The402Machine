@@ -54,7 +54,7 @@ beforeAll(async () => {
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 4 });
 
-	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql"]) {
+	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -197,7 +197,7 @@ describe("CATCH migration", () => {
 		expect(stored).toMatchObject({ status: "exhausted", stored_bytes: "23" });
 	});
 
-	it("adds protected ingest defaults and event method provenance", async () => {
+	it("adds ingest policy and event method provenance before the public-ingest migration", async () => {
 		const [resourceColumn] = await sql<{ column_default: string; is_nullable: string }[]>`
 			select column_default, is_nullable from information_schema.columns
 			where table_name = 'catch_resources' and column_name = 'ingest_auth_required'
@@ -206,8 +206,83 @@ describe("CATCH migration", () => {
 			select column_name, column_default from information_schema.columns
 			where table_name = 'catch_events' and column_name in ('method', 'authenticated') order by column_name
 		`;
-		expect(resourceColumn).toMatchObject({ column_default: "true", is_nullable: "NO" });
+		expect(resourceColumn).toMatchObject({ column_default: "false", is_nullable: "NO" });
 		expect(eventColumns.map(({ column_name }) => column_name)).toEqual(["authenticated", "method"]);
 		expect((await sql`select version from schema_migrations where version = '0008_catch_flexible_ingest'`)).toHaveLength(1);
 	});
+
+	it("opens ingestion for all CATCH resources and stores IP metadata", async () => {
+		const [resourceColumn] = await sql<{ column_default: string }[]>`
+			select column_default from information_schema.columns
+			where table_name = 'catch_resources' and column_name = 'ingest_auth_required'
+		`;
+		const eventColumns = await sql<{ column_name: string; data_type: string }[]>`
+			select column_name, data_type from information_schema.columns
+			where table_name = 'catch_events' and column_name in ('source_ip', 'ip_location') order by column_name
+		`;
+		expect(resourceColumn?.column_default).toBe("false");
+		expect(eventColumns.map(({ column_name }) => column_name)).toEqual(["ip_location", "source_ip"]);
+		expect((await sql`select version from schema_migrations where version = '0009_catch_ip_metadata'`)).toHaveLength(1);
+		const [size] = await sql<{ bytes: number }[]>`select catch_event_stored_bytes('{}'::jsonb, ${Buffer.from("x")}, '8.8.8.8'::inet, '{"country":"US"}'::jsonb) as bytes`;
+		expect(size?.bytes).toBeGreaterThan(1);
+	});
+
+	it("upgrades protected legacy resources to accept public ingestion", async () => {
+		const legacyContainer = `the402machine-upgrade-test-${randomUUID()}`;
+		let legacySql: ReturnType<typeof postgres> | undefined;
+		try {
+			docker("run", "--detach", "--rm", "--name", legacyContainer, "--publish", "127.0.0.1::5432", "--env", `POSTGRES_PASSWORD=${password}`, "--env", "POSTGRES_DB=the402machine_test", image);
+			const port = docker("port", legacyContainer, "5432/tcp").split(":").at(-1);
+			if (port === undefined) throw new Error("Could not determine PostgreSQL upgrade-test port");
+			const legacyUrl = `postgresql://postgres:${password}@127.0.0.1:${port}/the402machine_test`;
+			for (let attempt = 0; attempt < 40; attempt += 1) {
+				try { const probe = postgres(legacyUrl, { max: 1, connect_timeout: 1 }); await probe`select 1`; await probe.end(); break; }
+				catch { if (attempt === 39) throw new Error("PostgreSQL upgrade-test container did not become ready"); await new Promise((resolve) => setTimeout(resolve, 250)); }
+			}
+			legacySql = postgres(legacyUrl, { max: 1 });
+			for (const file of ["0001_catch.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0008_catch_flexible_ingest.sql"]) {
+				await legacySql.unsafe(await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8")).simple();
+			}
+			const publicId = `catch_${randomUUID().replaceAll("-", "")}`;
+			await legacySql`
+				insert into catch_resources (public_id, plan_id, owner_token_hash, ingest_token_hash, ingest_auth_required, request_limit, storage_limit_bytes, max_bytes_per_request, expires_at)
+				values (${publicId}, 'spark', 'owner', 'ingest', true, 402, ${2 * 1024 * 1024}, ${64 * 1024}, clock_timestamp() + interval '1 hour')
+			`;
+			await legacySql.unsafe(await readFile(new URL("../../migrations/0009_catch_ip_metadata.sql", import.meta.url), "utf8")).simple();
+			const [resource] = await legacySql<{ ingest_auth_required: boolean }[]>`select ingest_auth_required from catch_resources where public_id = ${publicId}`;
+			expect(resource?.ingest_auth_required).toBe(false);
+		} finally {
+			await legacySql?.end();
+			try { docker("rm", "--force", legacyContainer); } catch { /* container already removed */ }
+		}
+	}, 60_000);
+
+	it("does not charge legacy events for absent IP metadata during migration", async () => {
+		const legacyContainer = `the402machine-quota-upgrade-${randomUUID()}`;
+		let legacySql: ReturnType<typeof postgres> | undefined;
+		try {
+			docker("run", "--detach", "--rm", "--name", legacyContainer, "--publish", "127.0.0.1::5432", "--env", `POSTGRES_PASSWORD=${password}`, "--env", "POSTGRES_DB=the402machine_test", image);
+			const port = docker("port", legacyContainer, "5432/tcp").split(":").at(-1);
+			if (port === undefined) throw new Error("Could not determine PostgreSQL quota-upgrade port");
+			const legacyUrl = `postgresql://postgres:${password}@127.0.0.1:${port}/the402machine_test`;
+			for (let attempt = 0; attempt < 40; attempt += 1) {
+				try { const probe = postgres(legacyUrl, { max: 1, connect_timeout: 1 }); await probe`select 1`; await probe.end(); break; }
+				catch { if (attempt === 39) throw new Error("PostgreSQL quota-upgrade container did not become ready"); await new Promise((resolve) => setTimeout(resolve, 250)); }
+			}
+			legacySql = postgres(legacyUrl, { max: 1 });
+			for (const file of ["0001_catch.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0008_catch_flexible_ingest.sql"]) await legacySql.unsafe(await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8")).simple();
+			const publicId = `catch_${randomUUID().replaceAll("-", "")}`;
+			const [resource] = await legacySql<{ id: string }[]>`
+				insert into catch_resources (public_id, plan_id, owner_token_hash, ingest_token_hash, request_limit, storage_limit_bytes, max_bytes_per_request, stored_bytes, expires_at)
+				values (${publicId}, 'spark', 'owner', 'ingest', 402, 3, ${64 * 1024}, 3, clock_timestamp() + interval '1 hour') returning id
+			`;
+			await legacySql`insert into catch_events (resource_id, sequence_number, content_type, headers, body) values (${resource!.id}, 1, 'text/plain', '{}'::jsonb, ${Buffer.from("x")})`;
+			await legacySql.unsafe(await readFile(new URL("../../migrations/0009_catch_ip_metadata.sql", import.meta.url), "utf8")).simple();
+			const [upgraded] = await legacySql<{ stored_bytes: string }[]>`select stored_bytes from catch_resources where id = ${resource!.id}`;
+			expect(upgraded?.stored_bytes).toBe("3");
+		} finally {
+			await legacySql?.end();
+			try { docker("rm", "--force", legacyContainer); } catch { /* container already removed */ }
+		}
+	}, 60_000);
 });

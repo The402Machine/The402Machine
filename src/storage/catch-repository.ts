@@ -5,13 +5,23 @@ import { transitionCatchResource, type CatchResourceStatus } from "../domain/cat
 
 const ALLOWED_EVENT_HEADERS = new Set(["content-type", "user-agent", "x-request-id", "x-github-event", "x-github-delivery", "stripe-signature"]);
 const EVENT_METHODS = new Set(["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]);
+type StoredIpLocation = Record<string, string | number | boolean | null>;
+export type CatchIpLocation = {
+	ip: string;
+	country: string;
+	city: string;
+	continent: string;
+	latitude: number;
+	longitude: number;
+	timeZone?: string;
+	source: string;
+};
 
 export type CatchResource = {
 	id: string;
 	publicId: string;
 	planId: CatchPlanId;
 	status: CatchResourceStatus;
-	ingestAuthRequired: boolean;
 	requestLimit: number;
 	storageLimitBytes: number;
 	maxBytesPerRequest: number;
@@ -26,6 +36,8 @@ export type CatchEvent = {
 	sequenceNumber: number;
 	method: string;
 	authenticated: boolean;
+	sourceIp: string | null;
+	ipLocation: CatchIpLocation | null;
 	contentType: string;
 	headers: Record<string, string>;
 	body: Buffer;
@@ -46,7 +58,6 @@ export type CatchEventPage = { events: CatchEvent[]; nextCursor: number | null }
 export type CatchCredentialHashes = {
 	ownerTokenHash: string | null;
 	ingestTokenHash: string | null;
-	ingestAuthRequired: boolean;
 };
 
 type CredentialRow = {
@@ -78,6 +89,8 @@ type EventRow = {
 	sequence_number: number;
 	method: string;
 	authenticated: boolean;
+	source_ip: string | null;
+	ip_location: CatchIpLocation | null;
 	content_type: string;
 	headers: Record<string, string>;
 	body: Buffer;
@@ -99,6 +112,7 @@ export type AcceptEventInput = {
 	publicId: string;
 	method?: string;
 	authenticated?: boolean;
+	sourceIp?: string;
 	contentType: string;
 	headers: Record<string, string>;
 	body: Buffer;
@@ -142,18 +156,8 @@ export class CatchRepository {
 				return null;
 			}
 			if (resource.status !== "active" && resource.status !== "exhausted" && resource.status !== "suspended") return null;
-			return { ownerTokenHash: resource.owner_token_hash, ingestTokenHash: resource.ingest_token_hash, ingestAuthRequired: resource.ingest_auth_required };
+			return { ownerTokenHash: resource.owner_token_hash, ingestTokenHash: resource.ingest_token_hash };
 		});
-	}
-
-	public async setIngestAuthRequired(publicId: string, required: boolean): Promise<boolean> {
-		const rows = await this.sql<{ public_id: string }[]>`
-			update catch_resources
-			set ingest_auth_required = ${required}, updated_at = clock_timestamp()
-			where public_id = ${publicId} and status in ('active', 'exhausted', 'suspended') and clock_timestamp() < expires_at
-			returning public_id
-		`;
-		return rows[0] !== undefined;
 	}
 
 	public async acceptEvent(input: AcceptEventInput): Promise<AcceptEventResult> {
@@ -161,6 +165,7 @@ export class CatchRepository {
 		const method = (input.method ?? "POST").toUpperCase();
 		if (!EVENT_METHODS.has(method)) throw new Error("CATCH event method is invalid");
 		const authenticated = input.authenticated ?? true;
+		const sourceIp = input.sourceIp ?? null;
 		return this.sql.begin(async (tx) => {
 			const [resource] = await tx<ResourceRow[]>`
 				select *, clock_timestamp() >= expires_at as is_expired
@@ -175,11 +180,10 @@ export class CatchRepository {
 			}
 			if (resource.status === "exhausted") return { accepted: false, reason: "exhausted" };
 			if (resource.status !== "active") return { accepted: false, reason: "inactive" };
-			if (resource.ingest_auth_required && !authenticated) return { accepted: false, reason: "unauthorized" };
 			if (input.body.byteLength > resource.max_bytes_per_request) return { accepted: false, reason: "body_too_large" };
 
 			const nextCount = resource.accepted_request_count + 1;
-			const [eventSize] = await tx<{ bytes: number }[]>`select catch_event_stored_bytes(${tx.json(input.headers)}, ${input.body}) as bytes`;
+			const [eventSize] = await tx<{ bytes: number }[]>`select catch_event_stored_bytes(${tx.json(input.headers)}, ${input.body}, ${sourceIp}::inet, null) as bytes`;
 			if (eventSize === undefined) throw new Error("CATCH event size could not be calculated");
 			const nextBytes = Number(resource.stored_bytes) + eventSize.bytes;
 			if (nextCount > resource.request_limit || nextBytes > Number(resource.storage_limit_bytes)) {
@@ -188,8 +192,8 @@ export class CatchRepository {
 			}
 
 			const [event] = await tx<{ id: string }[]>`
-				insert into catch_events (resource_id, sequence_number, method, authenticated, content_type, headers, body)
-				values (${resource.id}, ${nextCount}, ${method}, ${authenticated}, ${input.contentType}, ${tx.json(input.headers)}, ${input.body})
+				insert into catch_events (resource_id, sequence_number, method, authenticated, source_ip, ip_location, content_type, headers, body)
+				values (${resource.id}, ${nextCount}, ${method}, ${authenticated}, ${sourceIp}, null, ${input.contentType}, ${tx.json(input.headers)}, ${input.body})
 				returning id
 			`;
 			if (event === undefined) throw new Error("CATCH event insertion returned no event");
@@ -204,6 +208,34 @@ export class CatchRepository {
 				where id = ${resource.id}
 			`;
 			return { accepted: true, eventId: event.id, sequenceNumber: nextCount };
+		});
+	}
+
+	public async setEventIpLocation(publicId: string, eventId: string, location: CatchIpLocation): Promise<boolean> {
+		const serialized = serializeIpLocation(location);
+		return this.sql.begin(async (tx) => {
+			const [resource] = await tx<ResourceRow[]>`select *, false as is_expired from catch_resources where public_id = ${publicId} for update`;
+			if (resource === undefined || !["active", "exhausted", "suspended"].includes(resource.status)) return false;
+			const [event] = await tx<{ previous_bytes: number; next_bytes: number }[]>`
+				select
+					catch_event_stored_bytes(headers, body, source_ip, ip_location) as previous_bytes,
+					catch_event_stored_bytes(headers, body, source_ip, ${tx.json(serialized)}) as next_bytes
+				from catch_events where id = ${eventId} and resource_id = ${resource.id} for update
+			`;
+			if (event === undefined) return false;
+			const delta = event.next_bytes - event.previous_bytes;
+			const nextStoredBytes = Number(resource.stored_bytes) + delta;
+			if (nextStoredBytes > Number(resource.storage_limit_bytes)) return false;
+			await tx`update catch_events set ip_location = ${tx.json(serialized)} where id = ${eventId} and resource_id = ${resource.id}`;
+			await tx`
+				update catch_resources
+				set stored_bytes = ${nextStoredBytes},
+					status = case when status = 'active' and ${nextStoredBytes} >= storage_limit_bytes then 'exhausted'::catch_resource_status else status end,
+					exhausted_at = case when status = 'active' and ${nextStoredBytes} >= storage_limit_bytes then coalesce(exhausted_at, clock_timestamp()) else exhausted_at end,
+					updated_at = clock_timestamp()
+				where id = ${resource.id}
+			`;
+			return true;
 		});
 	}
 
@@ -223,7 +255,7 @@ export class CatchRepository {
 			}
 			if (resource.status !== "active" && resource.status !== "exhausted" && resource.status !== "suspended") return { events: [], nextCursor: null };
 			const rows = await tx<EventRow[]>`
-				select id, sequence_number, method, authenticated, content_type, headers, body, received_at
+				select id, sequence_number, method, authenticated, host(source_ip) as source_ip, ip_location, content_type, headers, body, received_at
 				from catch_events
 				where resource_id = ${resource.id}
 					and (${cursor}::integer is null or sequence_number < ${cursor})
@@ -246,7 +278,7 @@ export class CatchRepository {
 			if (resource === undefined || !["active", "exhausted", "suspended"].includes(resource.status)) return false;
 			const [deleted] = await tx<{ stored_bytes: number }[]>`
 				delete from catch_events where id = ${eventId} and resource_id = ${resource.id}
-				returning catch_event_stored_bytes(headers, body) as stored_bytes
+				returning catch_event_stored_bytes(headers, body, source_ip, ip_location) as stored_bytes
 			`;
 			if (deleted === undefined) return false;
 			await tx`update catch_resources set stored_bytes = greatest(0, stored_bytes - ${deleted.stored_bytes}), updated_at = clock_timestamp() where id = ${resource.id}`;
@@ -308,13 +340,18 @@ function assertAllowedHeaders(headers: Record<string, string>): void {
 	if (Object.entries(headers).some(([name, value]) => !ALLOWED_EVENT_HEADERS.has(name) || typeof value !== "string")) throw new Error("CATCH event headers are invalid");
 }
 
+function serializeIpLocation(location: CatchIpLocation): StoredIpLocation {
+	return Object.fromEntries(Object.entries(location).flatMap(([key, value]) =>
+		typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? [[key, value]] : [],
+	));
+}
+
 function mapResource(row: ResourceRow): CatchResource {
 	return {
 		id: row.id,
 		publicId: row.public_id,
 		planId: row.plan_id,
 		status: row.status,
-		ingestAuthRequired: row.ingest_auth_required,
 		requestLimit: row.request_limit,
 		storageLimitBytes: Number(row.storage_limit_bytes),
 		maxBytesPerRequest: row.max_bytes_per_request,
@@ -326,5 +363,5 @@ function mapResource(row: ResourceRow): CatchResource {
 }
 
 function mapEvent(row: EventRow): CatchEvent {
-	return { id: row.id, sequenceNumber: row.sequence_number, method: row.method, authenticated: row.authenticated, contentType: row.content_type, headers: row.headers, body: row.body, receivedAt: row.received_at };
+	return { id: row.id, sequenceNumber: row.sequence_number, method: row.method, authenticated: row.authenticated, sourceIp: row.source_ip, ipLocation: row.ip_location, contentType: row.content_type, headers: row.headers, body: row.body, receivedAt: row.received_at };
 }

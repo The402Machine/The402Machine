@@ -11,7 +11,7 @@ import { CATCH_PRICES_SATS, WHISPER_PRICES_SATS } from "./payment/payment-domain
 import type { DispensedResource } from "./payment/payment-repository.js";
 import type { PaymentQuote } from "./payment/payment-service.js";
 import { generateIngestToken, generateOwnerToken, hashToken, verifyToken } from "./security/tokens.js";
-import type { AcceptEventInput, AcceptEventResult, CatchCredentialHashes, CatchEvent, CatchEventListOptions, CatchEventPage, CatchResource, ProvisionInput } from "./storage/catch-repository.js";
+import type { AcceptEventInput, AcceptEventResult, CatchCredentialHashes, CatchEvent, CatchEventListOptions, CatchEventPage, CatchIpLocation, CatchResource, ProvisionInput } from "./storage/catch-repository.js";
 import type { CreateWhisperInput } from "./whisper/whisper-repository.js";
 
 const MAX_INGEST_BYTES = Math.max(...Object.values(CATCH_PLANS).map((plan) => plan.maxBytesPerRequest));
@@ -26,8 +26,8 @@ export interface CatchApiRepository {
 	getResource(publicId: string): Promise<CatchResource | null>;
 	getCredentialHashes(publicId: string): Promise<CatchCredentialHashes | null>;
 	acceptEvent(input: AcceptEventInput): Promise<AcceptEventResult>;
+	setEventIpLocation(publicId: string, eventId: string, location: CatchIpLocation): Promise<boolean>;
 	listEvents(publicId: string, options: CatchEventListOptions): Promise<CatchEventPage>;
-	setIngestAuthRequired(publicId: string, required: boolean): Promise<boolean>;
 	deleteEvent(publicId: string, eventId: string): Promise<boolean>;
 	destroy(publicId: string): Promise<boolean>;
 }
@@ -41,6 +41,7 @@ export interface WhisperApiRepository {
 type CatchAppOptions = {
 	repository: CatchApiRepository;
 	tokenPepper: string;
+	lookupIp?: (ip: string) => Promise<CatchIpLocation | undefined>;
 	provisioningEnabled?: boolean;
 	provisioningSecret?: string;
 };
@@ -249,12 +250,12 @@ function registerCatchRoutes(app: FastifyInstance, options: CatchAppOptions): vo
 		const credentials = await options.repository.getCredentialHashes(request.params.publicId);
 		if (credentials === null || credentials.ingestTokenHash === null) return reply.code(401).send({ error: "unauthorized" });
 		const authenticated = verifyToken("ingest", bearerToken(request) ?? "", credentials.ingestTokenHash, options.tokenPepper);
-		if (credentials.ingestAuthRequired && !authenticated) return reply.code(401).send({ error: "unauthorized" });
 		const body = Buffer.isBuffer(request.body) ? request.body : Buffer.alloc(0);
 		if (body.byteLength > MAX_INGEST_BYTES) return reply.code(400).send({ error: "invalid request" });
-		const accepted = await options.repository.acceptEvent({ publicId: request.params.publicId, method: request.method, authenticated, contentType, headers: filteredHeaders(request), body });
-		if (!accepted.accepted && accepted.reason === "unauthorized") return reply.code(401).send({ error: "unauthorized" });
+		const sourceIp = request.ip;
+		const accepted = await options.repository.acceptEvent({ publicId: request.params.publicId, method: request.method, authenticated, sourceIp, contentType, headers: filteredHeaders(request), body });
 		if (!accepted.accepted) return reply.code(400).send({ error: "invalid request" });
+		if (options.lookupIp !== undefined) void enrichEventIp(options, request.params.publicId, accepted.eventId, sourceIp);
 		return reply.code(204).send();
 	};
 	for (const method of ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] as const) app.route({ method, url: "/c/:publicId", handler: ingestHandler });
@@ -274,15 +275,6 @@ function registerCatchRoutes(app: FastifyInstance, options: CatchAppOptions): vo
 		return reply.header("Cache-Control", "no-store").send({ events: page.events.map(eventResponse), nextCursor: page.nextCursor });
 	});
 
-	app.patch<{ Params: { publicId: string } }>("/api/catch/:publicId/settings", async (request, reply) => {
-		if (!consumeRateLimit(ownerRateLimits, request.ip, 30, 60_000)) return rateLimited(reply);
-		if (!await authorizeOwner(request, options)) return unauthorized(reply);
-		const body = Buffer.isBuffer(request.body) ? parseJsonBuffer(request.body) : request.body;
-		const ingestAuthRequired = typeof body === "object" && body !== null ? (body as { ingestAuthRequired?: unknown }).ingestAuthRequired : undefined;
-		if (typeof ingestAuthRequired !== "boolean") return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid request" });
-		const updated = await options.repository.setIngestAuthRequired(request.params.publicId, ingestAuthRequired);
-		return updated ? reply.header("Cache-Control", "no-store").send({ ingestAuthRequired }) : reply.header("Cache-Control", "no-store").code(404).send({ error: "not found" });
-	});
 
 	app.delete<{ Params: { publicId: string; eventId: string } }>("/api/catch/:publicId/events/:eventId", async (request, reply) => {
 		if (!consumeRateLimit(ownerRateLimits, request.ip, 30, 60_000)) return rateLimited(reply);
@@ -366,10 +358,19 @@ function parseEventOptions(query: { limit?: string; cursor?: string; access?: st
 	};
 }
 function resourceStatus(resource: CatchResource): object {
-	return { publicId: resource.publicId, planId: resource.planId, status: resource.status, ingestAuthRequired: resource.ingestAuthRequired, requestLimit: resource.requestLimit, storageLimitBytes: resource.storageLimitBytes, maxBytesPerRequest: resource.maxBytesPerRequest, acceptedRequestCount: resource.acceptedRequestCount, storedBytes: resource.storedBytes, createdAt: resource.createdAt.toISOString(), expiresAt: resource.expiresAt.toISOString() };
+	return { publicId: resource.publicId, planId: resource.planId, status: resource.status, requestLimit: resource.requestLimit, storageLimitBytes: resource.storageLimitBytes, maxBytesPerRequest: resource.maxBytesPerRequest, acceptedRequestCount: resource.acceptedRequestCount, storedBytes: resource.storedBytes, createdAt: resource.createdAt.toISOString(), expiresAt: resource.expiresAt.toISOString() };
 }
 function eventResponse(event: CatchEvent): object {
-	return { id: event.id, sequenceNumber: event.sequenceNumber, method: event.method, authenticated: event.authenticated, access: event.authenticated ? "authenticated" : "public", contentType: event.contentType, headers: event.headers, body: event.body.toString("base64"), bodyEncoding: "base64", receivedAt: event.receivedAt.toISOString() };
+	return { id: event.id, sequenceNumber: event.sequenceNumber, method: event.method, authenticated: event.authenticated, access: event.authenticated ? "authenticated" : "public", sourceIp: event.sourceIp, ipLocation: event.ipLocation, contentType: event.contentType, headers: event.headers, body: event.body.toString("base64"), bodyEncoding: "base64", receivedAt: event.receivedAt.toISOString() };
+}
+
+async function enrichEventIp(options: CatchAppOptions, publicId: string, eventId: string, ip: string): Promise<void> {
+	try {
+		const location = await options.lookupIp?.(ip);
+		if (location !== undefined) await options.repository.setEventIpLocation(publicId, eventId, location);
+	} catch {
+		// Geolocation is best-effort and must never delay or reject ingestion.
+	}
 }
 
 function provisionPlanId(body: unknown): unknown {

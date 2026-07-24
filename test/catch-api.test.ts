@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildApp, type CatchApiRepository } from "../src/app.js";
 import { hashToken } from "../src/security/tokens.js";
-import type { CatchResource } from "../src/storage/catch-repository.js";
+import type { CatchIpLocation, CatchResource } from "../src/storage/catch-repository.js";
 
 const pepper = "test-pepper";
 const provisioningSecret = "provisioning-secret";
@@ -14,7 +14,6 @@ const resource = (): CatchResource => ({
 	publicId: "catch_test-public-id",
 	planId: "spark",
 	status: "active",
-	ingestAuthRequired: true,
 	requestLimit: 402,
 	storageLimitBytes: 2 * 1024 * 1024,
 	maxBytesPerRequest: 64 * 1024,
@@ -27,10 +26,10 @@ const resource = (): CatchResource => ({
 class FakeCatchRepository implements CatchApiRepository {
 	public readonly provisions: Parameters<CatchApiRepository["provision"]>[] = [];
 	public readonly accepted: Parameters<CatchApiRepository["acceptEvent"]>[] = [];
+	public readonly enriched: { publicId: string; eventId: string; location: typeof location }[] = [];
 	public readonly deletedEvents: string[] = [];
 	public destroyed = false;
 	public credentialLookups = 0;
-	public ingestAuthRequired = true;
 	public credentials = {
 		ownerTokenHash: hashToken("owner", ownerToken, pepper),
 		ingestTokenHash: hashToken("ingest", ingestToken, pepper),
@@ -45,9 +44,9 @@ class FakeCatchRepository implements CatchApiRepository {
 		return Promise.resolve(publicId === resource().publicId ? resource() : null);
 	}
 
-	public getCredentialHashes(publicId: string): Promise<{ ownerTokenHash: string | null; ingestTokenHash: string | null; ingestAuthRequired: boolean } | null> {
+	public getCredentialHashes(publicId: string): Promise<{ ownerTokenHash: string | null; ingestTokenHash: string | null } | null> {
 		this.credentialLookups += 1;
-		return Promise.resolve(publicId === resource().publicId ? { ...this.credentials, ingestAuthRequired: this.ingestAuthRequired } : null);
+		return Promise.resolve(publicId === resource().publicId ? { ...this.credentials } : null);
 	}
 
 	public acceptEvent(input: Parameters<CatchApiRepository["acceptEvent"]>[0]): Promise<{ accepted: true; eventId: string; sequenceNumber: number }> {
@@ -56,15 +55,17 @@ class FakeCatchRepository implements CatchApiRepository {
 	}
 
 	public listEvents(): ReturnType<CatchApiRepository["listEvents"]> { return Promise.resolve({ events: [], nextCursor: null }); }
-	public setIngestAuthRequired(_publicId: string, required: boolean): Promise<boolean> { this.ingestAuthRequired = required; return Promise.resolve(true); }
+	public setEventIpLocation(publicId: string, eventId: string, locationValue: typeof location): Promise<boolean> { this.enriched.push({ publicId, eventId, location: locationValue }); return Promise.resolve(true); }
 	public deleteEvent(_publicId: string, eventId: string): Promise<boolean> { this.deletedEvents.push(eventId); return Promise.resolve(true); }
 	public destroy(): Promise<boolean> { this.destroyed = true; return Promise.resolve(true); }
 }
 
 const apps: ReturnType<typeof buildApp>[] = [];
-const buildCatchApp = (repository = new FakeCatchRepository()) => {
+const location = { ip: "127.0.0.1", country: "ES", city: "Madrid", continent: "EU", latitude: 40.4168, longitude: -3.7038, isp: "Example ISP", timeZone: "Europe/Madrid", source: "test" };
+const buildCatchApp = (repository = new FakeCatchRepository(), lookupIp: (ip: string) => Promise<CatchIpLocation | undefined> = vi.fn(() => Promise.resolve(location)), trustedProxy?: string) => {
 	const app = buildApp({
-		catch: { repository, tokenPepper: pepper, provisioningEnabled: true, provisioningSecret },
+		...(trustedProxy === undefined ? {} : { trustedProxy }),
+		catch: { repository, tokenPepper: pepper, provisioningEnabled: true, provisioningSecret, lookupIp },
 	});
 	apps.push(app);
 	return { app, repository };
@@ -126,16 +127,12 @@ describe("CATCH HTTP API", () => {
 		});
 		expect(response.statusCode).toBe(204);
 		expect(response.body).toBe("");
-		expect(repository.accepted[0]?.[0]).toMatchObject({ body: Buffer.from("hello"), headers: { "content-type": "text/plain", "user-agent": "test", "x-request-id": "request-1" } });
+		expect(repository.accepted[0]?.[0]).toMatchObject({ body: Buffer.from("hello"), sourceIp: "127.0.0.1", headers: { "content-type": "text/plain", "user-agent": "test", "x-request-id": "request-1" } });
+		expect(repository.enriched).toEqual([{ publicId: "catch_test-public-id", eventId: "event-1", location }]);
 	});
 
-	it("keeps ingest authenticated by default, can enable public ingest, and records webhook methods", async () => {
+	it("accepts tokenless and authenticated requests together and records webhook methods", async () => {
 		const { app, repository } = buildCatchApp();
-		expect((await app.inject({ method: "POST", url: "/c/catch_test-public-id", headers: { "content-type": "text/plain" }, payload: "denied" })).statusCode).toBe(401);
-		const enabled = await app.inject({ method: "PATCH", url: "/api/catch/catch_test-public-id/settings", headers: bearer(ownerToken), payload: { ingestAuthRequired: false } });
-		expect(enabled.statusCode).toBe(200);
-		expect(enabled.json()).toMatchObject({ ingestAuthRequired: false });
-
 		for (const method of ["POST", "PUT", "PATCH", "DELETE", "GET", "HEAD", "OPTIONS"] as const) {
 			const response = await app.inject(method === "GET" || method === "HEAD" || method === "OPTIONS"
 				? { method, url: "/c/catch_test-public-id?canary=1", headers: { "content-type": "text/plain" } }
@@ -144,14 +141,37 @@ describe("CATCH HTTP API", () => {
 		}
 		expect(repository.accepted.map(([event]) => event.method)).toEqual(["POST", "PUT", "PATCH", "DELETE", "GET", "HEAD", "OPTIONS"]);
 		expect(repository.accepted.every(([event]) => event.authenticated === false)).toBe(true);
-	});
-
-	it("marks token-backed events authenticated when public ingest is enabled", async () => {
-		const { app, repository } = buildCatchApp();
-		repository.ingestAuthRequired = false;
 		const response = await app.inject({ method: "PUT", url: "/c/catch_test-public-id", headers: { ...bearer(ingestToken), "content-type": "application/json" }, payload: { ok: true } });
 		expect(response.statusCode).toBe(204);
-		expect(repository.accepted[0]?.[0]).toMatchObject({ method: "PUT", authenticated: true });
+		expect(repository.accepted[repository.accepted.length - 1]?.[0]).toMatchObject({ method: "PUT", authenticated: true });
+		expect((await app.inject({ method: "PATCH", url: "/api/catch/catch_test-public-id/settings", headers: bearer(ownerToken), payload: { ingestAuthRequired: true } })).statusCode).toBe(404);
+	});
+
+	it("keeps ingestion available when IP geolocation fails", async () => {
+		const { app, repository } = buildCatchApp(new FakeCatchRepository(), vi.fn(() => Promise.reject(new Error("lookup unavailable"))));
+		const response = await app.inject({ method: "POST", url: "/c/catch_test-public-id", headers: { "content-type": "text/plain" }, payload: "still accepted" });
+		expect(response.statusCode).toBe(204);
+		expect(repository.accepted[0]?.[0]).toMatchObject({ authenticated: false, sourceIp: "127.0.0.1" });
+		expect(repository.enriched).toEqual([]);
+	});
+
+	it("accepts IPv6 source addresses even when local city lookup is unavailable", async () => {
+		const repository = new FakeCatchRepository();
+		const { app } = buildCatchApp(repository, vi.fn(() => Promise.resolve(undefined)), "127.0.0.1");
+		const response = await app.inject({ method: "POST", url: "/c/catch_test-public-id", headers: { "content-type": "text/plain", "x-forwarded-for": "2001:4860:4860::8888" }, payload: "ipv6", remoteAddress: "127.0.0.1" });
+		expect(response.statusCode).toBe(204);
+		expect(repository.accepted[0]?.[0]).toMatchObject({ authenticated: false, sourceIp: "2001:4860:4860::8888" });
+	});
+
+	it("returns ingestion before a slow IP lookup finishes", async () => {
+		let resolveLookup: ((value: typeof location) => void) | undefined;
+		const lookup = vi.fn(() => new Promise<typeof location>((resolve) => { resolveLookup = resolve; }));
+		const { app, repository } = buildCatchApp(new FakeCatchRepository(), lookup);
+		const response = await app.inject({ method: "POST", url: "/c/catch_test-public-id", headers: { "content-type": "text/plain" }, payload: "fast ack" });
+		expect(response.statusCode).toBe(204);
+		expect(repository.enriched).toEqual([]);
+		resolveLookup?.(location);
+		await vi.waitFor(() => expect(repository.enriched).toHaveLength(1));
 	});
 
 	it("accepts a Spark payload above the former 16 KiB ceiling", async () => {
@@ -162,10 +182,12 @@ describe("CATCH HTTP API", () => {
 		expect(repository.accepted[0]?.[0].body.byteLength).toBe(64 * 1024);
 	});
 
-	it("rejects incorrect role tokens, unsupported MIME, encoded and oversized ingestion", async () => {
+	it("treats invalid tokens as public and rejects unsupported MIME, encoded and oversized ingestion", async () => {
 		const { app, repository } = buildCatchApp();
+		const invalidToken = await app.inject({ method: "POST", url: "/c/catch_test-public-id", headers: { ...bearer(ownerToken), "content-type": "text/plain" }, payload: "public" });
+		expect(invalidToken.statusCode).toBe(204);
+		expect(repository.accepted[0]?.[0].authenticated).toBe(false);
 		for (const request of [
-			{ headers: { ...bearer(ownerToken), "content-type": "text/plain" }, payload: "x" },
 			{ headers: { ...bearer(ingestToken), "content-type": "image/png" }, payload: "x" },
 			{ headers: { ...bearer(ingestToken), "content-type": "text/plain", "content-encoding": "gzip" }, payload: "x" },
 			{ headers: { ...bearer(ingestToken), "content-type": "text/plain" }, payload: "x".repeat(1024 * 1024 + 1) },
@@ -173,7 +195,7 @@ describe("CATCH HTTP API", () => {
 			const response = await app.inject({ method: "POST", url: "/c/catch_test-public-id", ...request });
 			expect(response.statusCode).toBeGreaterThanOrEqual(400);
 		}
-		expect(repository.accepted).toHaveLength(0);
+		expect(repository.accepted).toHaveLength(1);
 	});
 
 	it("rate-limits repeated ingestion attempts before unbounded database work", async () => {
@@ -226,7 +248,7 @@ describe("CATCH HTTP API", () => {
 				},
 				payload: "x",
 			});
-			expect(response.statusCode).toBe(401);
+			expect(response.statusCode).toBe(204);
 		}
 		const throttled = await app.inject({
 			method: "POST",
@@ -250,7 +272,7 @@ describe("CATCH HTTP API", () => {
 			},
 			payload: "x",
 		});
-		expect(differentClient.statusCode).toBe(401);
+		expect(differentClient.statusCode).toBe(204);
 	});
 
 	it("ignores forwarding headers when the direct peer does not match the configured proxy", async () => {

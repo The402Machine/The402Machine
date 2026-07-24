@@ -13,7 +13,6 @@ describe("public API documentation", () => {
 			"POST|PUT|PATCH|DELETE|GET|HEAD|OPTIONS /c/{publicId}",
 			"GET /api/catch/{publicId}",
 			"GET /api/catch/{publicId}/events",
-			"PATCH /api/catch/{publicId}/settings",
 			"DELETE /api/catch/{publicId}/events/{eventId}",
 			"DELETE /api/catch/{publicId}",
 			"Idempotency-Key",
@@ -21,10 +20,15 @@ describe("public API documentation", () => {
 			"cursor",
 			"access=public|authenticated",
 			"bodyEncoding",
+			"sourceIp",
+			"ipLocation",
 			"GET /w/{publicId}",
 			"AES-256-GCM",
 			"X-Whisper-Plan",
 		]) expect(html).toContain(contract);
+		expect(html).toContain("accepted with or without the ingest token");
+		expect(html).toContain("locally resolved approximate IP location");
+		expect(html).not.toContain("enable public ingest");
 		expect(html).not.toMatch(/catch_(?:own|ing)_[A-Za-z0-9_-]{20,}/u);
 		expect(html).not.toMatch(/lnbc[0-9A-Za-z]{20,}/u);
 	});

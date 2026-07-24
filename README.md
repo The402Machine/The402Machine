@@ -94,6 +94,8 @@ Invoice creation uses the payment order UUID as LNbits `external_id`. Before cre
 
 `TRUSTED_PROXY` must be the reverse proxy address as seen by Fastify. Leave it unset for direct development access; never trust arbitrary forwarding headers. The production Compose file pins its edge subnet and gateway so this trust boundary cannot drift silently.
 
+CATCH stores the trusted request IP and resolves approximate city/country data locally from the packaged GeoLite database. Visitor IPs are not sent to third-party geolocation services.
+
 ## Security
 
 Please report security issues privately rather than opening a public issue. A dedicated security contact and disclosure policy will be published before payments are enabled.

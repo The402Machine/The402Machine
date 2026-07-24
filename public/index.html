@@ -6,7 +6,7 @@
 		<meta name="description" content="Buy a temporary webhook or an encrypted read-once message with Bitcoin over Lightning. No account, no subscription, hard limits." />
 		<meta name="theme-color" content="#080a08" />
 		<title>The402Machine — Disposable Internet Infrastructure</title>
-		<link rel="stylesheet" href="/assets/styles.css?v=10" />
+		<link rel="stylesheet" href="/assets/styles.css?v=11" />
 	</head>
 	<body>
 		<div class="noise" aria-hidden="true"></div>
@@ -58,11 +58,11 @@
 
 # Pay the returned BOLT11, then poll:
 curl https://the402machine.com/api/payments/{orderId}</pre></details><p class="api-note">WHISPER accepts client-encrypted <code>application/octet-stream</code> plus <code>X-Whisper-Plan</code>. Never upload plaintext.</p></article>
-						<article><p class="eyebrow">CATCH / INGEST</p><h3>Receive any webhook verb</h3><code>POST|PUT|PATCH|DELETE|GET|HEAD|OPTIONS /c/{publicId}</code><p>CATCH records the HTTP method, content type, allow-listed headers, raw body and whether the ingest token authenticated the request. Protected ingest is the default. Owner settings may enable public ingest for providers that cannot send headers.</p><details><summary>Authenticated event example</summary><pre>curl -X PUT https://the402machine.com/c/{publicId} \
+						<article><p class="eyebrow">CATCH / INGEST</p><h3>Receive any webhook verb</h3><code>POST|PUT|PATCH|DELETE|GET|HEAD|OPTIONS /c/{publicId}</code><p>Requests are accepted with or without the ingest token. CATCH records the HTTP method, content type, allow-listed headers, raw body, trusted source IP, locally resolved approximate IP location and whether the ingest token authenticated the request.</p><details><summary>Authenticated event example</summary><pre>curl -X PUT https://the402machine.com/c/{publicId} \
   -H 'Authorization: Bearer {ingestToken}' \
   -H 'Content-Type: application/json' \
-  --data '{"event":"canary"}'</pre></details><p class="api-note">Public ingest makes the URL itself a write capability. Anyone who learns it can consume quota. Owner APIs remain authenticated.</p></article>
-						<article><p class="eyebrow">CATCH / OWNER</p><h3>Inspect and manage</h3><code>GET /api/catch/{publicId}</code><code>GET /api/catch/{publicId}/events</code><code>PATCH /api/catch/{publicId}/settings</code><code>DELETE /api/catch/{publicId}/events/{eventId}</code><code>DELETE /api/catch/{publicId}</code><p>Use <code>Authorization: Bearer {ownerToken}</code>. Event listing supports <code>limit</code>, <code>cursor</code>, <code>access=public|authenticated</code>, <code>method</code>, <code>contentType</code> and <code>q</code>. Bodies use <code>bodyEncoding: "base64"</code>.</p><details><summary>Paginated listing example</summary><pre>curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;access=authenticated&amp;method=POST' \
+  --data '{"event":"canary"}'</pre></details><p class="api-note">The endpoint URL is a write capability: anyone who learns it can consume quota. Supplying the ingest token adds authenticated provenance. Owner APIs remain protected.</p></article>
+						<article><p class="eyebrow">CATCH / OWNER</p><h3>Inspect and manage</h3><code>GET /api/catch/{publicId}</code><code>GET /api/catch/{publicId}/events</code><code>DELETE /api/catch/{publicId}/events/{eventId}</code><code>DELETE /api/catch/{publicId}</code><p>Use <code>Authorization: Bearer {ownerToken}</code>. Event listing supports <code>limit</code>, <code>cursor</code>, <code>access=public|authenticated</code>, <code>method</code>, <code>contentType</code> and <code>q</code>. Bodies use <code>bodyEncoding: "base64"</code>; each event also includes <code>sourceIp</code> and best-effort <code>ipLocation</code>.</p><details><summary>Paginated listing example</summary><pre>curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;access=authenticated&amp;method=POST' \
   -H 'Authorization: Bearer {ownerToken}'
 
 # Continue with nextCursor:

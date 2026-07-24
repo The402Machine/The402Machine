@@ -39,7 +39,7 @@ beforeAll(async () => {
 	databaseUrl = `postgresql://postgres:${password}@127.0.0.1:${port}/the402machine_test`;
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 12 });
-	for (const file of ["0001_catch.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0008_catch_flexible_ingest.sql"]) {
+	for (const file of ["0001_catch.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -123,7 +123,7 @@ describe("CatchRepository", () => {
 	});
 
 	it("serializes concurrent accepts and never exceeds the byte quota", async () => {
-		const resource = await provisionSpark({ requestLimit: 10, storageLimitBytes: 14 });
+		const resource = await provisionSpark({ requestLimit: 10, storageLimitBytes: 10 });
 		const results = await Promise.all(Array.from({ length: 6 }, () => repository.acceptEvent({
 			publicId: resource.publicId,
 			contentType: "text/plain",
@@ -308,7 +308,6 @@ describe("CatchRepository", () => {
 
 	it("filters and paginates public and authenticated events", async () => {
 		const resource = await provisionSpark();
-		await repository.setIngestAuthRequired(resource.publicId, false);
 		await repository.acceptEvent({ publicId: resource.publicId, method: "POST", authenticated: false, contentType: "text/plain", headers: {}, body: Buffer.from("public needle") });
 		await repository.acceptEvent({ publicId: resource.publicId, method: "PUT", authenticated: true, contentType: "application/json", headers: {}, body: Buffer.from('{"needle":true}') });
 		await repository.acceptEvent({ publicId: resource.publicId, method: "DELETE", authenticated: false, contentType: "text/plain", headers: {}, body: Buffer.from("other") });
@@ -321,20 +320,42 @@ describe("CatchRepository", () => {
 		expect(json.events).toHaveLength(1);
 	});
 
-	it("rechecks protected ingest atomically before storing an unauthenticated event", async () => {
+	it("stores source IP and bounded geolocation for public events", async () => {
 		const resource = await provisionSpark();
-		await repository.setIngestAuthRequired(resource.publicId, true);
-
 		const result = await repository.acceptEvent({
 			publicId: resource.publicId,
 			method: "POST",
 			authenticated: false,
+			sourceIp: "8.8.8.8",
 			contentType: "text/plain",
 			headers: {},
-			body: Buffer.from("raced public event"),
+			body: Buffer.from("public event"),
 		});
 
-		expect(result).toEqual({ accepted: false, reason: "unauthorized" });
-		expect(await eventCount(resource.id)).toBe(0);
+		expect(result.accepted).toBe(true);
+		if (!result.accepted) throw new Error("Expected event to be accepted");
+		const beforeEnrichment = Number((await rawResource(resource.publicId))?.stored_bytes);
+		expect(await repository.setEventIpLocation(resource.publicId, result.eventId, { ip: "8.8.8.8", country: "US", city: "Mountain View", continent: "NA", latitude: 37.386, longitude: -122.0838, source: "test" })).toBe(true);
+		const afterEnrichment = Number((await rawResource(resource.publicId))?.stored_bytes);
+		expect(afterEnrichment).toBeGreaterThan(beforeEnrichment);
+		const [event] = (await repository.listEvents(resource.publicId, { limit: 10 })).events;
+		expect(event).toMatchObject({ sourceIp: "8.8.8.8", ipLocation: { country: "US", city: "Mountain View", source: "test" } });
+	});
+
+	it("marks an active resource exhausted when IP metadata fills its storage quota exactly", async () => {
+		const resource = await provisionSpark({ storageLimitBytes: 10_000 });
+		const accepted = await repository.acceptEvent({ publicId: resource.publicId, sourceIp: "8.8.8.8", contentType: "text/plain", headers: {}, body: Buffer.from("x") });
+		expect(accepted.accepted).toBe(true);
+		if (!accepted.accepted) throw new Error("Expected event to be accepted");
+		const location = { ip: "8.8.8.8", country: "US", city: "Mountain View", continent: "NA", latitude: 37.386, longitude: -122.0838, source: "test" };
+		const [sizes] = await sql<{ previous_bytes: number; next_bytes: number }[]>`
+			select catch_event_stored_bytes(headers, body, source_ip, ip_location) as previous_bytes,
+				catch_event_stored_bytes(headers, body, source_ip, ${sql.json(location)}) as next_bytes
+			from catch_events where id = ${accepted.eventId}
+		`;
+		if (sizes === undefined) throw new Error("Expected stored event sizes");
+		await sql`update catch_resources set storage_limit_bytes = ${sizes.next_bytes} where id = ${resource.id}`;
+		expect(await repository.setEventIpLocation(resource.publicId, accepted.eventId, location)).toBe(true);
+		expect(await rawResource(resource.publicId)).toMatchObject({ status: "exhausted", stored_bytes: String(sizes.next_bytes) });
 	});
 });

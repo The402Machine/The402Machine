@@ -53,7 +53,7 @@ describe("public landing page", () => {
 		expect(response.body).toContain('data-buy="catch"');
 		expect(response.body).toContain('data-buy="whisper"');
 		expect(response.body).toContain('data-plan="long"');
-		expect(response.body).toContain('href="/assets/styles.css?v=10"');
+		expect(response.body).toContain('href="/assets/styles.css?v=11"');
 		expect(response.body).toContain('src="/assets/checkout.js?v=15"');
 		expect(response.body).toContain('href="#api"');
 		expect(response.body).toContain('id="api"');

@@ -7,7 +7,7 @@
 		<meta name="referrer" content="no-referrer" />
 		<meta name="theme-color" content="#080a08" />
 		<title>CATCH portal — The402Machine</title>
-		<link rel="stylesheet" href="/assets/styles.css?v=10" />
+		<link rel="stylesheet" href="/assets/styles.css?v=11" />
 	</head>
 	<body class="portal-body">
 		<div class="noise" aria-hidden="true"></div>
@@ -56,16 +56,15 @@
 
 				<section class="portal-grid">
 					<article class="portal-card portal-ingest-card">
-						<div class="portal-card-head"><div><p class="eyebrow">SEND EVENTS HERE</p><h2>Ingest endpoint</h2></div><span>ANY VERB</span></div>
+						<div class="portal-card-head"><div><p class="eyebrow">SEND EVENTS HERE</p><h2>Ingest endpoint</h2></div></div>
 						<label><span>URL</span><input id="portal-ingest-url" readonly /></label>
 						<div class="portal-code-row"><code id="portal-auth-preview">Authorization: Bearer ••••••</code></div>
-						<div class="portal-auth-setting"><div><strong>Require ingest authentication</strong><small>Recommended. Disable only when the webhook provider cannot send headers.</small></div><button id="portal-ingest-auth" class="button" type="button">Checking…</button></div>
 						<div class="portal-actions">
 							<button id="portal-copy-endpoint" class="button primary" type="button">Copy endpoint</button>
 							<button id="portal-copy-auth" class="button" type="button">Copy auth header</button>
 							<button id="portal-copy-curl" class="button ghost" type="button">Copy cURL example</button>
 						</div>
-						<p class="portal-hint">The ingest token is hidden on screen. Copy actions place it on your clipboard only when requested.</p>
+						<p class="portal-hint">Requests work with or without the ingest token. Token-backed events are marked authenticated in the feed. The token is hidden on screen and copied only when requested.</p>
 					</article>
 
 					<article class="portal-card portal-events-card">
@@ -91,6 +90,6 @@
 		</main>
 
 		<footer class="footer shell"><span>THE402MACHINE.COM</span><span>OWNER CAPABILITY / KEEP PRIVATE</span><span>NO ACCOUNT RECOVERY</span></footer>
-		<script type="module" src="/assets/catch-portal.js?v=2"></script>
+		<script type="module" src="/assets/catch-portal.js?v=3"></script>
 	</body>
 </html>

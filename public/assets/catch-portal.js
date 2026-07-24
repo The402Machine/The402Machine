@@ -1,10 +1,10 @@
 const selectors = {
-	connection: "#portal-connection", content: "#portal-content", errorPanel: "#portal-error", errorCopy: "#portal-error-copy", importValue: "#portal-import", importButton: "#portal-import-submit", copyLinkButton: "#portal-copy-link", linkCard: "#portal-link-card", title: "#portal-title", statusBadge: "#portal-status", remaining: "#portal-remaining", expiry: "#portal-expiry", requests: "#portal-requests", requestsDetail: "#portal-requests-detail", requestsMeter: "#portal-requests-meter", storage: "#portal-storage", storageDetail: "#portal-storage-detail", storageMeter: "#portal-storage-meter", payload: "#portal-payload", ingestUrl: "#portal-ingest-url", authPreview: "#portal-auth-preview", ingestAuthButton: "#portal-ingest-auth", copyEndpointButton: "#portal-copy-endpoint", copyAuthButton: "#portal-copy-auth", copyCurlButton: "#portal-copy-curl", refreshButton: "#portal-refresh", eventsStatus: "#portal-events-status", eventsContainer: "#portal-events", accessFilter: "#portal-event-access", methodFilter: "#portal-event-method", contentTypeFilter: "#portal-event-content-type", searchFilter: "#portal-event-search", pageSize: "#portal-event-page-size", previousButton: "#portal-events-prev", nextButton: "#portal-events-next", pageLabel: "#portal-events-page", destroyButton: "#portal-destroy",
+	connection: "#portal-connection", content: "#portal-content", errorPanel: "#portal-error", errorCopy: "#portal-error-copy", importValue: "#portal-import", importButton: "#portal-import-submit", copyLinkButton: "#portal-copy-link", linkCard: "#portal-link-card", title: "#portal-title", statusBadge: "#portal-status", remaining: "#portal-remaining", expiry: "#portal-expiry", requests: "#portal-requests", requestsDetail: "#portal-requests-detail", requestsMeter: "#portal-requests-meter", storage: "#portal-storage", storageDetail: "#portal-storage-detail", storageMeter: "#portal-storage-meter", payload: "#portal-payload", ingestUrl: "#portal-ingest-url", authPreview: "#portal-auth-preview", copyEndpointButton: "#portal-copy-endpoint", copyAuthButton: "#portal-copy-auth", copyCurlButton: "#portal-copy-curl", refreshButton: "#portal-refresh", eventsStatus: "#portal-events-status", eventsContainer: "#portal-events", accessFilter: "#portal-event-access", methodFilter: "#portal-event-method", contentTypeFilter: "#portal-event-content-type", searchFilter: "#portal-event-search", pageSize: "#portal-event-page-size", previousButton: "#portal-events-prev", nextButton: "#portal-events-next", pageLabel: "#portal-events-page", destroyButton: "#portal-destroy",
 };
 const elements = Object.fromEntries(Object.entries(selectors).map(([name, selector]) => [name, document.querySelector(selector)]));
 if (Object.values(elements).some((element) => element === null)) throw new Error("CATCH portal is incomplete");
 
-const { connection, content, errorPanel, errorCopy, importValue, importButton, copyLinkButton, linkCard, title, statusBadge, remaining, expiry, requests, requestsDetail, requestsMeter, storage, storageDetail, storageMeter, payload, ingestUrl, authPreview, ingestAuthButton, copyEndpointButton, copyAuthButton, copyCurlButton, refreshButton, eventsStatus, eventsContainer, accessFilter, methodFilter, contentTypeFilter, searchFilter, pageSize, previousButton, nextButton, pageLabel, destroyButton } = elements;
+const { connection, content, errorPanel, errorCopy, importValue, importButton, copyLinkButton, linkCard, title, statusBadge, remaining, expiry, requests, requestsDetail, requestsMeter, storage, storageDetail, storageMeter, payload, ingestUrl, authPreview, copyEndpointButton, copyAuthButton, copyCurlButton, refreshButton, eventsStatus, eventsContainer, accessFilter, methodFilter, contentTypeFilter, searchFilter, pageSize, previousButton, nextButton, pageLabel, destroyButton } = elements;
 const capability = parseCapability(location.hash.slice(1));
 let resource = null;
 let countdownTimer = 0;
@@ -39,7 +39,6 @@ function bindActions() {
 	copyEndpointButton.addEventListener("click", () => copyWithFeedback(copyEndpointButton, endpointUrl(), "Endpoint copied"));
 	copyAuthButton.addEventListener("click", () => copyWithFeedback(copyAuthButton, `Authorization: Bearer ${capability.ingestToken}`, "Auth header copied"));
 	copyCurlButton.addEventListener("click", () => copyWithFeedback(copyCurlButton, curlExample(), "cURL copied"));
-	ingestAuthButton.addEventListener("click", () => toggleIngestAuth());
 	refreshButton.addEventListener("click", resetAndLoadEvents);
 	for (const filter of [accessFilter, methodFilter, contentTypeFilter, pageSize]) filter.addEventListener("change", resetAndLoadEvents);
 	searchFilter.addEventListener("input", () => { window.clearTimeout(searchTimer); searchTimer = window.setTimeout(resetAndLoadEvents, 300); });
@@ -121,8 +120,6 @@ function renderResource(value) {
 	payload.textContent = formatBytes(safeNumber(value.maxBytesPerRequest));
 	ingestUrl.value = endpointUrl();
 	authPreview.textContent = `Authorization: Bearer ${maskedToken(capability.ingestToken)}`;
-	ingestAuthButton.textContent = value.ingestAuthRequired === false ? "Public ingest · enable auth" : "Protected · make public";
-	ingestAuthButton.dataset.public = value.ingestAuthRequired === false ? "true" : "false";
 	expiry.textContent = `Expires ${formatDate(value.expiresAt)}`;
 	window.clearInterval(countdownTimer);
 	updateCountdown();
@@ -149,27 +146,16 @@ function eventCard(event) {
 	const method = document.createElement("b"); method.className = "portal-event-method"; method.textContent = String(event.method ?? "POST");
 	const access = document.createElement("b"); access.className = `portal-event-access ${event.authenticated === true ? "authenticated" : "public"}`; access.textContent = event.authenticated === true ? "AUTHENTICATED" : "PUBLIC";
 	const type = document.createElement("span"); type.textContent = String(event.contentType ?? "unknown");
-	identity.append(sequence, method, access, type);
+	const location = document.createElement("span"); location.className = "portal-event-location"; location.textContent = compactLocation(event.ipLocation);
+	identity.append(sequence, method, access, type, location);
 	const received = document.createElement("time"); received.dateTime = String(event.receivedAt ?? ""); received.textContent = formatDate(event.receivedAt); head.append(identity, received);
 	const body = document.createElement("pre"); body.textContent = eventBody(event);
 	const details = document.createElement("details"), summary = document.createElement("summary"), headers = document.createElement("pre"); summary.textContent = "Headers"; headers.textContent = JSON.stringify(event.headers ?? {}, null, 2); details.append(summary, headers);
+	const ipDetails = document.createElement("details"), ipSummary = document.createElement("summary"), ipInfo = document.createElement("pre"); ipSummary.textContent = "IP Location Info"; ipInfo.textContent = JSON.stringify({ ip: event.sourceIp ?? null, ...(validLocation(event.ipLocation) ? event.ipLocation : {}) }, null, 2); ipDetails.append(ipSummary, ipInfo);
 	const actions = document.createElement("div"); actions.className = "portal-event-actions";
 	const copyButton = document.createElement("button"); copyButton.className = "button ghost"; copyButton.type = "button"; copyButton.textContent = "Copy body"; copyButton.addEventListener("click", () => copyWithFeedback(copyButton, body.textContent ?? "", "Body copied"));
 	const deleteButton = document.createElement("button"); deleteButton.className = "button danger ghost"; deleteButton.type = "button"; deleteButton.textContent = "Delete event"; deleteButton.addEventListener("click", () => deleteEvent(String(event.id ?? ""), deleteButton));
-	actions.append(copyButton, deleteButton); article.append(head, body, details, actions); return article;
-}
-
-async function toggleIngestAuth() {
-	if (resource === null) return;
-	const currentlyRequired = resource.ingestAuthRequired !== false;
-	if (currentlyRequired && !window.confirm("Make ingest public? Anyone who learns the endpoint URL can send events and consume this CATCH quota.")) return;
-	ingestAuthButton.disabled = true;
-	try {
-		const response = await ownerFetch(`${apiUrl()}/settings`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ ingestAuthRequired: !currentlyRequired }) });
-		if (!response.ok) throw new Error(responseMessage(response));
-		await refreshResource();
-	} catch (error) { eventsStatus.textContent = error instanceof Error ? error.message : "Could not change ingest authentication."; }
-	finally { ingestAuthButton.disabled = false; }
+	actions.append(copyButton, deleteButton); article.append(head, body, details, ipDetails, actions); return article;
 }
 
 async function deleteEvent(eventId, button) {
@@ -218,3 +204,6 @@ function formatDate(value) { const date = new Date(value); return Number.isNaN(d
 function formatDuration(milliseconds) { const total = Math.max(0, Math.floor(milliseconds / 1000)), days = Math.floor(total / 86400), hours = Math.floor(total % 86400 / 3600), minutes = Math.floor(total % 3600 / 60), seconds = total % 60; return days > 0 ? `${days}d ${hours}h ${minutes}m` : hours > 0 ? `${hours}h ${minutes}m ${seconds}s` : `${minutes}m ${seconds}s`; }
 function maskedToken(token) { return `${token.slice(0, 10)}${"•".repeat(18)}`; }
 function shellQuote(value) { return `'${value.replaceAll("'", "'\\''")}'`; }
+function validLocation(value) { return typeof value === "object" && value !== null; }
+function compactLocation(value) { if (!validLocation(value)) return "Location unavailable"; const city = typeof value.city === "string" && value.city.length > 0 ? value.city : "Unknown city"; return `${countryFlag(value.country)} ${city}`.trim(); }
+function countryFlag(value) { if (typeof value !== "string" || !/^[A-Za-z]{2}$/.test(value)) return "🌐"; return String.fromCodePoint(...value.toUpperCase().split("").map((letter) => 127397 + letter.charCodeAt(0))); }

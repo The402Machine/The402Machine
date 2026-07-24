@@ -25,7 +25,7 @@ describe("public payment API", () => {
 		const repository = {
 			provision: () => Promise.reject(new Error("not used")), getCredentialHashes: () => Promise.resolve(null),
 			acceptEvent: () => Promise.resolve({ accepted: false as const, reason: "not_found" as const }), getResource: () => Promise.resolve(null),
-			listEvents: () => Promise.resolve({ events: [], nextCursor: null }), setIngestAuthRequired: () => Promise.resolve(false), deleteEvent: () => Promise.resolve(false), destroy: () => Promise.resolve(false),
+			listEvents: () => Promise.resolve({ events: [], nextCursor: null }), setEventIpLocation: () => Promise.resolve(false), deleteEvent: () => Promise.resolve(false), destroy: () => Promise.resolve(false),
 		};
 		const app = buildApp({
 			catch: { repository, tokenPepper: "pepper", provisioningEnabled: false },

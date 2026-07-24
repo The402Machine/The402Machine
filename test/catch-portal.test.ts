@@ -19,12 +19,14 @@ describe("CATCH owner portal", () => {
 
 		expect(response.statusCode).toBe(200);
 		expect(response.body).toContain("Your CATCH<br /><em>portal.</em>");
-		expect(response.body).toContain('href="/assets/styles.css?v=10"');
-		expect(response.body).toContain('src="/assets/catch-portal.js?v=2"');
+		expect(response.body).toContain('href="/assets/styles.css?v=11"');
+		expect(response.body).toContain('src="/assets/catch-portal.js?v=3"');
 		expect(response.body).toContain('id="portal-import"');
 		expect(response.body).toContain('id="portal-import-submit"');
 		expect(response.body).toContain('id="portal-link-card" class="portal-link-card" hidden');
-		expect(response.body).toContain('id="portal-ingest-auth"');
+		expect(response.body).not.toContain('id="portal-ingest-auth"');
+		expect(response.body).not.toContain("ANY VERB");
+
 		expect(response.body).toContain('id="portal-event-access"');
 		expect(response.body).toContain('id="portal-event-method"');
 		expect(response.body).toContain('id="portal-event-content-type"');
@@ -50,7 +52,12 @@ describe("CATCH owner portal", () => {
 		expect(source).toContain('parameters.set("cursor"');
 		expect(source).toContain('parameters.set("access"');
 		expect(source).toContain('parameters.set("method"');
-		expect(source).toContain('`${apiUrl()}/settings`');
+		expect(source).not.toContain('`${apiUrl()}/settings`');
+		expect(source).not.toContain("Make ingest public");
+		expect(source).toContain("countryFlag");
+		expect(source).toContain("event.ipLocation");
+		expect(source).toContain("event.sourceIp");
+		expect(source).toContain("IP Location Info");
 		expect(source).toContain('method: "DELETE"');
 		expect(source).not.toContain("localStorage");
 		expect(source).not.toContain("sessionStorage");
