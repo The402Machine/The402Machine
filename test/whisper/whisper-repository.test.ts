@@ -38,7 +38,7 @@ beforeAll(async () => {
 	databaseUrl = `postgresql://postgres:${password}@127.0.0.1:${port}/the402machine_test`;
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 12 });
-	for (const migrationName of ["0001_catch.sql", "0003_whisper.sql"]) {
+	for (const migrationName of ["0001_catch.sql", "0003_whisper.sql", "0010_whisper_multiread.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${migrationName}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -50,11 +50,12 @@ afterAll(async () => {
 	try { docker("rm", "--force", container); } catch { /* container already removed */ }
 });
 
-const createWhisper = async (overrides: { expiresAt?: Date } = {}) => repository.create({
+const createWhisper = async (overrides: { expiresAt?: Date; readLimit?: number; planId?: "spark" | "standard" | "long" } = {}) => repository.create({
 	publicId: `whisper_${randomUUID().replaceAll("-", "")}`,
-	planId: "spark",
+	planId: overrides.planId ?? "spark",
 	readTokenHash: randomUUID().replaceAll("-", ""),
 	ciphertext: Buffer.from("opaque-client-ciphertext"),
+	readLimit: overrides.readLimit ?? 1,
 	expiresAt: overrides.expiresAt ?? new Date(Date.now() + 60_000),
 });
 
@@ -65,6 +66,15 @@ describe("WhisperRepository", () => {
 		expect(results.filter((result) => result !== null)).toHaveLength(1);
 		expect(results.find((result) => result !== null)?.toString()).toBe("opaque-client-ciphertext");
 		expect(await repository.consume(whisper.publicId)).toBeNull();
+	});
+
+	it("serves exactly the configured number of reads under concurrency", async () => {
+		const whisper = await createWhisper({ planId: "standard", readLimit: 42 });
+		const results = await Promise.all(Array.from({ length: 60 }, async () => repository.consume(whisper.publicId)));
+		expect(results.filter((result) => result !== null)).toHaveLength(42);
+		expect(results.filter((result) => result?.toString() === "opaque-client-ciphertext")).toHaveLength(42);
+		expect(await repository.consume(whisper.publicId)).toBeNull();
+		expect(await repository.getCredentialHash(whisper.publicId)).toBeNull();
 	});
 
 	it("does not reveal and purges an expired whisper", async () => {

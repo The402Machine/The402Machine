@@ -106,9 +106,9 @@ describe("public payment API", () => {
 				{ planId: "long", priceSats: 4_002, durationLabel: "4 months + 2 days", requestLimit: 40_200, storageLimitBytes: 200 * 1024 * 1024, maxBytesPerRequest: 1024 * 1024, available: true },
 			] },
 			whisper: { plans: [
-				{ planId: "spark", priceSats: 42, durationLabel: "7 days", readOnce: true, maxCiphertextBytes: 4_215_276, available: true },
-				{ planId: "standard", priceSats: 402, durationLabel: "42 days", readOnce: true, maxCiphertextBytes: 4_215_276, available: true },
-				{ planId: "long", priceSats: 4_002, durationLabel: "402 days", readOnce: true, maxCiphertextBytes: 4_215_276, available: true },
+				{ planId: "spark", priceSats: 42, durationLabel: "7 days", readLimit: 1, maxCiphertextBytes: 4_215_276, available: true },
+				{ planId: "standard", priceSats: 402, durationLabel: "42 days", readLimit: 42, maxCiphertextBytes: 4_215_276, available: true },
+				{ planId: "long", priceSats: 4_002, durationLabel: "402 days", readLimit: 402, maxCiphertextBytes: 4_215_276, available: true },
 			] },
 		} });
 		await app.close();

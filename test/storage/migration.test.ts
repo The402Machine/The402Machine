@@ -54,7 +54,7 @@ beforeAll(async () => {
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 4 });
 
-	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql"]) {
+	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql", "0010_whisper_multiread.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -122,6 +122,18 @@ describe("CATCH migration", () => {
 			insert into payment_orders (idempotency_key, product, plan_id, product_payload, amount_sats)
 			values ('whisper-oversized-order', 'whisper', 'spark', ${Buffer.alloc(4_215_277, 7)}, 42)
 		`).rejects.toMatchObject({ code: "23514" });
+	});
+
+	it("adds bounded WHISPER read counters while preserving legacy resources as one-read", async () => {
+		const columns = await sql<{ column_name: string; column_default: string | null; is_nullable: string }[]>`
+			select column_name, column_default, is_nullable from information_schema.columns
+			where table_name = 'whispers' and column_name in ('read_limit', 'read_count') order by column_name
+		`;
+		expect(columns).toEqual([
+			{ column_name: "read_count", column_default: "0", is_nullable: "NO" },
+			{ column_name: "read_limit", column_default: "1", is_nullable: "NO" },
+		]);
+		expect((await sql`select version from schema_migrations where version = '0010_whisper_multiread'`)).toHaveLength(1);
 	});
 
 	it("rejects counters beyond the purchased quotas", async () => {

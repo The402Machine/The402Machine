@@ -132,10 +132,6 @@ h2 { font-size: clamp(42px, 6vw, 78px); line-height: .98; letter-spacing: -.065e
 .plan-card dt { color: var(--muted); }
 .plan-card dd { margin: 0; text-align: right; }
 .plan-card .button { width: 100%; margin-top: auto; }
-.whisper-rule { display: inline-flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; margin: 0 0 26px; padding: 12px 15px; border: 1px dashed #62536a; background: rgba(136,87,153,.07); }
-.whisper-rule b { color: #e5b8f4; font-size: 22px; }
-.whisper-rule span { color: var(--muted); }
-.whisper-rule small { color: #a580b1; font: 500 9px var(--mono); letter-spacing: .1em; }
 .compare-section { border-top: 1px solid var(--line); background: #0d100c; }
 .compare-inner { padding-block: clamp(48px, 5vw, 72px); }
 .compact-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 32px; }

@@ -7,6 +7,7 @@ export type CreateWhisperInput = {
 	planId: CatchPlanId;
 	readTokenHash: string;
 	ciphertext: Buffer;
+	readLimit: number;
 	expiresAt: Date;
 };
 
@@ -15,8 +16,8 @@ export class WhisperRepository {
 
 	public async create(input: CreateWhisperInput): Promise<{ id: string; publicId: string }> {
 		const rows = await this.sql<{ id: string; public_id: string }[]>`
-			insert into whispers (public_id, plan_id, read_token_hash, ciphertext, expires_at)
-			values (${input.publicId}, ${input.planId}, ${input.readTokenHash}, ${input.ciphertext}, ${input.expiresAt})
+			insert into whispers (public_id, plan_id, read_token_hash, ciphertext, read_limit, expires_at)
+			values (${input.publicId}, ${input.planId}, ${input.readTokenHash}, ${input.ciphertext}, ${input.readLimit}, ${input.expiresAt})
 			returning id, public_id
 		`;
 		const row = rows[0];
@@ -37,8 +38,8 @@ export class WhisperRepository {
 
 	public async consume(publicId: string): Promise<Buffer | null> {
 		return this.sql.begin(async (tx) => {
-			const rows = await tx<{ id: string; ciphertext: Buffer; is_expired: boolean }[]>`
-				select id, ciphertext, clock_timestamp() >= expires_at as is_expired
+			const rows = await tx<{ id: string; ciphertext: Buffer; read_count: number; read_limit: number; is_expired: boolean }[]>`
+				select id, ciphertext, read_count, read_limit, clock_timestamp() >= expires_at as is_expired
 				from whispers
 				where public_id = ${publicId} and status = 'active'
 				for update
@@ -54,12 +55,17 @@ export class WhisperRepository {
 				`;
 				return null;
 			}
-			await tx`
-				update whispers
-				set status = 'consumed', ciphertext = null, read_token_hash = null,
-					consumed_at = clock_timestamp(), updated_at = clock_timestamp()
-				where id = ${row.id}
-			`;
+			const finalRead = row.read_count + 1 >= row.read_limit;
+			if (finalRead) {
+				await tx`
+					update whispers
+					set status = 'consumed', read_count = read_limit, ciphertext = null, read_token_hash = null,
+						consumed_at = clock_timestamp(), updated_at = clock_timestamp()
+					where id = ${row.id}
+				`;
+			} else {
+				await tx`update whispers set read_count = read_count + 1, updated_at = clock_timestamp() where id = ${row.id}`;
+			}
 			return row.ciphertext;
 		});
 	}

@@ -81,7 +81,7 @@ function openCheckout() {
 	title.textContent = `Dispense ${product.toUpperCase()}`;
 	intro.textContent = product === "catch"
 		? "Choose by lifetime, request quota, and storage. Every CATCH stays inbound-only."
-		: "Choose how long the unread message should wait. Every WHISPER is still read once and encrypted in this browser.";
+		: "Choose how long the encrypted message should wait and how many successful reads it allows. Encryption happens in this browser.";
 	noteField.hidden = product !== "whisper";
 	note.required = product === "whisper";
 	output.hidden = true;
@@ -123,7 +123,7 @@ function updateSummary() {
 	if (plan === null) return;
 	const details = product === "catch"
 		? `${formatNumber(plan.requestLimit)} requests · ${formatBytes(plan.storageLimitBytes)} total storage · ${formatBytes(plan.maxBytesPerRequest)} per request`
-		: `One successful read · ${formatBytes(plan.maxCiphertextBytes)} encrypted payload · key stays in the URL fragment`;
+		: `${formatNumber(plan.readLimit)} successful ${plan.readLimit === 1 ? "read" : "reads"} · ${formatBytes(plan.maxCiphertextBytes)} encrypted payload`;
 	summary.innerHTML = `<div><span>${product.toUpperCase()} / ${plan.planId.toUpperCase()}</span><strong>${formatSats(plan.priceSats)} sats</strong></div><p>${plan.durationLabel}. ${details}.</p>`;
 }
 

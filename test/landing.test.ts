@@ -30,12 +30,17 @@ describe("public landing page", () => {
 		expect(response.body).toContain("7 days");
 		expect(response.body).toContain("42 days");
 		expect(response.body).toContain("402 days");
-		expect(response.body).toContain("4.02 MiB encrypted");
-		expect(response.body).toContain("KEY / URL FRAGMENT");
+		expect(response.body).toContain("Up to 42 reads");
+		expect(response.body).toContain("Up to 402 reads");
+		expect(response.body).not.toContain("KEY / URL FRAGMENT");
+		expect(response.body).not.toContain("Key location");
+		expect(response.body).not.toContain("HUMAN → ONE READ");
+		expect(response.body).toContain("Catch webhooks from GitHub, forms, monitors, or devices");
+		expect(response.body).toContain("Send an encrypted note, password, recovery detail, or private handoff");
 		expect(response.body).toContain('class="catalogue-illustration"');
 		expect(response.body).toContain('class="product-icon"');
 		expect(response.body).toContain("<title>CATCH webhook inbox</title>");
-		expect(response.body).toContain("<title>WHISPER read-once note</title>");
+		expect(response.body).toContain("<title>WHISPER encrypted message</title>");
 		expect(response.body).toContain("plan-price");
 		expect(response.body).not.toContain("Start with the job, then pick the fuse");
 		expect(response.body).not.toContain("A1 · MACHINE INPUT");
@@ -54,7 +59,7 @@ describe("public landing page", () => {
 		expect(response.body).toContain('data-buy="whisper"');
 		expect(response.body).toContain('data-plan="long"');
 		expect(response.body).toContain('href="/assets/styles.css?v=11"');
-		expect(response.body).toContain('src="/assets/checkout.js?v=15"');
+		expect(response.body).toContain('src="/assets/checkout.js?v=16"');
 		expect(response.body).toContain('href="#api"');
 		expect(response.body).toContain('id="api"');
 		expect(response.body).toContain("API / COMPLETE FLOW");
@@ -89,7 +94,7 @@ describe("public landing page", () => {
 		const response = await app.inject({ method: "GET", url: "/whisper.html" });
 
 		expect(response.statusCode).toBe(200);
-		expect(response.body).toContain('src="/assets/whisper-page.js?v=3"');
+		expect(response.body).toContain('src="/assets/whisper-page.js?v=4"');
 		expect(response.headers["content-security-policy"]).toContain("script-src 'self'");
 		expect(response.headers["content-security-policy"]).not.toContain("script-src 'none'");
 	});
@@ -178,9 +183,9 @@ describe("public landing page", () => {
 		]);
 
 		expect(html).toContain("Confirm before opening");
-		expect(html).toContain("only be read once");
+		expect(html).toContain("one of its available reads");
 		expect(source).toContain("window.confirm");
-		expect(source).toContain("will be deleted from the server");
+		expect(source).toContain("uses one available read");
 		expect(source.indexOf("window.confirm")).toBeLessThan(source.indexOf("fetch(`/w/"));
 	});
 });

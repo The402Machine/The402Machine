@@ -12,6 +12,7 @@ class FakeWhisperRepository implements WhisperApiRepository {
 	public created: Parameters<WhisperApiRepository["create"]>[0] | null = null;
 	public credentialHash: string | null = hashToken("owner", readToken, pepper);
 	public body: Buffer | null = Buffer.from("opaque-ciphertext");
+	public readsRemaining = 1;
 
 	public create(input: Parameters<WhisperApiRepository["create"]>[0]): Promise<{ id: string; publicId: string }> {
 		this.created = input;
@@ -20,9 +21,13 @@ class FakeWhisperRepository implements WhisperApiRepository {
 
 	public getCredentialHash(): Promise<string | null> { return Promise.resolve(this.credentialHash); }
 	public consume(): Promise<Buffer | null> {
+		if (this.body === null || this.readsRemaining <= 0) return Promise.resolve(null);
 		const current = this.body;
-		this.body = null;
-		this.credentialHash = null;
+		this.readsRemaining -= 1;
+		if (this.readsRemaining === 0) {
+			this.body = null;
+			this.credentialHash = null;
+		}
 		return Promise.resolve(current);
 	}
 }
@@ -70,6 +75,19 @@ describe("WHISPER HTTP API", () => {
 		expect(first.headers["cache-control"]).toBe("no-store");
 		const second = await app.inject({ method: "GET", url: "/w/whisper_test", headers: bearer(readToken) });
 		expect(second.statusCode).toBe(404);
+	});
+
+	it("allows a Standard WHISPER to be read up to 42 times", async () => {
+		const repository = new FakeWhisperRepository();
+		repository.readsRemaining = 42;
+		const app = buildApp({ whisper: { repository, tokenPepper: pepper } });
+		apps.push(app);
+		for (let read = 0; read < 42; read += 1) {
+			const response = await app.inject({ method: "GET", url: "/w/whisper_test", headers: bearer(readToken), remoteAddress: `127.0.0.${read + 1}` });
+			expect(response.statusCode).toBe(200);
+		}
+		const exhausted = await app.inject({ method: "GET", url: "/w/whisper_test", headers: bearer(readToken), remoteAddress: "127.0.1.1" });
+		expect(exhausted.statusCode).toBe(404);
 	});
 
 	it("rejects plaintext media types and oversized ciphertext", async () => {

@@ -5,20 +5,20 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="robots" content="noindex,nofollow" />
 		<title>WHISPER — The402Machine</title>
-		<link rel="stylesheet" href="/assets/styles.css?v=10" />
+		<link rel="stylesheet" href="/assets/styles.css?v=11" />
 	</head>
 	<body>
 		<div class="noise" aria-hidden="true"></div>
 		<main class="shell whisper-reader">
 			<section class="whisper-panel">
 				<p class="eyebrow">WHISPER / CLIENT-SIDE DECRYPTION</p>
-				<h1>One read.<br /><em>Then silence.</em></h1>
-				<p id="status" class="lede">The server holds only opaque ciphertext. Confirm before opening: this WHISPER can only be read once.</p>
-				<div class="whisper-warning"><strong>This action is final.</strong> After confirmation, the encrypted message is consumed and deleted from the server, then decrypted locally. Copy anything you need before closing or reloading the page.</div>
+				<h1>Open privately.<br /><em>Spend one read.</em></h1>
+				<p id="status" class="lede">The server holds only opaque ciphertext. Confirm before opening: this uses one of its available reads.</p>
+				<div class="whisper-warning"><strong>Each opening counts.</strong> After confirmation, one read is consumed and the message is decrypted locally. The final allowed read deletes the encrypted server copy. Copy anything you need before closing or reloading the page.</div>
 				<pre id="message" class="whisper-message" hidden></pre>
-				<div class="reader-actions"><button id="open" class="button primary">Open and destroy whisper</button><a class="button ghost" href="/">What is WHISPER?</a></div>
+				<div class="reader-actions"><button id="open" class="button primary">Open WHISPER</button><a class="button ghost" href="/">What is WHISPER?</a></div>
 			</section>
 		</main>
-		<script type="module" src="/assets/whisper-page.js?v=3"></script>
+		<script type="module" src="/assets/whisper-page.js?v=4"></script>
 	</body>
 </html>

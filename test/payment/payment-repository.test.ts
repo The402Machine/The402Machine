@@ -39,7 +39,7 @@ beforeAll(async () => {
 	databaseUrl = `postgresql://postgres:${password}@127.0.0.1:${port}/the402machine_test`;
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 12 });
-	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql"]) {
+	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0010_whisper_multiread.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${migrationName}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -111,7 +111,7 @@ describe("PaymentRepository", () => {
 		await repository.attachInvoice(order.id, { paymentHash: "e".repeat(64), bolt11: "lnbc4n1whisper" });
 		await repository.markPaid(order.id);
 		const results = await Promise.all(Array.from({ length: 4 }, () => repository.dispensePaidOrder(order.id, () => Promise.resolve({
-			product: "whisper", publicId: "whisper_payment_once_abcdefghijklmnopqrstuv", planId: "spark", readTokenHash: "read-hash",
+			product: "whisper", publicId: "whisper_payment_once_abcdefghijklmnopqrstuv", planId: "spark", readTokenHash: "read-hash", readLimit: 1,
 			ciphertext, readToken: "read-once", expiresAt: new Date(Date.now() + 60_000),
 		}))));
 		expect(results.every((result) => result?.product === "whisper" && result.readToken === "read-once")).toBe(true);

@@ -9,7 +9,7 @@ if (!(button instanceof HTMLButtonElement) || !(status instanceof HTMLElement) |
 }
 
 button.addEventListener("click", async () => {
-	if (!window.confirm("Open this WHISPER now? It can only be read once and will be deleted from the server immediately after this confirmed read.")) return;
+	if (!window.confirm("Open this WHISPER now? This uses one available read. If it is the final read, the encrypted server copy will be deleted.")) return;
 	button.disabled = true;
 	try {
 		const query = new URLSearchParams(location.search);
@@ -17,10 +17,10 @@ button.addEventListener("click", async () => {
 			headers: { authorization: `Bearer ${query.get("token") ?? ""}` },
 			cache: "no-store",
 		});
-		if (!response.ok) throw new Error("WHISPER is unavailable or has already been read.");
+		if (!response.ok) throw new Error("WHISPER is unavailable, expired, or has no reads remaining.");
 		message.textContent = await openWhisper(new Uint8Array(await response.arrayBuffer()), fragmentKey());
 		message.hidden = false;
-		status.textContent = "Decrypted locally. Reloading cannot retrieve it again.";
+		status.textContent = "Decrypted locally. This opening used one read; reloading will use another if any remain.";
 		button.hidden = true;
 	} catch (error) {
 		status.textContent = error instanceof Error ? error.message : "Could not open WHISPER.";

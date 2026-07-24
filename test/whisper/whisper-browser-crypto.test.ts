@@ -18,6 +18,7 @@ describe("WHISPER browser cryptography", () => {
 
 		expect(confirmation).toBeGreaterThanOrEqual(0);
 		expect(consume).toBeGreaterThan(confirmation);
+		expect(source).toContain("uses one available read");
 		expect(source).toContain("button.disabled = false");
 	});
 });

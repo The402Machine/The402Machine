@@ -3,7 +3,7 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<meta name="description" content="Buy a temporary webhook or an encrypted read-once message with Bitcoin over Lightning. No account, no subscription, hard limits." />
+		<meta name="description" content="Buy a temporary webhook inbox or an encrypted message with a fixed read allowance using Bitcoin over Lightning. No account or subscription." />
 		<meta name="theme-color" content="#080a08" />
 		<title>The402Machine — Disposable Internet Infrastructure</title>
 		<link rel="stylesheet" href="/assets/styles.css?v=11" />
@@ -68,12 +68,12 @@ curl https://the402machine.com/api/payments/{orderId}</pre></details><p class="a
 # Continue with nextCursor:
 curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;cursor={nextCursor}' \
   -H 'Authorization: Bearer {ownerToken}'</pre></details></article>
-						<article><p class="eyebrow">WHISPER / READ ONCE</p><h3>Encrypt before upload</h3><code>POST /api/payments/whisper</code><code>GET /w/{publicId}</code><p>Generate a 32-byte AES-256-GCM key locally. Upload <code>application/octet-stream</code> as <code>[0x01][12-byte nonce][ciphertext + tag]</code>, with <code>X-Whisper-Plan</code> and <code>Idempotency-Key</code>. After settlement, keep the key outside the API response.</p><details><summary>Read-once retrieval</summary><pre>curl https://the402machine.com/w/{publicId} \
+						<article><p class="eyebrow">WHISPER / ENCRYPTED DELIVERY</p><h3>Encrypt before upload</h3><code>POST /api/payments/whisper</code><code>GET /w/{publicId}</code><p>Generate a 32-byte AES-256-GCM key locally. Upload <code>application/octet-stream</code> as <code>[0x01][12-byte nonce][ciphertext + tag]</code>, with <code>X-Whisper-Plan</code> and <code>Idempotency-Key</code>. After settlement, keep the key outside the API response.</p><details><summary>Encrypted retrieval</summary><pre>curl https://the402machine.com/w/{publicId} \
   -H 'Authorization: Bearer {readToken}' \
   --output encrypted.bin
 
 # Decrypt locally with the separately retained AES-256-GCM key.
-# The first successful read permanently consumes the WHISPER.</pre></details><p class="api-note">The service never needs the plaintext or encryption key. Put the key in a URL fragment only when building a human-readable sharing link.</p></article>
+# Each successful retrieval uses one read. The final allowed read deletes the server copy.</pre></details><p class="api-note">The service never needs the plaintext or encryption key. The browser creates the shareable link for you.</p></article>
 					</div>
 				</div>
 			</section>
@@ -82,7 +82,7 @@ curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;cursor=
 				<header class="catalogue-heading">
 					<div class="catalogue-meta"><p class="eyebrow">CARTRIDGE CATALOGUE</p><div class="catalogue-count"><strong>02</strong><span>available cartridges</span></div></div>
 					<div class="catalogue-copy">
-						<div><h2>Pick a fuse.</h2><p class="section-intro">CATCH receives. WHISPER reveals once. Both erase themselves.</p></div>
+						<div><h2>Pick a fuse.</h2><p class="section-intro">CATCH collects incoming requests. WHISPER delivers an encrypted message a fixed number of times. Both expire automatically.</p></div>
 						<svg class="catalogue-illustration" viewBox="0 0 460 230" aria-hidden="true" focusable="false">
 							<g class="illustration-catch"><rect x="22" y="54" width="168" height="132" rx="5"/><path d="M22 91h48l16 20h40l16-20h48"/><rect x="50" y="26" width="28" height="28" rx="3"/><rect x="92" y="26" width="28" height="28" rx="3"/><rect x="134" y="26" width="28" height="28" rx="3"/><path d="M106 121v40m-15-15 15 15 15-15"/></g>
 							<path class="illustration-divider" d="M230 24v182"/>
@@ -96,7 +96,7 @@ curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;cursor=
 						<div class="card-index">A1</div>
 						<div class="card-body">
 							<div class="card-title"><div class="product-heading"><svg class="product-icon" viewBox="0 0 72 72" role="img"><title>CATCH webhook inbox</title><rect x="9" y="30" width="54" height="33" rx="3"/><path d="M9 42h16l6 8h10l6-8h16M36 8v26m-9-9 9 9 9-9"/><rect x="13" y="9" width="10" height="10"/><rect x="49" y="9" width="10" height="10"/></svg><div><p class="product-kicker">INBOUND-ONLY WEBHOOK</p><h3>CATCH</h3></div></div><span>LIVE</span></div>
-							<p class="product-line">Receive requests. Inspect. Erase.</p>
+							<p class="product-line">Catch webhooks from GitHub, forms, monitors, or devices. Inspect the method, headers, body, source IP, and location in one private inbox, then delete individual events or destroy the whole inbox.</p>
 							<div class="feature-strip"><span>Inbound only</span><span>Raw bytes</span><span>Hard stop</span></div>
 							<div class="plan-grid" aria-label="CATCH plan comparison">
 								<article class="plan-card"><header><small>SPARK</small><div class="plan-price"><strong>42</strong><span>SATS</span></div><b class="plan-duration">4h 02m</b></header><dl><div><dt>Requests</dt><dd>402</dd></div><div><dt>Storage</dt><dd>2 MiB</dd></div><div><dt>Payload</dt><dd>64 KiB</dd></div></dl><button class="button plan-buy" data-buy="catch" data-plan="spark">Choose Spark</button></article>
@@ -109,13 +109,12 @@ curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;cursor=
 					<article class="product-card whisper-card" id="whisper">
 						<div class="card-index">B1</div>
 						<div class="card-body">
-							<div class="card-title"><div class="product-heading"><svg class="product-icon" viewBox="0 0 72 72" role="img"><title>WHISPER read-once note</title><rect x="9" y="16" width="54" height="43" rx="4"/><path d="m9 22 27 22 27-22M9 59l20-20m34 20L43 39"/><path d="M51 9v14m-7-7h14"/></svg><div><p class="product-kicker">CLIENT-ENCRYPTED DEAD DROP</p><h3>WHISPER</h3></div></div><span>LIVE</span></div>
-							<p class="product-line">Encrypt here. Share once. Gone after reading.</p>
-							<div class="whisper-rule"><b>1 read</b><span>4.02 MiB encrypted</span><small>KEY / URL FRAGMENT</small></div>
+							<div class="card-title"><div class="product-heading"><svg class="product-icon" viewBox="0 0 72 72" role="img"><title>WHISPER encrypted message</title><rect x="9" y="16" width="54" height="43" rx="4"/><path d="m9 22 27 22 27-22M9 59l20-20m34 20L43 39"/><path d="M51 9v14m-7-7h14"/></svg><div><p class="product-kicker">CLIENT-ENCRYPTED DEAD DROP</p><h3>WHISPER</h3></div></div><span>LIVE</span></div>
+							<p class="product-line">Send an encrypted note, password, recovery detail, or private handoff. The message is encrypted in your browser before upload and stays available only for the purchased time and read allowance.</p>
 							<div class="plan-grid" aria-label="WHISPER plan comparison">
-								<article class="plan-card"><header><small>SPARK</small><div class="plan-price"><strong>42</strong><span>SATS</span></div><b class="plan-duration">7 days</b></header><dl><div><dt>Reads</dt><dd>1</dd></div><div><dt>Encrypted size</dt><dd>4.02 MiB</dd></div><div><dt>Key location</dt><dd>URL fragment</dd></div></dl><button class="button plan-buy" data-buy="whisper" data-plan="spark">Choose Spark</button></article>
-								<article class="plan-card recommended"><div class="recommendation">BEST BALANCE</div><header><small>STANDARD</small><div class="plan-price"><strong>402</strong><span>SATS</span></div><b class="plan-duration">42 days</b></header><dl><div><dt>Reads</dt><dd>1</dd></div><div><dt>Encrypted size</dt><dd>4.02 MiB</dd></div><div><dt>Key location</dt><dd>URL fragment</dd></div></dl><button class="button plan-buy primary" data-buy="whisper" data-plan="standard">Choose Standard</button></article>
-								<article class="plan-card"><header><small>LONG</small><div class="plan-price"><strong>4,002</strong><span>SATS</span></div><b class="plan-duration">402 days</b></header><dl><div><dt>Reads</dt><dd>1</dd></div><div><dt>Encrypted size</dt><dd>4.02 MiB</dd></div><div><dt>Key location</dt><dd>URL fragment</dd></div></dl><button class="button plan-buy" data-buy="whisper" data-plan="long">Choose Long</button></article>
+								<article class="plan-card"><header><small>SPARK</small><div class="plan-price"><strong>42</strong><span>SATS</span></div><b class="plan-duration">7 days</b></header><dl><div><dt>Read allowance</dt><dd>1 read</dd></div><div><dt>Encrypted size</dt><dd>Up to 4.02 MiB</dd></div><div><dt>Best for</dt><dd>One private handoff</dd></div></dl><button class="button plan-buy" data-buy="whisper" data-plan="spark">Choose Spark</button></article>
+								<article class="plan-card recommended"><div class="recommendation">BEST BALANCE</div><header><small>STANDARD</small><div class="plan-price"><strong>402</strong><span>SATS</span></div><b class="plan-duration">42 days</b></header><dl><div><dt>Read allowance</dt><dd>Up to 42 reads</dd></div><div><dt>Encrypted size</dt><dd>Up to 4.02 MiB</dd></div><div><dt>Best for</dt><dd>Small team handoff</dd></div></dl><button class="button plan-buy primary" data-buy="whisper" data-plan="standard">Choose Standard</button></article>
+								<article class="plan-card"><header><small>LONG</small><div class="plan-price"><strong>4,002</strong><span>SATS</span></div><b class="plan-duration">402 days</b></header><dl><div><dt>Read allowance</dt><dd>Up to 402 reads</dd></div><div><dt>Encrypted size</dt><dd>Up to 4.02 MiB</dd></div><div><dt>Best for</dt><dd>Long-lived distribution</dd></div></dl><button class="button plan-buy" data-buy="whisper" data-plan="long">Choose Long</button></article>
 							</div>
 						</div>
 					</article>
@@ -127,7 +126,7 @@ curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;cursor=
 					<div class="compact-heading"><p class="eyebrow">DECISION GUIDE</p><h2>Machine or human?</h2></div>
 					<div class="decision-cards">
 						<article><svg viewBox="0 0 72 72" aria-hidden="true"><rect x="9" y="30" width="54" height="33" rx="3"/><path d="M9 42h16l6 8h10l6-8h16M36 8v26m-9-9 9 9 9-9"/></svg><div><p class="product-kicker">MACHINE → INBOX</p><h3>CATCH</h3><span>requests in · owner key out · time or quota ends it</span></div></article>
-						<article><svg viewBox="0 0 72 72" aria-hidden="true"><rect x="9" y="16" width="54" height="43" rx="4"/><path d="m9 22 27 22 27-22M9 59l20-20m34 20L43 39"/></svg><div><p class="product-kicker">HUMAN → ONE READ</p><h3>WHISPER</h3><span>Encrypt · share link · first read destroys it</span></div></article>
+						<article><svg viewBox="0 0 72 72" aria-hidden="true"><rect x="9" y="16" width="54" height="43" rx="4"/><path d="m9 22 27 22 27-22M9 59l20-20m34 20L43 39"/></svg><div><p class="product-kicker">HUMAN → ENCRYPTED HANDOFF</p><h3>WHISPER</h3><span>Write locally · share one private link · final allowed read erases the server copy</span></div></article>
 					</div>
 				</div>
 			</section>
@@ -175,6 +174,6 @@ curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;cursor=
 		</dialog>
 
 		<footer class="footer shell"><span>THE402MACHINE.COM</span><span>PAYMENT REQUIRED / TAKEN LITERALLY</span><span>© 2026</span></footer>
-		<script type="module" src="/assets/checkout.js?v=15"></script>
+		<script type="module" src="/assets/checkout.js?v=16"></script>
 	</body>
 </html>

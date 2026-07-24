@@ -27,9 +27,9 @@ Concurrent retries reuse one invoice. After server-side settlement verification,
 
 ### WHISPER
 
-An encrypted whisper that disappears after its first successful read or when its selected lifetime ends. The server accepts only bounded opaque ciphertext; encryption and decryption belong to the client.
+An encrypted message with a fixed read allowance that disappears after its final successful read or when its selected lifetime ends. The server accepts only bounded opaque ciphertext; encryption and decryption belong to the client.
 
-The browser helper uses AES-256-GCM. The server receives ciphertext and a read credential, but not the AES key: the key stays in the URL fragment (`#...`). A successful read atomically clears both the ciphertext and read-token hash.
+The browser helper uses AES-256-GCM. The server receives ciphertext and a read credential, but not the AES key. Each successful retrieval atomically increments the read count; the final allowed read clears the ciphertext and credential.
 
 ## Product boundary
 
@@ -37,7 +37,7 @@ The402Machine sells closed functions, never general computing capability. It wil
 
 ## Current status
 
-The public landing page and Lightning checkout are online. CATCH and WHISPER are implemented, including bounded ingestion, encrypted read-once delivery, private access, transactional quotas, expiry cleanup, and PostgreSQL persistence. The first external CATCH purchase has been verified end to end.
+The public landing page and Lightning checkout are online. CATCH and WHISPER are implemented, including bounded ingestion, encrypted limited-read delivery, private access, transactional quotas, expiry cleanup, and PostgreSQL persistence. The first external CATCH purchase has been verified end to end.
 
 Current plan ladder:
 
@@ -45,7 +45,7 @@ Current plan ladder:
 - Standard: 402 sats
 - Long: 4,002 sats
 
-CATCH uses lifetimes of 4h 02m, 40d 02h, and 4 months + 2 days while scaling request, storage, and per-request payload quotas. WHISPER uses unread windows of 7, 42, and 402 days; every plan remains one-read, client-encrypted, and holds up to 4.02 MiB of ciphertext.
+CATCH uses lifetimes of 4h 02m, 40d 02h, and 4 months + 2 days while scaling request, storage, and per-request payload quotas. WHISPER uses windows of 7, 42, and 402 days with read allowances of 1, 42, and 402. Every plan is client-encrypted and holds up to 4.02 MiB of ciphertext.
 
 ## CATCH guarantees
 

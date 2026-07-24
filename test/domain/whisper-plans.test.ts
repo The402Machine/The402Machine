@@ -3,11 +3,11 @@ import { describe, expect, it } from "vitest";
 import { calculateWhisperExpiry, WHISPER_PLANS } from "../../src/domain/whisper-plans.js";
 
 describe("WHISPER plan catalogue", () => {
-	it("offers longer unread lifetimes with room for a 4.02 MiB encrypted note", () => {
+	it("scales the unread lifetime and successful read allowance", () => {
 		expect(WHISPER_PLANS).toEqual({
-			spark: { id: "spark", durationSeconds: 7 * 24 * 60 * 60, maxCiphertextBytes: 4_215_276, available: true },
-			standard: { id: "standard", durationSeconds: 42 * 24 * 60 * 60, maxCiphertextBytes: 4_215_276, available: true },
-			long: { id: "long", durationSeconds: 402 * 24 * 60 * 60, maxCiphertextBytes: 4_215_276, available: true },
+			spark: { id: "spark", durationSeconds: 7 * 24 * 60 * 60, readLimit: 1, maxCiphertextBytes: 4_215_276, available: true },
+			standard: { id: "standard", durationSeconds: 42 * 24 * 60 * 60, readLimit: 42, maxCiphertextBytes: 4_215_276, available: true },
+			long: { id: "long", durationSeconds: 402 * 24 * 60 * 60, readLimit: 402, maxCiphertextBytes: 4_215_276, available: true },
 		});
 	});
 

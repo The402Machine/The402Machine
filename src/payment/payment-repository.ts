@@ -31,7 +31,7 @@ export type DispensedResource =
 	| { product: "whisper"; resourceId: string; publicId: string; readToken: string; expiresAt: Date };
 
 export type AtomicCatchProvision = ProvisionInput & { product: "catch"; ownerToken: string; ingestToken: string };
-export type AtomicWhisperProvision = { product: "whisper"; publicId: string; planId: PurchasableCatchPlanId; readTokenHash: string; ciphertext: Buffer; readToken: string; expiresAt: Date };
+export type AtomicWhisperProvision = { product: "whisper"; publicId: string; planId: PurchasableCatchPlanId; readTokenHash: string; ciphertext: Buffer; readLimit: number; readToken: string; expiresAt: Date };
 export type AtomicProvision = AtomicCatchProvision | AtomicWhisperProvision;
 
 export class PaymentRepository {
@@ -141,8 +141,8 @@ async function insertCatch(tx: TransactionSql, input: AtomicCatchProvision): Pro
 
 async function insertWhisper(tx: TransactionSql, input: AtomicWhisperProvision): Promise<string> {
 	const rows = await tx<{ id: string }[]>`
-		insert into whispers (public_id, plan_id, read_token_hash, ciphertext, expires_at)
-		values (${input.publicId}, ${input.planId}, ${input.readTokenHash}, ${input.ciphertext}, ${input.expiresAt}) returning id
+		insert into whispers (public_id, plan_id, read_token_hash, ciphertext, read_limit, expires_at)
+		values (${input.publicId}, ${input.planId}, ${input.readTokenHash}, ${input.ciphertext}, ${input.readLimit}, ${input.expiresAt}) returning id
 	`;
 	if (rows[0] === undefined) throw new Error("WHISPER payment provisioning returned no resource");
 	return rows[0].id;

@@ -145,7 +145,7 @@ function paymentCatalogue() {
 				],
 			},
 			whisper: {
-				description: "Client-encrypted message that vanishes after one successful read.",
+				description: "Client-encrypted message with a fixed read allowance and expiry.",
 				clientEncryption: "AES-256-GCM",
 				plans: [
 					whisperPlan("spark", "7 days", "Short handoff"),
@@ -164,7 +164,7 @@ function catchPlan(planId: "spark" | "standard" | "long", durationLabel: string,
 
 function whisperPlan(planId: "spark" | "standard" | "long", durationLabel: string, bestFor: string) {
 	const plan = WHISPER_PLANS[planId];
-	return { planId, priceSats: WHISPER_PRICES_SATS[planId], durationLabel, bestFor, readOnce: true, maxCiphertextBytes: plan.maxCiphertextBytes, available: plan.available };
+	return { planId, priceSats: WHISPER_PRICES_SATS[planId], durationLabel, bestFor, readLimit: plan.readLimit, maxCiphertextBytes: plan.maxCiphertextBytes, available: plan.available };
 }
 
 function parsePaymentPlan(body: Buffer): unknown {
@@ -196,8 +196,8 @@ function registerWhisperRoutes(app: FastifyInstance, options: WhisperAppOptions)
 			const readToken = generateOwnerToken();
 			const publicId = `whisper_${randomBytes(24).toString("base64url")}`;
 			const expiresAt = calculateWhisperExpiry(planId, new Date());
-			await options.repository.create({ publicId, planId, readTokenHash: hashToken("owner", readToken, options.tokenPepper), ciphertext: request.body, expiresAt });
-			return reply.header("Cache-Control", "no-store").code(201).send({ publicId, readToken, expiresAt: expiresAt.toISOString(), maxBytes: plan.maxCiphertextBytes });
+			await options.repository.create({ publicId, planId, readTokenHash: hashToken("owner", readToken, options.tokenPepper), ciphertext: request.body, readLimit: plan.readLimit, expiresAt });
+			return reply.header("Cache-Control", "no-store").code(201).send({ publicId, readToken, expiresAt: expiresAt.toISOString(), readLimit: plan.readLimit, maxBytes: plan.maxCiphertextBytes });
 		});
 	}
 
