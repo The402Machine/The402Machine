@@ -183,7 +183,7 @@ describe("public landing page", () => {
 		expect(source).toContain("saveSettings({ publicStatusEnabled: enabled }");
 		expect(source).toContain('hash.startsWith("public=")');
 		expect(source).toContain("location.replace(`/pulse-public.html#");
-		expect(await readFile(new URL("../public/demo.html", import.meta.url), "utf8")).toContain("/pulse-public.html#pulse_demo_local_402machine");
+		expect(await readFile(new URL("../public/demo.html", import.meta.url), "utf8")).toContain("/pulse-public.html#pulse_demo_local_402machine_01");
 	});
 
 	it("exposes the landing stylesheet", async () => {
