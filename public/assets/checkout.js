@@ -219,7 +219,6 @@ form.addEventListener("submit", async (event) => {
 		if (!catalogResponse.ok || currentCatalog.checkoutEnabled !== true || !isCatalog(currentCatalog)) throw new Error("Public Lightning checkout is currently disabled.");
 		const currentPlan = currentCatalog.products[product].plans.find((candidate) => candidate.planId === selectedPlanId && candidate.available === true);
 		if (currentPlan === undefined || currentPlan.priceSats !== plan.priceSats) throw new Error("This plan changed. Close checkout and review the current catalogue.");
-		status.textContent = "Requesting a Lightning invoice…";
 		if (product === "whisper") {
 			const revealIntent = scheduledRevealIntent();
 			if (revealIntent === "invalid") throw new Error("Choose a valid reveal date or leave it blank for immediate delivery.");
@@ -323,6 +322,7 @@ function setPaymentStage(stage) {
 	progress.dataset.stage = stage;
 	form.dataset.stage = stage;
 	requesting.hidden = stage !== "requesting";
+	status.hidden = stage === "requesting";
 	if (stage === "review") {
 		submitButton.hidden = false;
 		submitButton.disabled = false;

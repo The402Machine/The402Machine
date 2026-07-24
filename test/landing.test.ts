@@ -67,7 +67,7 @@ describe("public landing page", () => {
 		expect(response.body).toContain('data-buy="pulse"');
 		expect(response.body).toContain('data-plan="long"');
 		expect(response.body).toContain('href="/assets/styles.css?v=15"');
-		expect(response.body).toContain('src="/assets/checkout.js?v=22"');
+		expect(response.body).toContain('src="/assets/checkout.js?v=23"');
 		expect(response.body).toContain('src="/assets/landing.js?v=1"');
 		expect(response.body).toContain('href="/api.html"');
 		expect(response.body).not.toContain('id="api"');
@@ -245,6 +245,8 @@ describe("public landing page", () => {
 		expect(source).toContain('setPaymentStage("requesting")');
 		expect(source).toContain("resetCheckoutState");
 		expect(html).toContain("Requesting invoice");
+		expect(source).toContain('status.hidden = stage === "requesting"');
+		expect(source).not.toContain('status.textContent = "Requesting a Lightning invoice…"');
 		expect(source).toContain("form.dataset.stage = stage");
 		expect(source).toContain("session !== checkoutSession || !dialog.open");
 		expect(source).toContain("quoteAttempt?.intent !== intent");
