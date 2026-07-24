@@ -10,6 +10,8 @@ const planChoices = document.querySelector("#checkout-plans");
 const summary = document.querySelector("#checkout-summary");
 const noteField = document.querySelector("#whisper-note-field");
 const note = document.querySelector("#whisper-note");
+const burnField = document.querySelector("#whisper-burn-field");
+const burnAfterRead = document.querySelector("#whisper-burn-after-read");
 const status = document.querySelector("#checkout-status");
 const output = document.querySelector("#checkout-output");
 const closeButton = document.querySelector("#checkout-close");
@@ -27,7 +29,7 @@ const deliveryActions = document.querySelector("#checkout-delivery-actions");
 const portalLink = document.querySelector("#checkout-portal");
 const copyPortalButton = document.querySelector("#checkout-copy-portal");
 
-if (!(dialog instanceof HTMLDialogElement) || !(form instanceof HTMLFormElement) || !(title instanceof HTMLElement) || !(intro instanceof HTMLElement) || !(planChoices instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(noteField instanceof HTMLElement) || !(note instanceof HTMLTextAreaElement) || !(status instanceof HTMLElement) || !(output instanceof HTMLTextAreaElement) || !(closeButton instanceof HTMLButtonElement) || !(submitButton instanceof HTMLButtonElement) || !(indicator instanceof HTMLElement) || !(paymentPanel instanceof HTMLElement) || !(progress instanceof HTMLElement) || !(qr instanceof HTMLElement) || !(amount instanceof HTMLElement) || !(walletLink instanceof HTMLAnchorElement) || !(webLnButton instanceof HTMLButtonElement) || !(copyButton instanceof HTMLButtonElement) || !(invoice instanceof HTMLTextAreaElement) || !(deliveryActions instanceof HTMLElement) || !(portalLink instanceof HTMLAnchorElement) || !(copyPortalButton instanceof HTMLButtonElement)) throw new Error("Checkout is incomplete");
+if (!(dialog instanceof HTMLDialogElement) || !(form instanceof HTMLFormElement) || !(title instanceof HTMLElement) || !(intro instanceof HTMLElement) || !(planChoices instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(noteField instanceof HTMLElement) || !(note instanceof HTMLTextAreaElement) || !(burnField instanceof HTMLElement) || !(burnAfterRead instanceof HTMLInputElement) || !(status instanceof HTMLElement) || !(output instanceof HTMLTextAreaElement) || !(closeButton instanceof HTMLButtonElement) || !(submitButton instanceof HTMLButtonElement) || !(indicator instanceof HTMLElement) || !(paymentPanel instanceof HTMLElement) || !(progress instanceof HTMLElement) || !(qr instanceof HTMLElement) || !(amount instanceof HTMLElement) || !(walletLink instanceof HTMLAnchorElement) || !(webLnButton instanceof HTMLButtonElement) || !(copyButton instanceof HTMLButtonElement) || !(invoice instanceof HTMLTextAreaElement) || !(deliveryActions instanceof HTMLElement) || !(portalLink instanceof HTMLAnchorElement) || !(copyPortalButton instanceof HTMLButtonElement)) throw new Error("Checkout is incomplete");
 
 let catalog = null;
 let product = "catch";
@@ -84,6 +86,8 @@ function openCheckout() {
 		: "Choose how long the encrypted message should wait and how many successful reads it allows. Encryption happens in this browser.";
 	noteField.hidden = product !== "whisper";
 	note.required = product === "whisper";
+	burnAfterRead.checked = false;
+	updateBurnChoice();
 	output.hidden = true;
 	output.value = "";
 	deliveryActions.hidden = true;
@@ -110,7 +114,7 @@ function renderPlanChoices(plans) {
 		input.name = "planId";
 		input.value = plan.planId;
 		input.checked = plan.planId === selectedPlanId;
-		input.addEventListener("change", () => { selectedPlanId = plan.planId; updateSummary(); });
+		input.addEventListener("change", () => { selectedPlanId = plan.planId; updateBurnChoice(); updateSummary(); });
 		const copy = document.createElement("span");
 		copy.innerHTML = `<b>${plan.planId.toUpperCase()}</b><strong>${formatSats(plan.priceSats)} <small>SATS</small></strong><small>${plan.durationLabel} · ${plan.bestFor}</small>`;
 		label.append(input, copy);
@@ -123,9 +127,22 @@ function updateSummary() {
 	if (plan === null) return;
 	const details = product === "catch"
 		? `${formatNumber(plan.requestLimit)} requests · ${formatBytes(plan.storageLimitBytes)} total storage · ${formatBytes(plan.maxBytesPerRequest)} per request`
-		: `${formatNumber(plan.readLimit)} successful ${plan.readLimit === 1 ? "read" : "reads"} · ${formatBytes(plan.maxCiphertextBytes)} encrypted payload`;
+		: `${burnAfterRead.checked ? "Burn after the first successful read" : `${formatNumber(plan.readLimit)} successful ${plan.readLimit === 1 ? "read" : "reads"}`} · ${formatBytes(plan.maxCiphertextBytes)} encrypted payload`;
 	summary.innerHTML = `<div><span>${product.toUpperCase()} / ${plan.planId.toUpperCase()}</span><strong>${formatSats(plan.priceSats)} sats</strong></div><p>${plan.durationLabel}. ${details}.</p>`;
 }
+
+function updateBurnChoice() {
+	const plan = selectedPlan();
+	burnField.hidden = product !== "whisper" || plan === null || plan.readLimit === 1;
+	if (burnField.hidden) burnAfterRead.checked = false;
+}
+
+function effectiveWhisperReadLimit() {
+	const plan = selectedPlan();
+	return burnAfterRead.checked ? 1 : plan?.readLimit ?? 1;
+}
+
+burnAfterRead.addEventListener("change", updateSummary);
 
 closeButton.addEventListener("click", () => closeCheckout());
 dialog.addEventListener("cancel", (event) => { event.preventDefault(); });
@@ -182,7 +199,7 @@ form.addEventListener("submit", async (event) => {
 		if (product === "whisper") {
 			const sealed = await sealWhisper(note.value);
 			encryptionKey = sealed.key;
-			response = await fetch("/api/payments/whisper", { method: "POST", headers: { "content-type": "application/octet-stream", "idempotency-key": idempotencyKey, "x-whisper-plan": selectedPlanId }, body: sealed.ciphertext });
+			response = await fetch("/api/payments/whisper", { method: "POST", headers: { "content-type": "application/octet-stream", "idempotency-key": idempotencyKey, "x-whisper-plan": selectedPlanId, "x-whisper-read-limit": String(effectiveWhisperReadLimit()) }, body: sealed.ciphertext });
 		} else {
 			response = await fetch("/api/payments/catch", { method: "POST", headers: { "content-type": "application/json", "idempotency-key": idempotencyKey }, body: JSON.stringify({ planId: selectedPlanId }) });
 		}

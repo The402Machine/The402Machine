@@ -48,13 +48,28 @@ describe("public payment API", () => {
 		const response = await app.inject({ method: "POST", url: "/api/payments/whisper", headers: { "idempotency-key": "idempotency-whisper-1", "x-whisper-plan": "spark", "content-type": "application/octet-stream" }, payload: ciphertext });
 		expect(response.statusCode).toBe(402);
 		expect(response.json()).toEqual(quote);
-		expect(calls).toEqual([{ idempotencyKey: "idempotency-whisper-1", product: "whisper", planId: "spark", productPayload: ciphertext }]);
+		expect(calls).toEqual([{ idempotencyKey: "idempotency-whisper-1", product: "whisper", planId: "spark", productPayload: ciphertext, whisperReadLimit: 1 }]);
 		const plaintext = await app.inject({ method: "POST", url: "/api/payments/whisper", headers: { "idempotency-key": "idempotency-whisper-2", "x-whisper-plan": "spark", "content-type": "text/plain" }, payload: "secret" });
 		expect(plaintext.statusCode).toBe(400);
 		await app.close();
 	});
 
 	it("accepts a WHISPER note near 4.02 MiB and rejects a larger ciphertext", async () => {
+		const burnCalls: unknown[] = [];
+		const burnQuote: PaymentQuote = { orderId: "order-whisper-burn", product: "whisper", planId: "standard", amountSats: 402, bolt11: "lnbc402n1burn", paymentHash: "8".repeat(64) };
+		const burnApp = buildApp({ payment: { quote: (input) => { burnCalls.push(input); return Promise.resolve(burnQuote); }, fulfill: () => Promise.resolve({ settled: false }) } });
+		const burnCiphertext = Buffer.from([1, ...Array.from({ length: 29 }, (_, index) => index)]);
+		const burn = await burnApp.inject({ method: "POST", url: "/api/payments/whisper", headers: { "idempotency-key": "idempotency-whisper-burn", "x-whisper-plan": "standard", "x-whisper-read-limit": "1", "content-type": "application/octet-stream" }, payload: burnCiphertext });
+		expect(burn.statusCode).toBe(402);
+		expect(burnCalls).toEqual([{ idempotencyKey: "idempotency-whisper-burn", product: "whisper", planId: "standard", productPayload: burnCiphertext, whisperReadLimit: 1 }]);
+		const allowance = await burnApp.inject({ method: "POST", url: "/api/payments/whisper", headers: { "idempotency-key": "idempotency-whisper-allowance", "x-whisper-plan": "standard", "content-type": "application/octet-stream" }, payload: burnCiphertext });
+		expect(allowance.statusCode).toBe(402);
+		expect(burnCalls.at(-1)).toEqual({ idempotencyKey: "idempotency-whisper-allowance", product: "whisper", planId: "standard", productPayload: burnCiphertext, whisperReadLimit: 42 });
+		const invalid = await burnApp.inject({ method: "POST", url: "/api/payments/whisper", headers: { "idempotency-key": "idempotency-whisper-invalid", "x-whisper-plan": "standard", "x-whisper-read-limit": "2", "content-type": "application/octet-stream" }, payload: burnCiphertext });
+		expect(invalid.statusCode).toBe(400);
+		expect(burnCalls).toHaveLength(2);
+		await burnApp.close();
+
 		const calls: unknown[] = [];
 		const quote: PaymentQuote = { orderId: "order-whisper-large", product: "whisper", planId: "spark", amountSats: 42, bolt11: "lnbc42n1large", paymentHash: "c".repeat(64) };
 		const app = buildApp({ payment: { quote: (input) => { calls.push(input); return Promise.resolve(quote); }, fulfill: () => Promise.resolve({ settled: false }) } });

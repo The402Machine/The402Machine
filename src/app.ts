@@ -54,7 +54,7 @@ type WhisperAppOptions = {
 };
 
 type PaymentAppOptions = {
-	quote(input: { idempotencyKey: string; product: "catch" | "whisper"; planId: "spark" | "standard" | "long"; productPayload: Buffer | null }): Promise<PaymentQuote>;
+	quote(input: { idempotencyKey: string; product: "catch" | "whisper"; planId: "spark" | "standard" | "long"; productPayload: Buffer | null; whisperReadLimit?: number | null }): Promise<PaymentQuote>;
 	fulfill(orderId: string): Promise<{ settled: false } | { settled: true; resource: DispensedResource }>;
 };
 
@@ -111,10 +111,13 @@ function registerPaymentRoutes(app: FastifyInstance, payment: PaymentAppOptions)
 		if (!consumeRateLimit(quoteRateLimits, request.ip, 10, 60_000)) return rateLimited(reply);
 		const idempotencyKey = request.headers["idempotency-key"];
 		const planId = request.headers["x-whisper-plan"];
+		const requestedReadLimit = request.headers["x-whisper-read-limit"];
 		if (typeof idempotencyKey !== "string" || idempotencyKey.length < 8 || idempotencyKey.length > 128) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid idempotency key" });
 		if (!isPlanId(planId) || !WHISPER_PLANS[planId].available) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid plan" });
+		const whisperReadLimit = requestedReadLimit === undefined ? WHISPER_PLANS[planId].readLimit : Number(requestedReadLimit);
+		if (whisperReadLimit !== 1 && whisperReadLimit !== WHISPER_PLANS[planId].readLimit) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid read limit" });
 		if (normalizedContentType(request.headers["content-type"]) !== "application/octet-stream" || !Buffer.isBuffer(request.body) || request.body.byteLength < 30 || request.body.byteLength > WHISPER_PLANS[planId].maxCiphertextBytes) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid ciphertext" });
-		const quote = await payment.quote({ idempotencyKey, product: "whisper", planId, productPayload: request.body });
+		const quote = await payment.quote({ idempotencyKey, product: "whisper", planId, productPayload: request.body, whisperReadLimit });
 		return reply.header("Cache-Control", "no-store").code(402).send(quote);
 	});
 

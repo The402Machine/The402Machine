@@ -3,7 +3,7 @@ import type { AtomicProvision, DispensedResource } from "./payment-repository.js
 import type { PaymentOrder, PaymentProduct, PurchasableCatchPlanId } from "./payment-domain.js";
 
 export interface PaymentOrderStore {
-	createOrder(input: { idempotencyKey: string; product?: PaymentProduct; planId: PurchasableCatchPlanId; productPayload?: Buffer | null }): Promise<PaymentOrder>;
+	createOrder(input: { idempotencyKey: string; product?: PaymentProduct; planId: PurchasableCatchPlanId; productPayload?: Buffer | null; whisperReadLimit?: number | null }): Promise<PaymentOrder>;
 	attachInvoice(orderId: string, invoice: { paymentHash: string; bolt11: string }): Promise<PaymentOrder>;
 	ensureInvoice(orderId: string, createInvoice: () => Promise<{ paymentHash: string; bolt11: string }>): Promise<PaymentOrder & { bolt11: string }>;
 	getOrder(orderId: string): Promise<(PaymentOrder & { bolt11: string | null }) | null>;
@@ -25,7 +25,7 @@ export type PaymentQuote = {
 export class PaymentService {
 	public constructor(private readonly orders: PaymentOrderStore, private readonly adapter: PaymentAdapter, private readonly provisionProduct: ProductProvisioner) {}
 
-	public async quote(input: { idempotencyKey: string; product?: PaymentProduct; planId: PurchasableCatchPlanId; productPayload?: Buffer | null }): Promise<PaymentQuote> {
+	public async quote(input: { idempotencyKey: string; product?: PaymentProduct; planId: PurchasableCatchPlanId; productPayload?: Buffer | null; whisperReadLimit?: number | null }): Promise<PaymentQuote> {
 		const order = await this.orders.createOrder(input);
 		const invoiced = await this.orders.ensureInvoice(order.id, async () => {
 			const existing = await this.adapter.findInvoice({ orderId: order.id, amountSats: order.amountSats });

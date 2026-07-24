@@ -16,6 +16,7 @@ const pendingOrder = (): PaymentOrder => createPaymentOrder({
 	product: "catch",
 	planId: "spark",
 	productPayload: null,
+	whisperReadLimit: null,
 	createdAt: new Date("2026-07-23T08:00:00.000Z"),
 });
 
@@ -32,6 +33,7 @@ describe("payment domain", () => {
 			product: "catch",
 			planId: "spark",
 			productPayload: null,
+			whisperReadLimit: null,
 			amountSats: 42,
 			status: "created",
 			paymentHash: null,

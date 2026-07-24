@@ -22,6 +22,7 @@ export type PaymentOrder = {
 	product: PaymentProduct;
 	planId: PurchasableCatchPlanId;
 	productPayload: Buffer | null;
+	whisperReadLimit: number | null;
 	amountSats: number;
 	status: PaymentOrderStatus;
 	paymentHash: string | null;
@@ -37,10 +38,17 @@ export function createPaymentOrder(input: {
 	product: PaymentProduct;
 	planId: PurchasableCatchPlanId;
 	productPayload: Buffer | null;
+	whisperReadLimit?: number | null;
 	createdAt: Date;
 }): PaymentOrder {
 	return {
-		...input,
+		id: input.id,
+		idempotencyKey: input.idempotencyKey,
+		product: input.product,
+		planId: input.planId,
+		productPayload: input.productPayload,
+		whisperReadLimit: input.whisperReadLimit ?? null,
+		createdAt: input.createdAt,
 		amountSats: priceForProduct(input.product, input.planId),
 		status: "created",
 		paymentHash: null,

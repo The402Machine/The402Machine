@@ -39,7 +39,7 @@ beforeAll(async () => {
 	databaseUrl = `postgresql://postgres:${password}@127.0.0.1:${port}/the402machine_test`;
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 12 });
-	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0010_whisper_multiread.sql"]) {
+	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${migrationName}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -59,6 +59,13 @@ describe("PaymentRepository", () => {
 	});
 
 	it("prices all three currently available plans", async () => {
+		const ciphertext = Buffer.concat([Buffer.from([1]), Buffer.alloc(29, 7)]);
+		const burn = await repository.createOrder({ idempotencyKey: "idem-whisper-burn-policy", product: "whisper", planId: "standard", productPayload: ciphertext, whisperReadLimit: 1 });
+		const repeated = await repository.createOrder({ idempotencyKey: "idem-whisper-burn-policy", product: "whisper", planId: "standard", productPayload: ciphertext, whisperReadLimit: 1 });
+		expect(burn.whisperReadLimit).toBe(1);
+		expect(repeated.id).toBe(burn.id);
+		await expect(repository.createOrder({ idempotencyKey: "idem-whisper-burn-policy", product: "whisper", planId: "standard", productPayload: ciphertext, whisperReadLimit: 42 })).rejects.toThrow("Idempotency key already belongs to another purchase");
+
 		const spark = await repository.createOrder({ idempotencyKey: "idem-price-spark", planId: "spark" });
 		const standard = await repository.createOrder({ idempotencyKey: "idem-price-standard", planId: "standard" });
 		const long = await repository.createOrder({ idempotencyKey: "idem-price-long", planId: "long" });

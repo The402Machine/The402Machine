@@ -29,7 +29,7 @@ Concurrent retries reuse one invoice. After server-side settlement verification,
 
 An encrypted message with a fixed read allowance that disappears after its final successful read or when its selected lifetime ends. The server accepts only bounded opaque ciphertext; encryption and decryption belong to the client.
 
-The browser helper uses AES-256-GCM. The server receives ciphertext and a read credential, but not the AES key. Each successful retrieval atomically increments the read count; the final allowed read clears the ciphertext and credential.
+The browser helper uses AES-256-GCM. The server receives ciphertext and a read credential, but not the AES key. Each successful retrieval atomically increments the read count; the final allowed read clears the ciphertext and credential. Standard and Long buyers can choose `X-Whisper-Read-Limit: 1` at purchase time to burn the server copy after the first successful read instead of using the full plan allowance.
 
 ## Product boundary
 

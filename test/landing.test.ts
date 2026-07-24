@@ -58,8 +58,8 @@ describe("public landing page", () => {
 		expect(response.body).toContain('data-buy="catch"');
 		expect(response.body).toContain('data-buy="whisper"');
 		expect(response.body).toContain('data-plan="long"');
-		expect(response.body).toContain('href="/assets/styles.css?v=11"');
-		expect(response.body).toContain('src="/assets/checkout.js?v=16"');
+		expect(response.body).toContain('href="/assets/styles.css?v=12"');
+		expect(response.body).toContain('src="/assets/checkout.js?v=17"');
 		expect(response.body).toContain('href="#api"');
 		expect(response.body).toContain('id="api"');
 		expect(response.body).toContain("API / COMPLETE FLOW");
@@ -137,6 +137,16 @@ describe("public landing page", () => {
 	});
 
 	it("presents the invoice as a QR, Lightning link, WebLN action, and pending state", async () => {
+		const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
+		const checkoutSource = await readFile(new URL("../public/assets/checkout.js", import.meta.url), "utf8");
+		expect(html).toContain('id="whisper-burn-field"');
+		expect(html).toContain('id="whisper-burn-after-read"');
+		expect(html).toContain("Burn after first read");
+		expect(html).toContain("even when the plan includes more reads");
+		expect(checkoutSource).toContain('"x-whisper-read-limit": String(effectiveWhisperReadLimit())');
+		expect(checkoutSource).toContain("burnAfterRead.checked");
+		expect(checkoutSource).toContain("Burn after the first successful read");
+
 		const [source, qrBundle, webLnBundle] = await Promise.all([
 			readFile(new URL("../public/assets/checkout.js", import.meta.url), "utf8"),
 			readFile(new URL("../public/assets/qr-browser-v3.js", import.meta.url), "utf8"),

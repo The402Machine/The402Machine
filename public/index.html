@@ -6,7 +6,7 @@
 		<meta name="description" content="Buy a temporary webhook inbox or an encrypted message with a fixed read allowance using Bitcoin over Lightning. No account or subscription." />
 		<meta name="theme-color" content="#080a08" />
 		<title>The402Machine — Disposable Internet Infrastructure</title>
-		<link rel="stylesheet" href="/assets/styles.css?v=11" />
+		<link rel="stylesheet" href="/assets/styles.css?v=12" />
 	</head>
 	<body>
 		<div class="noise" aria-hidden="true"></div>
@@ -68,7 +68,7 @@ curl https://the402machine.com/api/payments/{orderId}</pre></details><p class="a
 # Continue with nextCursor:
 curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;cursor={nextCursor}' \
   -H 'Authorization: Bearer {ownerToken}'</pre></details></article>
-						<article><p class="eyebrow">WHISPER / ENCRYPTED DELIVERY</p><h3>Encrypt before upload</h3><code>POST /api/payments/whisper</code><code>GET /w/{publicId}</code><p>Generate a 32-byte AES-256-GCM key locally. Upload <code>application/octet-stream</code> as <code>[0x01][12-byte nonce][ciphertext + tag]</code>, with <code>X-Whisper-Plan</code> and <code>Idempotency-Key</code>. After settlement, keep the key outside the API response.</p><details><summary>Encrypted retrieval</summary><pre>curl https://the402machine.com/w/{publicId} \
+						<article><p class="eyebrow">WHISPER / ENCRYPTED DELIVERY</p><h3>Encrypt before upload</h3><code>POST /api/payments/whisper</code><code>GET /w/{publicId}</code><p>Generate a 32-byte AES-256-GCM key locally. Upload <code>application/octet-stream</code> as <code>[0x01][12-byte nonce][ciphertext + tag]</code>, with <code>X-Whisper-Plan</code> and <code>Idempotency-Key</code>. Add <code>X-Whisper-Read-Limit: 1</code> to burn after the first successful read, even on Standard or Long. After settlement, keep the key outside the API response.</p><details><summary>Encrypted retrieval</summary><pre>curl https://the402machine.com/w/{publicId} \
   -H 'Authorization: Bearer {readToken}' \
   --output encrypted.bin
 
@@ -142,6 +142,7 @@ curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;cursor=
 				<p id="checkout-intro" class="checkout-intro"></p>
 				<fieldset><legend>Choose a plan</legend><div id="checkout-plans" class="checkout-plans"></div></fieldset>
 				<label id="whisper-note-field" hidden><span>Message</span><textarea id="whisper-note" maxlength="4000000" rows="7" placeholder="Encrypted in this browser before upload"></textarea><small>Plaintext stays in this browser. Up to 4,000,000 characters; encrypted payload must fit within 4.02 MiB.</small></label>
+				<label id="whisper-burn-field" class="whisper-burn" hidden><input id="whisper-burn-after-read" type="checkbox" /><span><b>Burn after first read</b><small>Delete the encrypted server copy after its first successful read, even when the plan includes more reads.</small></span></label>
 				<div id="checkout-summary" class="checkout-summary"></div>
 				<button id="checkout-submit" class="button primary" type="submit">Create Lightning invoice</button>
 				<section id="checkout-payment" class="checkout-payment" hidden aria-live="polite">
@@ -174,6 +175,6 @@ curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;cursor=
 		</dialog>
 
 		<footer class="footer shell"><span>THE402MACHINE.COM</span><span>PAYMENT REQUIRED / TAKEN LITERALLY</span><span>© 2026</span></footer>
-		<script type="module" src="/assets/checkout.js?v=16"></script>
+		<script type="module" src="/assets/checkout.js?v=17"></script>
 	</body>
 </html>

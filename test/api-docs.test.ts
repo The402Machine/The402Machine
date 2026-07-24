@@ -25,6 +25,7 @@ describe("public API documentation", () => {
 			"GET /w/{publicId}",
 			"AES-256-GCM",
 			"X-Whisper-Plan",
+			"X-Whisper-Read-Limit: 1",
 		]) expect(html).toContain(contract);
 		expect(html).toContain("accepted with or without the ingest token");
 		expect(html).toContain("locally resolved approximate IP location");

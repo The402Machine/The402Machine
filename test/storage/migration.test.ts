@@ -54,7 +54,7 @@ beforeAll(async () => {
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 4 });
 
-	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql", "0010_whisper_multiread.sql"]) {
+	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -111,16 +111,16 @@ describe("CATCH migration", () => {
 		expect(legacyLimits.every(({ definition }) => definition.includes("4215276") && !definition.includes("16384"))).toBe(true);
 		const ciphertext = Buffer.alloc(4_215_276, 7);
 		await expect(sql`
-			insert into payment_orders (idempotency_key, product, plan_id, product_payload, amount_sats)
-			values ('whisper-large-order', 'whisper', 'spark', ${ciphertext}, 42)
+			insert into payment_orders (idempotency_key, product, plan_id, product_payload, whisper_read_limit, amount_sats)
+			values ('whisper-large-order', 'whisper', 'spark', ${ciphertext}, 1, 42)
 		`).resolves.toBeDefined();
 		await expect(sql`
 			insert into whispers (public_id, plan_id, read_token_hash, ciphertext, expires_at)
 			values (${`whisper_${"w".repeat(22)}`}, 'spark', 'read-hash', ${ciphertext}, clock_timestamp() + interval '7 days')
 		`).resolves.toBeDefined();
 		await expect(sql`
-			insert into payment_orders (idempotency_key, product, plan_id, product_payload, amount_sats)
-			values ('whisper-oversized-order', 'whisper', 'spark', ${Buffer.alloc(4_215_277, 7)}, 42)
+			insert into payment_orders (idempotency_key, product, plan_id, product_payload, whisper_read_limit, amount_sats)
+			values ('whisper-oversized-order', 'whisper', 'spark', ${Buffer.alloc(4_215_277, 7)}, 1, 42)
 		`).rejects.toMatchObject({ code: "23514" });
 	});
 
@@ -137,6 +137,25 @@ describe("CATCH migration", () => {
 	});
 
 	it("rejects counters beyond the purchased quotas", async () => {
+		const [column] = await sql<{ column_default: string | null; is_nullable: string }[]>`
+			select column_default, is_nullable from information_schema.columns
+			where table_name = 'payment_orders' and column_name = 'whisper_read_limit'
+		`;
+		expect(column).toEqual({ column_default: null, is_nullable: "YES" });
+		expect((await sql`select version from schema_migrations where version = '0011_whisper_burn_after_read'`)).toHaveLength(1);
+		await expect(sql`
+			insert into payment_orders (idempotency_key, product, plan_id, product_payload, whisper_read_limit, amount_sats)
+			values ('burn-standard', 'whisper', 'standard', ${Buffer.alloc(30, 7)}, 1, 402)
+		`).resolves.toBeDefined();
+		await expect(sql`
+			insert into payment_orders (idempotency_key, product, plan_id, product_payload, whisper_read_limit, amount_sats)
+			values ('invalid-standard-read-limit', 'whisper', 'standard', ${Buffer.alloc(30, 7)}, 2, 402)
+		`).rejects.toMatchObject({ code: "23514" });
+		await expect(sql`
+			insert into payment_orders (idempotency_key, product, plan_id, product_payload, whisper_read_limit, amount_sats)
+			values ('invalid-catch-read-limit', 'catch', 'spark', null, 1, 42)
+		`).rejects.toMatchObject({ code: "23514" });
+
 		await expect(sql`
 			insert into catch_resources (
 				public_id, plan_id, owner_token_hash, ingest_token_hash,

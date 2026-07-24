@@ -5,7 +5,7 @@ import postgres from "postgres";
 import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import { calculatePlanExpiry, CATCH_PLANS } from "./domain/catch-plans.js";
-import { calculateWhisperExpiry, WHISPER_PLANS } from "./domain/whisper-plans.js";
+import { calculateWhisperExpiry } from "./domain/whisper-plans.js";
 import { lookupIpLocally } from "./ip-location.js";
 import { LnbitsPaymentAdapter } from "./payment/lnbits-adapter.js";
 import { PaymentRepository } from "./payment/payment-repository.js";
@@ -45,6 +45,7 @@ const paymentService = database === undefined || config.payment.provider !== "ln
 			const plan = CATCH_PLANS[order.planId];
 			if (order.product === "whisper") {
 				if (order.productPayload === null) throw new Error("WHISPER order has no ciphertext");
+				if (order.whisperReadLimit === null) throw new Error("WHISPER order has no read limit");
 				const readToken = generateOwnerToken();
 				return Promise.resolve({
 					product: "whisper" as const,
@@ -52,7 +53,7 @@ const paymentService = database === undefined || config.payment.provider !== "ln
 					planId: order.planId,
 					readTokenHash: hashToken("owner", readToken, config.catch.tokenPepper!),
 					ciphertext: order.productPayload,
-					readLimit: WHISPER_PLANS[order.planId].readLimit,
+					readLimit: order.whisperReadLimit,
 					readToken,
 					expiresAt: calculateWhisperExpiry(order.planId, new Date()),
 				});
