@@ -65,4 +65,15 @@ describe("PULSE contract", () => {
 		});
 		expect(parsePulseSettings({ publicStatusEnabledd: true }, current)).toBeNull();
 	});
+
+	it("merges partial settings from the raw JSON buffer installed for CATCH", () => {
+		const current = resource({ publicStatusEnabled: false });
+		expect(parsePulseSettings(Buffer.from('{"publicStatusEnabled":true}'), current)).toEqual({
+			name: current.name,
+			description: current.description,
+			expectedIntervalSeconds: current.expectedIntervalSeconds,
+			graceSeconds: current.graceSeconds,
+			publicStatusEnabled: true,
+		});
+	});
 });

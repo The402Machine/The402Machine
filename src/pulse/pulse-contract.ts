@@ -34,12 +34,13 @@ export type OwnerPulseStatus = PublicPulseStatus & {
 };
 
 export function parsePulseSettings(body: unknown, current: PulseResource): PulseSettings | null {
-	if (!isRecord(body) || Object.keys(body).some((key) => !PULSE_SETTING_KEYS.has(key as keyof PulseSettings))) return null;
-	const rawName = body.name === undefined ? current.name : body.name;
-	const rawDescription = body.description === undefined ? current.description : body.description;
-	const expectedIntervalSeconds = body.expectedIntervalSeconds === undefined ? current.expectedIntervalSeconds : body.expectedIntervalSeconds;
-	const graceSeconds = body.graceSeconds === undefined ? current.graceSeconds : body.graceSeconds;
-	const publicStatusEnabled = body.publicStatusEnabled === undefined ? current.publicStatusEnabled : body.publicStatusEnabled;
+	const parsedBody = parseSettingsBody(body);
+	if (parsedBody === null || Object.keys(parsedBody).some((key) => !PULSE_SETTING_KEYS.has(key as keyof PulseSettings))) return null;
+	const rawName = parsedBody.name === undefined ? current.name : parsedBody.name;
+	const rawDescription = parsedBody.description === undefined ? current.description : parsedBody.description;
+	const expectedIntervalSeconds = parsedBody.expectedIntervalSeconds === undefined ? current.expectedIntervalSeconds : parsedBody.expectedIntervalSeconds;
+	const graceSeconds = parsedBody.graceSeconds === undefined ? current.graceSeconds : parsedBody.graceSeconds;
+	const publicStatusEnabled = parsedBody.publicStatusEnabled === undefined ? current.publicStatusEnabled : parsedBody.publicStatusEnabled;
 	if (typeof rawName !== "string" || typeof rawDescription !== "string" || typeof publicStatusEnabled !== "boolean" || typeof expectedIntervalSeconds !== "number" || typeof graceSeconds !== "number") return null;
 	const name = rawName.trim();
 	const description = rawDescription.trim();
@@ -78,4 +79,16 @@ export function ownerPulseStatus(resource: PulseResource, now = Date.now()): Own
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseSettingsBody(body: unknown): Record<string, unknown> | null {
+	if (Buffer.isBuffer(body)) {
+		try {
+			const parsed: unknown = JSON.parse(body.toString("utf8"));
+			return isRecord(parsed) ? parsed : null;
+		} catch {
+			return null;
+		}
+	}
+	return isRecord(body) ? body : null;
 }

@@ -68,6 +68,35 @@ describe("PULSE API", () => {
 		expect(response.json()).toMatchObject({ publicStatusEnabled: true, expectedIntervalSeconds: 300, graceSeconds: 600 });
 	});
 
+	it("parses owner JSON settings even when the CATCH raw JSON parser is registered", async () => {
+		const repository = repositoryFixture();
+		repository.resource.publicStatusEnabled = false;
+		repository.updateSettings = (_publicId: string, settings: PulseSettings) => {
+			Object.assign(repository.resource, settings);
+			return Promise.resolve(repository.resource);
+		};
+		const app = buildApp({
+			pulse: { repository, tokenPepper: "pepper" },
+			catch: {
+				repository: {
+					provision: () => Promise.reject(new Error("unused")), getResource: () => Promise.resolve(null), getCredentialHashes: () => Promise.resolve(null),
+					acceptEvent: () => Promise.reject(new Error("unused")), setEventIpLocation: () => Promise.resolve(false), listEvents: () => Promise.resolve({ events: [], nextCursor: null }),
+					deleteEvent: () => Promise.resolve(false), destroy: () => Promise.resolve(false),
+				},
+				tokenPepper: "pepper",
+			},
+		});
+		apps.push(app);
+		const response = await app.inject({
+			method: "PATCH",
+			url: `/api/pulse/${repository.resource.publicId}`,
+			headers: { authorization: "Bearer pulse_own_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ", "content-type": "application/json" },
+			payload: { publicStatusEnabled: true },
+		});
+		expect(response.statusCode, response.body).toBe(200);
+		expect(response.json()).toMatchObject({ publicStatusEnabled: true });
+	});
+
 	it("rejects unknown settings fields instead of silently accepting client mistakes", async () => {
 		const repository = repositoryFixture();
 		let updates = 0;
