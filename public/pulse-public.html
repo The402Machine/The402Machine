@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta name="robots" content="noindex,nofollow,noarchive" />
+	<meta name="referrer" content="no-referrer" />
+	<meta name="theme-color" content="#080a08" />
+	<title>Public PULSE status — The402Machine</title>
+	<link rel="stylesheet" href="/assets/styles.css?v=17" />
+</head>
+<body class="pulse-public-body">
+	<div class="noise" aria-hidden="true"></div>
+	<header class="topbar portal-topbar"><a class="brand" href="/"><span class="brand-mark">402</span><span>PUBLIC PULSE STATUS</span></a><span id="public-pulse-connection" class="portal-connection">CONNECTING</span></header>
+	<main class="shell pulse-public-shell">
+		<section id="public-pulse-error" class="portal-error pulse-public-error" hidden><p class="eyebrow">PUBLIC STATUS UNAVAILABLE</p><h1>This PULSE is not currently shared.</h1><p>The owner may have disabled the public page, destroyed the monitor, or reached its expiry.</p></section>
+		<section id="public-pulse-dashboard" class="pulse-public-dashboard" hidden>
+			<header class="pulse-public-hero"><div><p class="eyebrow">SHAREABLE STATUS / READ ONLY</p><h1 id="public-pulse-name">Untitled monitor</h1><p id="public-pulse-description" class="lede">Heartbeat status without private capabilities.</p></div><div id="public-pulse-state" class="pulse-state" data-state="waiting"><i></i><span>WAITING</span></div></header>
+			<section class="pulse-public-summary"><article><small>CURRENT STATUS</small><strong id="public-pulse-summary">Waiting for first signal</strong><span id="public-pulse-relative">No heartbeat received yet</span></article></section>
+			<section class="pulse-public-signal"><header><div><p class="eyebrow">PUBLIC OBSERVATION</p><h2>Latest signal</h2></div><span>STATUS ONLY</span></header><div id="public-pulse-signal" class="pulse-public-orbit"><i></i><b></b></div><p>A deliberately limited, read-only summary intended for safe sharing.</p></section>
+		</section>
+	</main>
+	<footer class="footer shell"><span>THE402MACHINE.COM</span><span>PUBLIC READ-ONLY STATUS</span><span>NO PRIVATE CAPABILITIES</span></footer>
+	<script type="module" src="/assets/pulse-public.js?v=2"></script>
+</body>
+</html>

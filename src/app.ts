@@ -297,7 +297,7 @@ function registerPulseRoutes(app: FastifyInstance, options: PulseAppOptions): vo
 		if (!await authorizePulseOwner(request, options)) return unauthorized(reply);
 		const current = await options.repository.getResource(request.params.publicId);
 		if (current === null) return reply.header("Cache-Control", "no-store").code(404).send({ error: "not found" });
-		const settings = parsePulseSettings(request.body, current.planId);
+		const settings = parsePulseSettings(request.body, current);
 		if (settings === null) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid settings" });
 		const updated = await options.repository.updateSettings(request.params.publicId, settings);
 		return updated === null ? reply.header("Cache-Control", "no-store").code(404).send({ error: "not found" }) : reply.header("Cache-Control", "no-store").send(ownerPulseStatus(updated));
@@ -313,9 +313,15 @@ async function authorizePulseOwner(request: FastifyRequest<{ Params: { publicId:
 	const credentials = await options.repository.getCredentialHashes(request.params.publicId);
 	return credentials?.ownerTokenHash !== null && credentials !== null && verifyPulseToken("owner", bearerToken(request) ?? "", credentials.ownerTokenHash, options.tokenPepper);
 }
-function parsePulseSettings(body: Partial<PulseSettings> | undefined, planId: "spark" | "standard" | "long"): PulseSettings | null {
-	if (body === undefined || typeof body.name !== "string" || body.name.trim().length < 1 || body.name.trim().length > 80 || typeof body.description !== "string" || body.description.length > 240 || typeof body.publicStatusEnabled !== "boolean" || typeof body.expectedIntervalSeconds !== "number" || typeof body.graceSeconds !== "number" || !validPulseSchedule(planId, body.expectedIntervalSeconds, body.graceSeconds)) return null;
-	return { name: body.name.trim(), description: body.description.trim(), expectedIntervalSeconds: body.expectedIntervalSeconds, graceSeconds: body.graceSeconds, publicStatusEnabled: body.publicStatusEnabled };
+function parsePulseSettings(body: Partial<PulseSettings> | undefined, current: PulseResource): PulseSettings | null {
+	if (body === undefined || body === null || typeof body !== "object" || Array.isArray(body)) return null;
+	const name = body.name === undefined ? current.name : body.name;
+	const description = body.description === undefined ? current.description : body.description;
+	const expectedIntervalSeconds = body.expectedIntervalSeconds === undefined ? current.expectedIntervalSeconds : body.expectedIntervalSeconds;
+	const graceSeconds = body.graceSeconds === undefined ? current.graceSeconds : body.graceSeconds;
+	const publicStatusEnabled = body.publicStatusEnabled === undefined ? current.publicStatusEnabled : body.publicStatusEnabled;
+	if (typeof name !== "string" || name.trim().length < 1 || name.trim().length > 80 || typeof description !== "string" || description.length > 240 || typeof publicStatusEnabled !== "boolean" || typeof expectedIntervalSeconds !== "number" || typeof graceSeconds !== "number" || !validPulseSchedule(current.planId, expectedIntervalSeconds, graceSeconds)) return null;
+	return { name: name.trim(), description: description.trim(), expectedIntervalSeconds, graceSeconds, publicStatusEnabled };
 }
 function pulseState(resource: PulseResource): "waiting" | "operational" | "late" | "exhausted" | "expired" {
 	if (resource.status === "exhausted") return "exhausted";
@@ -323,7 +329,7 @@ function pulseState(resource: PulseResource): "waiting" | "operational" | "late"
 	if (resource.lastPingAt === null) return "waiting";
 	return Date.now() > resource.lastPingAt.getTime() + resource.expectedIntervalSeconds * 1_000 + resource.graceSeconds * 1_000 ? "late" : "operational";
 }
-function publicPulseStatus(resource: PulseResource): object { return { name: resource.name, description: resource.description, state: pulseState(resource), lastPingAt: resource.lastPingAt?.toISOString() ?? null, expectedIntervalSeconds: resource.expectedIntervalSeconds, graceSeconds: resource.graceSeconds, expiresAt: resource.expiresAt.toISOString() }; }
+function publicPulseStatus(resource: PulseResource): object { return { name: resource.name, description: resource.description, state: pulseState(resource), lastPingAt: resource.lastPingAt?.toISOString() ?? null }; }
 function ownerPulseStatus(resource: PulseResource): object { return { publicId: resource.publicId, planId: resource.planId, status: resource.status, state: pulseState(resource), heartbeatLimit: resource.heartbeatLimit, heartbeatCount: resource.heartbeatCount, expectedIntervalSeconds: resource.expectedIntervalSeconds, graceSeconds: resource.graceSeconds, name: resource.name, description: resource.description, publicStatusEnabled: resource.publicStatusEnabled, lastPingAt: resource.lastPingAt?.toISOString() ?? null, createdAt: resource.createdAt.toISOString(), expiresAt: resource.expiresAt.toISOString() }; }
 
 function registerCatchRoutes(app: FastifyInstance, options: CatchAppOptions): void {

@@ -140,12 +140,50 @@ describe("public landing page", () => {
 		const app = buildApp(); apps.push(app);
 		const response = await app.inject({ method: "GET", url: "/pulse.html" });
 		expect(response.statusCode).toBe(200);
-		expect(response.body).toContain("PULSE STATUS");
+		expect(response.body).toContain("PULSE OWNER");
 		expect(response.body).toContain('name="robots" content="noindex,nofollow,noarchive"');
-		expect(response.body).toContain('src="/assets/pulse-page.js?v=2"');
-		expect(response.body).toContain("CURRENT SIGNAL");
+		expect(response.body).toContain('src="/assets/pulse-page.js?v=4"');
+		expect(response.body).toContain('id="pulse-signal-track"');
 		expect(response.body).toContain("Copy heartbeat URL");
-		expect(response.body).toContain("Copy public status link");
+		expect(response.body).toContain("Enable public page");
+		expect(response.body).toContain("Disable public page");
+		expect(response.body).toContain('id="pulse-public-card"');
+		expect(response.body).toContain('href="/pulse-public.html"');
+		expect(response.body).not.toContain('id="pulse-public-input"');
+	});
+
+	it("keeps the PULSE public status page separate from owner capabilities", async () => {
+		const app = buildApp(); apps.push(app);
+		const response = await app.inject({ method: "GET", url: "/pulse-public.html" });
+		expect(response.statusCode).toBe(200);
+		expect(response.body).toContain("PUBLIC PULSE STATUS");
+		expect(response.body).toContain("not currently shared");
+		expect(response.body).toContain('src="/assets/pulse-public.js?v=2"');
+		expect(response.body).not.toContain("Copy heartbeat URL");
+		expect(response.body).not.toContain("Copy curl command");
+		expect(response.body).not.toContain("HEARTBEAT CAPABILITY");
+		expect(response.body).not.toContain("STATUS PAGE SETTINGS");
+		const source = await readFile(new URL("../public/assets/pulse-public.js", import.meta.url), "utf8");
+		expect(source).not.toContain("authorization");
+		expect(source).not.toContain("/p/");
+		expect(source).not.toContain("heartbeatCount");
+		expect(source).not.toContain("expectedIntervalSeconds");
+		expect(source).not.toContain("graceSeconds");
+		expect(source).not.toContain("expiresAt");
+	});
+
+	it("renders incoming PULSE heartbeats as a bounded live signal history", async () => {
+		const source = await readFile(new URL("../public/assets/pulse-page.js", import.meta.url), "utf8");
+		expect(source).toContain("appendHeartbeatObservation");
+		expect(source).toContain("heartbeatCount");
+		expect(source).toContain("pulse-signal-node");
+		expect(source).toContain("setInterval(() => void refresh(), 3_000)");
+		expect(source).toContain('enabled ? "Copy public status link" : "Enable public page"');
+		expect(source).toContain("publicUrl.disabled = !enabled");
+		expect(source).toContain("saveSettings({ publicStatusEnabled: enabled }");
+		expect(source).toContain('hash.startsWith("public=")');
+		expect(source).toContain("location.replace(`/pulse-public.html#");
+		expect(await readFile(new URL("../public/demo.html", import.meta.url), "utf8")).toContain("/pulse-public.html#pulse_demo_local_402machine");
 	});
 
 	it("exposes the landing stylesheet", async () => {

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../../src/app.js";
+import type { PulseSettings } from "../../src/pulse/pulse-repository.js";
 import { generatePulseToken, hashPulseToken } from "../../src/security/pulse-tokens.js";
 
 const apps: ReturnType<typeof buildApp>[] = [];
@@ -20,7 +21,7 @@ function repositoryFixture() {
 		getResource: () => Promise.resolve(resource),
 		getCredentialHashes: () => Promise.resolve({ ownerTokenHash: resource.ownerTokenHash, pingTokenHash: resource.pingTokenHash }),
 		acceptHeartbeat: () => Promise.resolve({ accepted: true as const, heartbeatCount: 1, lastPingAt: new Date("2026-07-24T10:05:00.000Z"), exhausted: false }),
-		updateSettings: () => Promise.resolve(resource),
+		updateSettings: function (this: void, ...args: [string, PulseSettings]) { void args; return Promise.resolve(resource); },
 		destroy: () => Promise.resolve(true),
 	};
 }
@@ -45,15 +46,59 @@ describe("PULSE API", () => {
 		expect(update.statusCode).toBe(200);
 	});
 
+	it("enables the public page with the default Spark schedule and an empty description", async () => {
+		const repository = repositoryFixture();
+		repository.resource.publicStatusEnabled = false;
+		let receivedSettings: unknown = null;
+		repository.updateSettings = (_publicId: string, settings: PulseSettings) => {
+			receivedSettings = settings;
+			Object.assign(repository.resource, settings);
+			return Promise.resolve(repository.resource);
+		};
+		const app = buildApp({ pulse: { repository, tokenPepper: "pepper" } }); apps.push(app);
+		const response = await app.inject({
+			method: "PATCH",
+			url: `/api/pulse/${repository.resource.publicId}`,
+			headers: { authorization: "Bearer pulse_own_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ", "content-type": "application/json" },
+			payload: { name: "Untitled monitor", description: "", expectedIntervalSeconds: 300, graceSeconds: 600, publicStatusEnabled: true },
+		});
+		expect(response.statusCode).toBe(200);
+		expect(receivedSettings).toEqual({ name: "Untitled monitor", description: "", expectedIntervalSeconds: 300, graceSeconds: 600, publicStatusEnabled: true });
+		expect(response.json()).toMatchObject({ publicStatusEnabled: true, expectedIntervalSeconds: 300, graceSeconds: 600 });
+	});
+
+	it("toggles public sharing without resubmitting unrelated monitor settings", async () => {
+		const repository = repositoryFixture();
+		repository.resource.publicStatusEnabled = false;
+		let receivedSettings: PulseSettings | null = null;
+		repository.updateSettings = (_publicId: string, settings: PulseSettings) => {
+			receivedSettings = settings;
+			Object.assign(repository.resource, settings);
+			return Promise.resolve(repository.resource);
+		};
+		const app = buildApp({ pulse: { repository, tokenPepper: "pepper" } }); apps.push(app);
+		const response = await app.inject({
+			method: "PATCH",
+			url: `/api/pulse/${repository.resource.publicId}`,
+			headers: { authorization: "Bearer pulse_own_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ", "content-type": "application/json" },
+			payload: { publicStatusEnabled: true },
+		});
+		expect(response.statusCode).toBe(200);
+		expect(receivedSettings).toEqual({ name: "Backup heartbeat", description: "Nightly backup worker", expectedIntervalSeconds: 300, graceSeconds: 600, publicStatusEnabled: true });
+	});
+
 	it("exposes only bounded public status data when enabled", async () => {
 		const repository = repositoryFixture();
 		const app = buildApp({ pulse: { repository, tokenPepper: "pepper" } }); apps.push(app);
 		const response = await app.inject({ method: "GET", url: `/api/pulse/${repository.resource.publicId}/public` });
 		expect(response.statusCode).toBe(200);
 		expect(response.headers["cache-control"]).toContain("max-age");
-		expect(response.json()).toEqual({ name: "Backup heartbeat", description: "Nightly backup worker", state: "waiting", lastPingAt: null, expectedIntervalSeconds: 300, graceSeconds: 600, expiresAt: "2026-07-28T12:00:00.000Z" });
+		expect(response.json()).toEqual({ name: "Backup heartbeat", description: "Nightly backup worker", state: "waiting", lastPingAt: null });
 		expect(response.body).not.toContain("Token");
 		expect(response.body).not.toContain("heartbeatLimit");
+		expect(response.body).not.toContain("expectedIntervalSeconds");
+		expect(response.body).not.toContain("graceSeconds");
+		expect(response.body).not.toContain("expiresAt");
 	});
 
 	it("hides disabled public pages and supports explicit destruction", async () => {
