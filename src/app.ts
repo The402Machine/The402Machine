@@ -283,7 +283,7 @@ function registerPulseRoutes(app: FastifyInstance, options: PulseAppOptions): vo
 	});
 	app.get<{ Params: { publicId: string } }>("/api/pulse/:publicId/public", async (request, reply) => {
 		const resource = await options.repository.getResource(request.params.publicId);
-		if (resource === null || !resource.publicStatusEnabled || resource.status === "manually_destroyed") return reply.header("Cache-Control", "public, max-age=15").code(404).send({ error: "not found" });
+		if (resource === null || !resource.publicStatusEnabled || resource.status === "expired" || resource.status === "manually_destroyed") return reply.header("Cache-Control", "public, max-age=15").code(404).send({ error: "not found" });
 		return reply.header("Cache-Control", "public, max-age=15").send(publicPulseStatus(resource));
 	});
 	app.get<{ Params: { publicId: string } }>("/api/pulse/:publicId", async (request, reply) => {

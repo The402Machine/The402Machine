@@ -164,6 +164,34 @@ describe("PaymentRepository", () => {
 		expect(await pulse.getCredentialHashes(publicId)).toEqual({ ownerTokenHash: "a".repeat(64), pingTokenHash: null });
 	});
 
+	it("erases public PULSE metadata when the lifetime expires", async () => {
+		const publicId = "pulse_expiry_private_abcdefghijklmnopqrstuv";
+		await sql`
+			insert into pulse_resources (public_id, plan_id, owner_token_hash, ping_token_hash, heartbeat_limit, expected_interval_seconds, grace_seconds, name, description, public_status_enabled, last_ping_at, expires_at)
+			values (${publicId}, 'spark', ${"a".repeat(64)}, ${"b".repeat(64)}, 3, 300, 600, 'Sensitive job', 'Internal schedule', true, clock_timestamp() - interval '2 minutes', clock_timestamp() + interval '100 milliseconds')
+		`;
+		await new Promise((resolve) => setTimeout(resolve, 150));
+		const pulse = new (await import("../../src/pulse/pulse-repository.js")).PulseRepository(sql);
+		expect(await pulse.expireDue()).toBe(1);
+		expect(await pulse.getResource(publicId)).toMatchObject({
+			status: "expired", name: "Expired monitor", description: "", publicStatusEnabled: false, lastPingAt: null,
+		});
+	});
+
+	it("erases public PULSE metadata when an expired monitor receives a heartbeat", async () => {
+		const publicId = "pulse_expired_ping_abcdefghijklmnopqrstuv";
+		await sql`
+			insert into pulse_resources (public_id, plan_id, owner_token_hash, ping_token_hash, heartbeat_limit, expected_interval_seconds, grace_seconds, name, description, public_status_enabled, last_ping_at, expires_at)
+			values (${publicId}, 'spark', ${"a".repeat(64)}, ${"b".repeat(64)}, 3, 300, 600, 'Sensitive ping', 'Private timing', true, clock_timestamp() - interval '2 minutes', clock_timestamp() + interval '100 milliseconds')
+		`;
+		await new Promise((resolve) => setTimeout(resolve, 150));
+		const pulse = new (await import("../../src/pulse/pulse-repository.js")).PulseRepository(sql);
+		expect(await pulse.acceptHeartbeat(publicId)).toEqual({ accepted: false, reason: "expired" });
+		expect(await pulse.getResource(publicId)).toMatchObject({
+			status: "expired", name: "Expired monitor", description: "", publicStatusEnabled: false, lastPingAt: null,
+		});
+	});
+
 	it("stores a WHISPER payment payload near 4.02 MiB", async () => {
 		const ciphertext = Buffer.alloc(4_215_276, 7);
 		ciphertext[0] = 1;

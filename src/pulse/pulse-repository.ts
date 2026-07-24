@@ -53,7 +53,7 @@ export class PulseRepository {
 			const row = rows[0];
 			if (row === undefined) return { accepted: false, reason: "not_found" };
 			if (row.is_expired && (row.status === "active" || row.status === "exhausted")) {
-				await tx`update pulse_resources set status = 'expired', owner_token_hash = null, ping_token_hash = null, expired_at = clock_timestamp(), updated_at = clock_timestamp() where id = ${row.id}`;
+				await tx`update pulse_resources set status = 'expired', owner_token_hash = null, ping_token_hash = null, name = 'Expired monitor', description = '', public_status_enabled = false, last_ping_at = null, expired_at = clock_timestamp(), updated_at = clock_timestamp() where id = ${row.id}`;
 				return { accepted: false, reason: "expired" };
 			}
 			if (row.status !== "active") return { accepted: false, reason: row.status === "exhausted" ? "exhausted" : "not_found" };
@@ -93,7 +93,7 @@ export class PulseRepository {
 		return this.sql.begin(async (tx) => {
 			const rows = await tx<{ id: string }[]>`select id from pulse_resources where status in ('active', 'exhausted') and clock_timestamp() >= expires_at order by expires_at limit ${limit} for update skip locked`;
 			if (rows.length === 0) return 0;
-			const result = await tx`update pulse_resources set status = 'expired', owner_token_hash = null, ping_token_hash = null, expired_at = clock_timestamp(), updated_at = clock_timestamp() where id in ${tx(rows.map(({ id }) => id))}`;
+			const result = await tx`update pulse_resources set status = 'expired', owner_token_hash = null, ping_token_hash = null, name = 'Expired monitor', description = '', public_status_enabled = false, last_ping_at = null, expired_at = clock_timestamp(), updated_at = clock_timestamp() where id in ${tx(rows.map(({ id }) => id))}`;
 			return result.count;
 		});
 	}

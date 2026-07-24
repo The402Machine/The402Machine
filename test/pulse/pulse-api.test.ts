@@ -8,7 +8,7 @@ afterEach(async () => { await Promise.all(apps.splice(0).map(async (app) => app.
 
 function repositoryFixture() {
 	const resource = {
-		id: "resource-pulse-1", publicId: "pulse_abcdefghijklmnopqrstuv", planId: "spark" as const, status: "active" as const,
+		id: "resource-pulse-1", publicId: "pulse_abcdefghijklmnopqrstuv", planId: "spark" as const, status: "active" as "active" | "exhausted" | "expired" | "manually_destroyed",
 		ownerTokenHash: hashPulseToken("owner", "pulse_own_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ", "pepper"),
 		pingTokenHash: hashPulseToken("ping", "pulse_ping_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ", "pepper"),
 		heartbeatLimit: 1_202, heartbeatCount: 0, expectedIntervalSeconds: 300, graceSeconds: 600,
@@ -63,6 +63,15 @@ describe("PULSE API", () => {
 		expect((await app.inject({ method: "GET", url: `/api/pulse/${repository.resource.publicId}/public` })).statusCode).toBe(404);
 		const destroyed = await app.inject({ method: "DELETE", url: `/api/pulse/${repository.resource.publicId}`, headers: { authorization: "Bearer pulse_own_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ" } });
 		expect(destroyed.statusCode).toBe(204);
+	});
+
+	it("hides public status after the monitor expires", async () => {
+		const repository = repositoryFixture();
+		repository.resource.status = "expired";
+		const app = buildApp({ pulse: { repository, tokenPepper: "pepper" } }); apps.push(app);
+		const response = await app.inject({ method: "GET", url: `/api/pulse/${repository.resource.publicId}/public` });
+		expect(response.statusCode).toBe(404);
+		expect(response.json()).toEqual({ error: "not found" });
 	});
 
 	it("generates role-specific high-entropy capabilities", () => {
