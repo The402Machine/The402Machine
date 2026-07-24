@@ -52,12 +52,14 @@ beforeAll(async () => {
 
 	databaseUrl = `postgresql://postgres:${password}@127.0.0.1:${port}/the402machine_test`;
 	await waitForPostgres();
-	sql = postgres(databaseUrl, { max: 4 });
+	sql = postgres(databaseUrl, { max: 1 });
 
-	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql"]) {
+	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
+	await sql.end();
+	sql = postgres(databaseUrl, { max: 4 });
 }, 60_000);
 
 afterAll(async () => {
@@ -167,6 +169,21 @@ describe("CATCH migration", () => {
 				403, 0, clock_timestamp() + interval '1 hour'
 			)
 		`).rejects.toMatchObject({ code: "23514" });
+	});
+
+
+	it("adds PULSE resources, the payment product, and bounded lifetime quotas", async () => {
+		expect((await sql`select version from schema_migrations where version = '0012_pulse'`)).toHaveLength(1);
+		expect((await sql<{ product: string }[]>`select unnest(enum_range(null::payment_product))::text as product`).map(({ product }) => product)).toContain("pulse");
+		const [resource] = await sql<{ id: string }[]>`
+			insert into pulse_resources (public_id, plan_id, owner_token_hash, ping_token_hash, heartbeat_limit, expected_interval_seconds, grace_seconds, expires_at)
+			values ('pulse_abcdefghijklmnopqrstuv', 'spark', ${"a".repeat(64)}, ${"b".repeat(64)}, 1202, 300, 600, clock_timestamp() + interval '4 days 2 hours') returning id
+		`;
+		expect(resource).toBeDefined();
+		expect((await sql<{ enabled: boolean }[]>`select public_status_enabled as enabled from pulse_resources where id = ${resource!.id}`)[0]?.enabled).toBe(false);
+		await expect(sql`update pulse_resources set heartbeat_count = 1203 where id = ${resource!.id}`).rejects.toMatchObject({ code: "23514" });
+		await expect(sql`update pulse_resources set status = 'expired' where id = ${resource!.id}`).rejects.toMatchObject({ code: "23514" });
+		await expect(sql`insert into payment_orders (idempotency_key, product, plan_id, amount_sats) values ('pulse-price', 'pulse', 'standard', 402)`).resolves.toBeDefined();
 	});
 
 	it("requires live and readable resources to retain both credentials", async () => {

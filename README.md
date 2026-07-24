@@ -31,13 +31,23 @@ An encrypted message with a fixed read allowance that disappears after its final
 
 The browser helper uses AES-256-GCM. The server receives ciphertext and a read credential, but not the AES key. Each successful retrieval atomically increments the read count; the final allowed read clears the ciphertext and credential. Standard and Long buyers can choose `X-Whisper-Read-Limit: 1` at purchase time to burn the server copy after the first successful read instead of using the full plan allowance.
 
+### PULSE
+
+A temporary heartbeat monitor for cron jobs, backups, agents, and small services. PULSE accepts authenticated `POST` heartbeats, stores only the aggregate count and latest successful timestamp, and renders a private dashboard with an optional public status page.
+
+- **Spark:** 4 days 2 hours, 1,202 lifetime heartbeats (about every 5 minutes if spread evenly) — **42 sats**.
+- **Standard:** 42 days, 61,402 lifetime heartbeats (about every minute) — **402 sats**.
+- **Long:** 402 days, 1,740,402 lifetime heartbeats (about every 20 seconds) — **4,002 sats**.
+
+The quota covers the whole purchased lifetime and may be used in bursts. PULSE ignores request bodies and never forwards requests, calls user URLs, executes code, or sends alerts. The public status page is disabled by default and can be enabled from the private owner dashboard.
+
 ## Product boundary
 
 The402Machine sells closed functions, never general computing capability. It will not offer arbitrary code, proxies, redirects, tunnels, mutable public APIs, configurable HTTP responses, or user-controlled outbound requests.
 
 ## Current status
 
-The public landing page and Lightning checkout are online. CATCH and WHISPER are implemented, including bounded ingestion, encrypted limited-read delivery, private access, transactional quotas, expiry cleanup, and PostgreSQL persistence. The first external CATCH purchase has been verified end to end.
+The public landing page and Lightning checkout are online. CATCH, WHISPER, and PULSE are implemented with bounded capabilities, transactional quotas, automatic expiry cleanup, private owner access, and PostgreSQL persistence. The first external CATCH purchase has been verified end to end.
 
 Current plan ladder:
 
@@ -45,7 +55,7 @@ Current plan ladder:
 - Standard: 402 sats
 - Long: 4,002 sats
 
-CATCH uses lifetimes of 4h 02m, 40d 02h, and 4 months + 2 days while scaling request, storage, and per-request payload quotas. WHISPER uses windows of 7, 42, and 402 days with read allowances of 1, 42, and 402. Every plan is client-encrypted and holds up to 4.02 MiB of ciphertext.
+CATCH uses lifetimes of 4h 02m, 40d 02h, and 4 months + 2 days while scaling request, storage, and per-request payload quotas. WHISPER uses windows of 7, 42, and 402 days with read allowances of 1, 42, and 402; every plan is client-encrypted and holds up to 4.02 MiB of ciphertext. PULSE uses windows of 4d 02h, 42 days, and 402 days with fixed lifetime quotas of 1,202, 61,402, and 1,740,402 heartbeats.
 
 ## CATCH guarantees
 

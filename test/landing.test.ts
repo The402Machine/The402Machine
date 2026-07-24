@@ -24,6 +24,14 @@ describe("public landing page", () => {
 		expect(response.body).toContain("4 months + 2 days");
 		expect(response.body).toContain("CATCH");
 		expect(response.body).toContain("WHISPER");
+		expect(response.body).toContain("PULSE");
+		expect(response.body).toContain("1,202 heartbeats");
+		expect(response.body).toContain("61,402 heartbeats");
+		expect(response.body).toContain("1,740,402 heartbeats");
+		expect(response.body).toContain("about every 5 minutes");
+		expect(response.body).toContain("about every minute");
+		expect(response.body).toContain("about every 20 seconds");
+		expect(response.body).toContain("The quota belongs to the full lifetime");
 		expect(response.body).toContain('<div class="plan-price"><strong>42</strong><span>SATS</span>');
 		expect(response.body).toContain('<div class="plan-price"><strong>402</strong><span>SATS</span>');
 		expect(response.body).toContain('<div class="plan-price"><strong>4,002</strong><span>SATS</span>');
@@ -52,14 +60,15 @@ describe("public landing page", () => {
 		expect(response.body).toContain("1 MiB");
 		expect(response.body).toContain("available cartridges");
 		expect(response.body).toContain("CHECKING LIGHTNING CHECKOUT");
-		expect(response.body).toContain("TWO CARTRIDGES LIVE");
+		expect(response.body).toContain("THREE SLOTS LIVE");
 		expect(response.body).toContain("Source-available");
 		expect(response.body).not.toContain("Open source");
 		expect(response.body).toContain('data-buy="catch"');
 		expect(response.body).toContain('data-buy="whisper"');
+		expect(response.body).toContain('data-buy="pulse"');
 		expect(response.body).toContain('data-plan="long"');
-		expect(response.body).toContain('href="/assets/styles.css?v=12"');
-		expect(response.body).toContain('src="/assets/checkout.js?v=17"');
+		expect(response.body).toContain('href="/assets/styles.css?v=14"');
+		expect(response.body).toContain('src="/assets/checkout.js?v=20"');
 		expect(response.body).toContain('href="#api"');
 		expect(response.body).toContain('id="api"');
 		expect(response.body).toContain("API / COMPLETE FLOW");
@@ -74,6 +83,19 @@ describe("public landing page", () => {
 		expect(response.body).toContain('id="checkout-wallet"');
 		expect(response.body).toContain('id="checkout-copy"');
 		expect(response.body).toContain('id="checkout-progress"');
+	});
+
+
+	it("serves a polished PULSE status surface without indexing private portals", async () => {
+		const app = buildApp(); apps.push(app);
+		const response = await app.inject({ method: "GET", url: "/pulse.html" });
+		expect(response.statusCode).toBe(200);
+		expect(response.body).toContain("PULSE STATUS");
+		expect(response.body).toContain('name="robots" content="noindex,nofollow,noarchive"');
+		expect(response.body).toContain('src="/assets/pulse-page.js?v=2"');
+		expect(response.body).toContain("CURRENT SIGNAL");
+		expect(response.body).toContain("Copy heartbeat URL");
+		expect(response.body).toContain("Copy public status link");
 	});
 
 	it("exposes the landing stylesheet", async () => {
@@ -166,6 +188,8 @@ describe("public landing page", () => {
 		expect(source).toContain('setPaymentStage("paid")');
 		expect(source).toContain("form.dataset.stage = stage");
 		expect(source).toContain("session !== checkoutSession || !dialog.open");
+		expect(source).toContain("quoteAttempt?.intent !== intent");
+		expect(source).toContain("quoteAttempt.idempotencyKey");
 		expect(source).toContain('dialog.addEventListener("cancel"');
 		expect(source).toContain("output.hidden = false");
 		expect(source).toContain("attempt < 205");

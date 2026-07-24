@@ -83,6 +83,17 @@ describe("public payment API", () => {
 		await app.close();
 	});
 
+	it("quotes PULSE as a fixed lifetime quota with no purchase payload", async () => {
+		const quote: PaymentQuote = { orderId: "order-pulse", product: "pulse", planId: "standard", amountSats: 402, bolt11: "lnbc402n1pulse", paymentHash: "9".repeat(64) };
+		const calls: unknown[] = [];
+		const app = buildApp({ payment: { quote: (input) => { calls.push(input); return Promise.resolve(quote); }, fulfill: () => Promise.resolve({ settled: false }) } });
+		const response = await app.inject({ method: "POST", url: "/api/payments/pulse", headers: { "idempotency-key": "idempotency-pulse-1", "content-type": "application/json" }, payload: { planId: "standard" } });
+		expect(response.statusCode).toBe(402);
+		expect(response.json()).toEqual(quote);
+		expect(calls).toEqual([{ idempotencyKey: "idempotency-pulse-1", product: "pulse", planId: "standard", productPayload: null }]);
+		await app.close();
+	});
+
 	it("does not expose credentials before payment and returns them after fulfillment", async () => {
 		const resource = { product: "catch" as const, resourceId: "resource-1", publicId: "catch_once", ownerToken: "owner-token", ingestToken: "ingest-token", expiresAt: new Date("2026-07-23T12:00:00.000Z") };
 		let settled = false;
@@ -124,6 +135,11 @@ describe("public payment API", () => {
 				{ planId: "spark", priceSats: 42, durationLabel: "7 days", readLimit: 1, maxCiphertextBytes: 4_215_276, available: true },
 				{ planId: "standard", priceSats: 402, durationLabel: "42 days", readLimit: 42, maxCiphertextBytes: 4_215_276, available: true },
 				{ planId: "long", priceSats: 4_002, durationLabel: "402 days", readLimit: 402, maxCiphertextBytes: 4_215_276, available: true },
+			] },
+			pulse: { plans: [
+				{ planId: "spark", priceSats: 42, durationLabel: "4d 02h", heartbeatLimit: 1_202, suggestedCadenceSeconds: 300, available: true },
+				{ planId: "standard", priceSats: 402, durationLabel: "42 days", heartbeatLimit: 61_402, suggestedCadenceSeconds: 60, available: true },
+				{ planId: "long", priceSats: 4_002, durationLabel: "402 days", heartbeatLimit: 1_740_402, suggestedCadenceSeconds: 20, available: true },
 			] },
 		} });
 		await app.close();

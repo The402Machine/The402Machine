@@ -3,6 +3,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import type { Sql, TransactionSql } from "postgres";
 
 import { CATCH_PLANS } from "../domain/catch-plans.js";
+import { PULSE_PLANS } from "../domain/pulse-plans.js";
 import { MAX_WHISPER_CIPHERTEXT_BYTES, WHISPER_PLANS } from "../domain/whisper-plans.js";
 import type { ProvisionInput } from "../storage/catch-repository.js";
 import { priceForProduct, type PaymentOrder, type PaymentOrderStatus, type PaymentProduct, type PurchasableCatchPlanId } from "./payment-domain.js";
@@ -25,15 +26,18 @@ type PaymentOrderRow = {
 
 type CatchDelivery = { product: "catch"; publicId: string; ownerToken: string; ingestToken: string; expiresAt: string };
 type WhisperDelivery = { product: "whisper"; publicId: string; readToken: string; expiresAt: string };
-type PaymentDelivery = CatchDelivery | WhisperDelivery;
+type PulseDelivery = { product: "pulse"; publicId: string; ownerToken: string; pingToken: string; expiresAt: string };
+type PaymentDelivery = CatchDelivery | WhisperDelivery | PulseDelivery;
 
 export type DispensedResource =
 	| { product: "catch"; resourceId: string; publicId: string; ownerToken: string; ingestToken: string; expiresAt: Date }
-	| { product: "whisper"; resourceId: string; publicId: string; readToken: string; expiresAt: Date };
+	| { product: "whisper"; resourceId: string; publicId: string; readToken: string; expiresAt: Date }
+	| { product: "pulse"; resourceId: string; publicId: string; ownerToken: string; pingToken: string; expiresAt: Date };
 
 export type AtomicCatchProvision = ProvisionInput & { product: "catch"; ownerToken: string; ingestToken: string };
 export type AtomicWhisperProvision = { product: "whisper"; publicId: string; planId: PurchasableCatchPlanId; readTokenHash: string; ciphertext: Buffer; readLimit: number; readToken: string; expiresAt: Date };
-export type AtomicProvision = AtomicCatchProvision | AtomicWhisperProvision;
+export type AtomicPulseProvision = { product: "pulse"; publicId: string; planId: PurchasableCatchPlanId; ownerTokenHash: string; pingTokenHash: string; heartbeatLimit: number; expectedIntervalSeconds: number; graceSeconds: number; ownerToken: string; pingToken: string; expiresAt: Date };
+export type AtomicProvision = AtomicCatchProvision | AtomicWhisperProvision | AtomicPulseProvision;
 
 export class PaymentRepository {
 	private readonly deliveryKey: Buffer;
@@ -42,11 +46,12 @@ export class PaymentRepository {
 
 	public async createOrder(input: { idempotencyKey: string; product?: PaymentProduct; planId: PurchasableCatchPlanId; productPayload?: Buffer | null; whisperReadLimit?: number | null }): Promise<PaymentOrder> {
 		const product = input.product ?? "catch";
-		const planAvailable = product === "catch" ? CATCH_PLANS[input.planId].available : WHISPER_PLANS[input.planId].available;
+		const planAvailable = product === "catch" ? CATCH_PLANS[input.planId].available : product === "whisper" ? WHISPER_PLANS[input.planId].available : PULSE_PLANS[input.planId].available;
 		if (!planAvailable) throw new Error("Plan is not available");
 		const productPayload = input.productPayload ?? null;
 		const whisperReadLimit = product === "whisper" ? input.whisperReadLimit ?? WHISPER_PLANS[input.planId].readLimit : null;
 		if (product === "catch" && productPayload !== null) throw new Error("CATCH orders cannot contain a product payload");
+		if (product === "pulse" && productPayload !== null) throw new Error("PULSE orders cannot contain a product payload");
 		if (product === "whisper" && (productPayload === null || productPayload.byteLength < 30 || productPayload.byteLength > MAX_WHISPER_CIPHERTEXT_BYTES)) throw new Error("WHISPER ciphertext is invalid");
 		if (product === "whisper" && whisperReadLimit !== 1 && whisperReadLimit !== WHISPER_PLANS[input.planId].readLimit) throw new Error("WHISPER read limit is invalid");
 		const rows = await this.sql<PaymentOrderRow[]>`
@@ -99,9 +104,10 @@ export class PaymentRepository {
 
 	public async getOrder(orderId: string): Promise<(PaymentOrder & { bolt11: string | null }) | null> {
 		const rows = await this.sql<(PaymentOrderRow & { bolt11: string | null })[]>`
-			select o.*, coalesce(c.public_id, w.public_id) as resource_public_id from payment_orders o
+			select o.*, coalesce(c.public_id, w.public_id, p.public_id) as resource_public_id from payment_orders o
 			left join catch_resources c on o.product = 'catch' and c.id = o.resource_id
 			left join whispers w on o.product = 'whisper' and w.id = o.resource_id
+			left join pulse_resources p on o.product = 'pulse' and p.id = o.resource_id
 			where o.id = ${orderId}
 		`;
 		const row = rows[0];
@@ -122,10 +128,12 @@ export class PaymentRepository {
 			if (row.status !== "paid") return null;
 			const input = await provision(mapOrder(row));
 			if (input.product !== row.product) throw new Error("Provisioned product does not match order");
-			const resourceId = input.product === "catch" ? await insertCatch(tx, input) : await insertWhisper(tx, input);
+			const resourceId = input.product === "catch" ? await insertCatch(tx, input) : input.product === "whisper" ? await insertWhisper(tx, input) : await insertPulse(tx, input);
 			const delivery: PaymentDelivery = input.product === "catch"
 				? { product: "catch", publicId: input.publicId, ownerToken: input.ownerToken, ingestToken: input.ingestToken, expiresAt: input.expiresAt.toISOString() }
-				: { product: "whisper", publicId: input.publicId, readToken: input.readToken, expiresAt: input.expiresAt.toISOString() };
+				: input.product === "whisper"
+					? { product: "whisper", publicId: input.publicId, readToken: input.readToken, expiresAt: input.expiresAt.toISOString() }
+					: { product: "pulse", publicId: input.publicId, ownerToken: input.ownerToken, pingToken: input.pingToken, expiresAt: input.expiresAt.toISOString() };
 			const encryptedDelivery = encryptDelivery(delivery, this.deliveryKey);
 			await tx`update payment_orders set status = 'dispensed', resource_id = ${resourceId}, delivery_ciphertext = ${encryptedDelivery}, product_payload = null, dispensed_at = clock_timestamp(), updated_at = clock_timestamp() where id = ${orderId} and status = 'paid'`;
 			return deliveryResource(resourceId, delivery);
@@ -151,6 +159,15 @@ async function insertWhisper(tx: TransactionSql, input: AtomicWhisperProvision):
 	return rows[0].id;
 }
 
+async function insertPulse(tx: TransactionSql, input: AtomicPulseProvision): Promise<string> {
+	const rows = await tx<{ id: string }[]>`
+		insert into pulse_resources (public_id, plan_id, owner_token_hash, ping_token_hash, heartbeat_limit, expected_interval_seconds, grace_seconds, expires_at)
+		values (${input.publicId}, ${input.planId}, ${input.ownerTokenHash}, ${input.pingTokenHash}, ${input.heartbeatLimit}, ${input.expectedIntervalSeconds}, ${input.graceSeconds}, ${input.expiresAt}) returning id
+	`;
+	if (rows[0] === undefined) throw new Error("PULSE payment provisioning returned no resource");
+	return rows[0].id;
+}
+
 function mapOrder(row: PaymentOrderRow): PaymentOrder {
 	return { id: row.id, idempotencyKey: row.idempotency_key, product: row.product, planId: row.plan_id, productPayload: row.product_payload, whisperReadLimit: row.whisper_read_limit, amountSats: row.amount_sats, status: row.status, paymentHash: row.payment_hash, resourcePublicId: row.resource_public_id, createdAt: row.created_at, paidAt: row.paid_at, dispensedAt: row.dispensed_at };
 }
@@ -159,5 +176,5 @@ function buffersEqual(left: Buffer | null, right: Buffer | null): boolean { retu
 function decodeDeliveryKey(value: string): Buffer { const key = Buffer.from(value, "base64url"); if (key.byteLength !== 32) throw new Error("PAYMENT_DELIVERY_KEY must contain 32 base64url-encoded bytes"); return key; }
 function encryptDelivery(delivery: PaymentDelivery, key: Buffer): Buffer { const nonce = randomBytes(12); const cipher = createCipheriv("aes-256-gcm", key, nonce); const ciphertext = Buffer.concat([cipher.update(JSON.stringify(delivery), "utf8"), cipher.final()]); return Buffer.concat([nonce, cipher.getAuthTag(), ciphertext]); }
 function decryptDelivery(payload: Buffer, key: Buffer): PaymentDelivery { if (payload.byteLength < 29) throw new Error("Stored payment delivery is invalid"); const decipher = createDecipheriv("aes-256-gcm", key, payload.subarray(0, 12)); decipher.setAuthTag(payload.subarray(12, 28)); const parsed: unknown = JSON.parse(Buffer.concat([decipher.update(payload.subarray(28)), decipher.final()]).toString("utf8")); if (!isPaymentDelivery(parsed)) throw new Error("Stored payment delivery is invalid"); return parsed; }
-function isPaymentDelivery(value: unknown): value is PaymentDelivery { if (typeof value !== "object" || value === null) return false; const d = value as Record<string, unknown>; return d.product === "catch" ? typeof d.publicId === "string" && typeof d.ownerToken === "string" && typeof d.ingestToken === "string" && typeof d.expiresAt === "string" : d.product === "whisper" && typeof d.publicId === "string" && typeof d.readToken === "string" && typeof d.expiresAt === "string"; }
-function deliveryResource(resourceId: string, delivery: PaymentDelivery): DispensedResource { return delivery.product === "catch" ? { product: "catch", resourceId, publicId: delivery.publicId, ownerToken: delivery.ownerToken, ingestToken: delivery.ingestToken, expiresAt: new Date(delivery.expiresAt) } : { product: "whisper", resourceId, publicId: delivery.publicId, readToken: delivery.readToken, expiresAt: new Date(delivery.expiresAt) }; }
+function isPaymentDelivery(value: unknown): value is PaymentDelivery { if (typeof value !== "object" || value === null) return false; const d = value as Record<string, unknown>; if (d.product === "catch") return typeof d.publicId === "string" && typeof d.ownerToken === "string" && typeof d.ingestToken === "string" && typeof d.expiresAt === "string"; if (d.product === "whisper") return typeof d.publicId === "string" && typeof d.readToken === "string" && typeof d.expiresAt === "string"; return d.product === "pulse" && typeof d.publicId === "string" && typeof d.ownerToken === "string" && typeof d.pingToken === "string" && typeof d.expiresAt === "string"; }
+function deliveryResource(resourceId: string, delivery: PaymentDelivery): DispensedResource { if (delivery.product === "catch") return { product: "catch", resourceId, publicId: delivery.publicId, ownerToken: delivery.ownerToken, ingestToken: delivery.ingestToken, expiresAt: new Date(delivery.expiresAt) }; if (delivery.product === "whisper") return { product: "whisper", resourceId, publicId: delivery.publicId, readToken: delivery.readToken, expiresAt: new Date(delivery.expiresAt) }; return { product: "pulse", resourceId, publicId: delivery.publicId, ownerToken: delivery.ownerToken, pingToken: delivery.pingToken, expiresAt: new Date(delivery.expiresAt) }; }

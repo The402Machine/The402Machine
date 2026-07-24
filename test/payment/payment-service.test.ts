@@ -41,9 +41,9 @@ class FakeOrderStore implements PaymentOrderStore {
 		if (order.status !== "paid") return Promise.resolve(null);
 		return provision(order).then((resource) => {
 			Object.assign(order, { status: "dispensed", resourcePublicId: resource.publicId });
-			return resource.product === "catch"
-				? { product: "catch", resourceId: "resource-1", publicId: resource.publicId, ownerToken: resource.ownerToken, ingestToken: resource.ingestToken, expiresAt: resource.expiresAt }
-				: { product: "whisper", resourceId: "resource-1", publicId: resource.publicId, readToken: resource.readToken, expiresAt: resource.expiresAt };
+			if (resource.product === "catch") return { product: "catch", resourceId: "resource-1", publicId: resource.publicId, ownerToken: resource.ownerToken, ingestToken: resource.ingestToken, expiresAt: resource.expiresAt };
+			if (resource.product === "whisper") return { product: "whisper", resourceId: "resource-1", publicId: resource.publicId, readToken: resource.readToken, expiresAt: resource.expiresAt };
+			return { product: "pulse", resourceId: "resource-1", publicId: resource.publicId, ownerToken: resource.ownerToken, pingToken: resource.pingToken, expiresAt: resource.expiresAt };
 		});
 	}
 }

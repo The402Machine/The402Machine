@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta name="robots" content="noindex,nofollow,noarchive" />
+	<meta name="theme-color" content="#080a08" />
+	<title>PULSE status — The402Machine</title>
+	<link rel="stylesheet" href="/assets/styles.css?v=14" />
+</head>
+<body class="portal-body pulse-body">
+	<div class="noise" aria-hidden="true"></div>
+	<header class="topbar portal-topbar"><a class="brand" href="/"><span class="brand-mark">402</span><span>PULSE STATUS</span></a><span id="pulse-connection" class="portal-connection">CONNECTING</span></header>
+	<main class="shell portal-shell">
+		<section id="pulse-error" class="portal-error" hidden><p class="eyebrow">PULSE / PRIVATE CAPABILITY</p><h2>Open a valid PULSE link.</h2><p>This page expects the private owner capability or a public status identifier.</p></section>
+		<section id="pulse-dashboard" hidden>
+			<header class="pulse-hero">
+				<div><p class="eyebrow">LIVE HEARTBEAT MONITOR</p><h1 id="pulse-name">Untitled monitor</h1><p id="pulse-description" class="lede">Waiting for status…</p></div>
+				<div id="pulse-state" class="pulse-state" data-state="waiting"><i></i><span>WAITING</span></div>
+			</header>
+			<section class="pulse-overview">
+				<article><small>LAST HEARTBEAT</small><strong id="pulse-last">Never</strong><span id="pulse-last-relative">Waiting for the first ping</span></article>
+				<article><small>NEXT EXPECTED</small><strong id="pulse-next">—</strong><span id="pulse-schedule">Schedule unavailable</span></article>
+				<article><small>TIME REMAINING</small><strong id="pulse-expiry">—</strong><span>Automatic hard stop</span></article>
+			</section>
+			<section class="pulse-history-card"><header><div><p class="eyebrow">CURRENT SIGNAL</p><h2>Latest observation</h2></div><span>LIVE VIEW</span></header><div id="pulse-timeline" class="pulse-timeline"><i></i></div><p id="pulse-history-copy">PULSE stores only the latest successful heartbeat timestamp and an aggregate counter — not request bodies or a detailed event log.</p></section>
+			<section id="pulse-owner" class="pulse-owner" hidden>
+				<article class="pulse-capability"><p class="eyebrow">HEARTBEAT CAPABILITY</p><h2>Wire your job.</h2><input id="pulse-heartbeat-url" readonly /><div class="reader-actions"><button id="pulse-copy-url" class="button primary">Copy heartbeat URL</button><button id="pulse-copy-curl" class="button ghost">Copy curl command</button></div><p>Send an authenticated POST. Bodies are ignored and never stored. The purchased quota can be spent at any pace during the lifetime.</p><label><span>Public status page</span><input id="pulse-public-url" readonly /></label><button id="pulse-copy-public" class="button ghost">Copy public status link</button></article>
+				<form id="pulse-settings" class="pulse-settings"><p class="eyebrow">STATUS PAGE SETTINGS</p><label><span>Name</span><input id="pulse-name-input" maxlength="80" required /></label><label><span>Description</span><textarea id="pulse-description-input" maxlength="240" rows="3"></textarea></label><div class="pulse-form-grid"><label><span>Expected every (seconds)</span><input id="pulse-interval-input" type="number" required /></label><label><span>Late grace (seconds)</span><input id="pulse-grace-input" type="number" required /></label></div><label class="pulse-toggle"><input id="pulse-public-input" type="checkbox" /><span>Public status page enabled</span></label><button class="button primary" type="submit">Save status page</button><p id="pulse-settings-status" role="status"></p></form>
+				<section class="portal-danger"><div><p class="eyebrow">DESTRUCTIVE ACTION</p><h2>Destroy PULSE.</h2><p>Erases both capabilities immediately. This cannot be undone.</p></div><button id="pulse-destroy" class="button danger">Destroy monitor</button></section>
+			</section>
+		</section>
+	</main>
+	<footer class="footer shell"><span>THE402MACHINE.COM</span><span>FIXED QUOTA / VISIBLE FUSE</span><span>© 2026</span></footer>
+	<script type="module" src="/assets/pulse-page.js?v=2"></script>
+</body>
+</html>

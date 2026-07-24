@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
 	CATCH_PRICES_SATS,
+	PULSE_PRICES_SATS,
 	WHISPER_PRICES_SATS,
 	attachPaymentOrderInvoice,
 	createPaymentOrder,
@@ -24,6 +25,7 @@ describe("payment domain", () => {
 	it("uses the 42 / 402 / 4002 sats cartridge ladder for both products", () => {
 		expect(CATCH_PRICES_SATS).toEqual({ spark: 42, standard: 402, long: 4_002 });
 		expect(WHISPER_PRICES_SATS).toEqual({ spark: 42, standard: 402, long: 4_002 });
+		expect(PULSE_PRICES_SATS).toEqual({ spark: 42, standard: 402, long: 4_002 });
 	});
 
 	it("creates an unpaid order without granting a resource", () => {

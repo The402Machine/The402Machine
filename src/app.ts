@@ -6,10 +6,13 @@ import fastifyStatic from "@fastify/static";
 import Fastify, { LogController, type FastifyInstance, type FastifyRequest } from "fastify";
 
 import { calculatePlanExpiry, CATCH_PLANS } from "./domain/catch-plans.js";
+import { PULSE_PLANS, validPulseSchedule } from "./domain/pulse-plans.js";
 import { calculateWhisperExpiry, MAX_WHISPER_CIPHERTEXT_BYTES, WHISPER_PLANS } from "./domain/whisper-plans.js";
-import { CATCH_PRICES_SATS, WHISPER_PRICES_SATS } from "./payment/payment-domain.js";
+import { CATCH_PRICES_SATS, PULSE_PRICES_SATS, WHISPER_PRICES_SATS } from "./payment/payment-domain.js";
 import type { DispensedResource } from "./payment/payment-repository.js";
 import type { PaymentQuote } from "./payment/payment-service.js";
+import type { AcceptPulseResult, PulseResource, PulseSettings } from "./pulse/pulse-repository.js";
+import { verifyPulseToken } from "./security/pulse-tokens.js";
 import { generateIngestToken, generateOwnerToken, hashToken, verifyToken } from "./security/tokens.js";
 import type { AcceptEventInput, AcceptEventResult, CatchCredentialHashes, CatchEvent, CatchEventListOptions, CatchEventPage, CatchIpLocation, CatchResource, ProvisionInput } from "./storage/catch-repository.js";
 import type { CreateWhisperInput } from "./whisper/whisper-repository.js";
@@ -38,6 +41,14 @@ export interface WhisperApiRepository {
 	consume(publicId: string): Promise<Buffer | null>;
 }
 
+export interface PulseApiRepository {
+	getResource(publicId: string): Promise<PulseResource | null>;
+	getCredentialHashes(publicId: string): Promise<{ ownerTokenHash: string | null; pingTokenHash: string | null } | null>;
+	acceptHeartbeat(publicId: string): Promise<AcceptPulseResult>;
+	updateSettings(publicId: string, settings: PulseSettings): Promise<PulseResource | null>;
+	destroy(publicId: string): Promise<boolean>;
+}
+
 type CatchAppOptions = {
 	repository: CatchApiRepository;
 	tokenPepper: string;
@@ -53,8 +64,10 @@ type WhisperAppOptions = {
 	provisioningSecret?: string;
 };
 
+type PulseAppOptions = { repository: PulseApiRepository; tokenPepper: string };
+
 type PaymentAppOptions = {
-	quote(input: { idempotencyKey: string; product: "catch" | "whisper"; planId: "spark" | "standard" | "long"; productPayload: Buffer | null; whisperReadLimit?: number | null }): Promise<PaymentQuote>;
+	quote(input: { idempotencyKey: string; product: "catch" | "whisper" | "pulse"; planId: "spark" | "standard" | "long"; productPayload: Buffer | null; whisperReadLimit?: number | null }): Promise<PaymentQuote>;
 	fulfill(orderId: string): Promise<{ settled: false } | { settled: true; resource: DispensedResource }>;
 };
 
@@ -63,6 +76,7 @@ type BuildAppOptions = {
 	trustedProxy?: string;
 	catch?: CatchAppOptions;
 	whisper?: WhisperAppOptions;
+	pulse?: PulseAppOptions;
 	payment?: PaymentAppOptions;
 };
 
@@ -90,6 +104,7 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
 
 	if (options.catch !== undefined) registerCatchRoutes(app, options.catch);
 	if (options.whisper !== undefined) registerWhisperRoutes(app, options.whisper);
+	if (options.pulse !== undefined) registerPulseRoutes(app, options.pulse);
 	if (options.payment !== undefined) registerPaymentRoutes(app, options.payment);
 	return app;
 };
@@ -121,13 +136,25 @@ function registerPaymentRoutes(app: FastifyInstance, payment: PaymentAppOptions)
 		return reply.header("Cache-Control", "no-store").code(402).send(quote);
 	});
 
+	app.post<{ Body: { planId?: unknown } }>("/api/payments/pulse", async (request, reply) => {
+		if (!consumeRateLimit(quoteRateLimits, request.ip, 10, 60_000)) return rateLimited(reply);
+		const idempotencyKey = request.headers["idempotency-key"];
+		const planId = Buffer.isBuffer(request.body) ? parsePaymentPlan(request.body) : request.body?.planId;
+		if (typeof idempotencyKey !== "string" || idempotencyKey.length < 8 || idempotencyKey.length > 128) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid idempotency key" });
+		if (!isPlanId(planId) || !PULSE_PLANS[planId].available) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid plan" });
+		const quote = await payment.quote({ idempotencyKey, product: "pulse", planId, productPayload: null });
+		return reply.header("Cache-Control", "no-store").code(402).send(quote);
+	});
+
 	app.get<{ Params: { orderId: string } }>("/api/payments/:orderId", async (request, reply) => {
 		if (!consumeRateLimit(verificationRateLimits, request.ip, 30, 60_000)) return rateLimited(reply);
 		const result = await payment.fulfill(request.params.orderId);
 		if (!result.settled) return reply.header("Cache-Control", "no-store").code(402).send(result);
 		const resource = result.resource.product === "catch"
 			? { product: "catch", publicId: result.resource.publicId, ownerToken: result.resource.ownerToken, ingestToken: result.resource.ingestToken, expiresAt: result.resource.expiresAt.toISOString() }
-			: { product: "whisper", publicId: result.resource.publicId, readToken: result.resource.readToken, expiresAt: result.resource.expiresAt.toISOString() };
+			: result.resource.product === "whisper"
+				? { product: "whisper", publicId: result.resource.publicId, readToken: result.resource.readToken, expiresAt: result.resource.expiresAt.toISOString() }
+				: { product: "pulse", publicId: result.resource.publicId, ownerToken: result.resource.ownerToken, pingToken: result.resource.pingToken, expiresAt: result.resource.expiresAt.toISOString() };
 		return reply.header("Cache-Control", "no-store").send({ settled: true, resource });
 	});
 
@@ -156,6 +183,14 @@ function paymentCatalogue() {
 					whisperPlan("long", "402 days", "Long-term dead drop"),
 				],
 			},
+			pulse: {
+				description: "Temporary heartbeat monitor with a fixed lifetime quota, private owner portal, and optional public status page.",
+				plans: [
+					pulsePlan("spark", "4d 02h", "Short jobs and compact experiments"),
+					pulsePlan("standard", "42 days", "Production cron jobs and automations"),
+					pulsePlan("long", "402 days", "Long-running infrastructure"),
+				],
+			},
 		},
 	};
 }
@@ -168,6 +203,11 @@ function catchPlan(planId: "spark" | "standard" | "long", durationLabel: string,
 function whisperPlan(planId: "spark" | "standard" | "long", durationLabel: string, bestFor: string) {
 	const plan = WHISPER_PLANS[planId];
 	return { planId, priceSats: WHISPER_PRICES_SATS[planId], durationLabel, bestFor, readLimit: plan.readLimit, maxCiphertextBytes: plan.maxCiphertextBytes, available: plan.available };
+}
+
+function pulsePlan(planId: "spark" | "standard" | "long", durationLabel: string, bestFor: string) {
+	const plan = PULSE_PLANS[planId];
+	return { planId, priceSats: PULSE_PRICES_SATS[planId], durationLabel, bestFor, heartbeatLimit: plan.heartbeatLimit, suggestedCadenceSeconds: plan.suggestedCadenceSeconds, minimumGraceSeconds: plan.minimumGraceSeconds, available: plan.available };
 }
 
 function parsePaymentPlan(body: Buffer): unknown {
@@ -215,6 +255,61 @@ function registerWhisperRoutes(app: FastifyInstance, options: WhisperAppOptions)
 		return reply.header("Cache-Control", "no-store").type("application/octet-stream").send(ciphertext);
 	});
 }
+
+function registerPulseRoutes(app: FastifyInstance, options: PulseAppOptions): void {
+	const heartbeatRateLimits = new Map<string, RateLimitBucket>();
+	const ownerRateLimits = new Map<string, RateLimitBucket>();
+	app.post<{ Params: { publicId: string } }>("/p/:publicId", async (request, reply) => {
+		if (!consumeRateLimit(heartbeatRateLimits, `${request.ip}:${request.params.publicId}`, 120, 60_000)) return rateLimited(reply);
+		const credentials = await options.repository.getCredentialHashes(request.params.publicId);
+		if (credentials?.pingTokenHash === null || credentials === null || !verifyPulseToken("ping", bearerToken(request) ?? "", credentials.pingTokenHash, options.tokenPepper)) return reply.header("Cache-Control", "no-store").code(404).send({ error: "not found" });
+		const result = await options.repository.acceptHeartbeat(request.params.publicId);
+		return result.accepted ? reply.header("Cache-Control", "no-store").code(204).send() : reply.header("Cache-Control", "no-store").code(404).send({ error: "not found" });
+	});
+	app.get<{ Params: { publicId: string } }>("/api/pulse/:publicId/public", async (request, reply) => {
+		const resource = await options.repository.getResource(request.params.publicId);
+		if (resource === null || !resource.publicStatusEnabled || resource.status === "manually_destroyed") return reply.header("Cache-Control", "public, max-age=15").code(404).send({ error: "not found" });
+		return reply.header("Cache-Control", "public, max-age=15").send(publicPulseStatus(resource));
+	});
+	app.get<{ Params: { publicId: string } }>("/api/pulse/:publicId", async (request, reply) => {
+		if (!consumeRateLimit(ownerRateLimits, request.ip, 30, 60_000)) return rateLimited(reply);
+		if (!await authorizePulseOwner(request, options)) return unauthorized(reply);
+		const resource = await options.repository.getResource(request.params.publicId);
+		return resource === null ? reply.header("Cache-Control", "no-store").code(404).send({ error: "not found" }) : reply.header("Cache-Control", "no-store").send(ownerPulseStatus(resource));
+	});
+	app.patch<{ Params: { publicId: string }; Body: Partial<PulseSettings> }>("/api/pulse/:publicId", async (request, reply) => {
+		if (!consumeRateLimit(ownerRateLimits, request.ip, 30, 60_000)) return rateLimited(reply);
+		if (!await authorizePulseOwner(request, options)) return unauthorized(reply);
+		const current = await options.repository.getResource(request.params.publicId);
+		if (current === null) return reply.header("Cache-Control", "no-store").code(404).send({ error: "not found" });
+		const settings = parsePulseSettings(request.body, current.planId);
+		if (settings === null) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid settings" });
+		const updated = await options.repository.updateSettings(request.params.publicId, settings);
+		return updated === null ? reply.header("Cache-Control", "no-store").code(404).send({ error: "not found" }) : reply.header("Cache-Control", "no-store").send(ownerPulseStatus(updated));
+	});
+	app.delete<{ Params: { publicId: string } }>("/api/pulse/:publicId", async (request, reply) => {
+		if (!consumeRateLimit(ownerRateLimits, request.ip, 30, 60_000)) return rateLimited(reply);
+		if (!await authorizePulseOwner(request, options)) return unauthorized(reply);
+		return await options.repository.destroy(request.params.publicId) ? reply.header("Cache-Control", "no-store").code(204).send() : reply.header("Cache-Control", "no-store").code(404).send({ error: "not found" });
+	});
+}
+
+async function authorizePulseOwner(request: FastifyRequest<{ Params: { publicId: string } }>, options: PulseAppOptions): Promise<boolean> {
+	const credentials = await options.repository.getCredentialHashes(request.params.publicId);
+	return credentials?.ownerTokenHash !== null && credentials !== null && verifyPulseToken("owner", bearerToken(request) ?? "", credentials.ownerTokenHash, options.tokenPepper);
+}
+function parsePulseSettings(body: Partial<PulseSettings> | undefined, planId: "spark" | "standard" | "long"): PulseSettings | null {
+	if (body === undefined || typeof body.name !== "string" || body.name.trim().length < 1 || body.name.trim().length > 80 || typeof body.description !== "string" || body.description.length > 240 || typeof body.publicStatusEnabled !== "boolean" || typeof body.expectedIntervalSeconds !== "number" || typeof body.graceSeconds !== "number" || !validPulseSchedule(planId, body.expectedIntervalSeconds, body.graceSeconds)) return null;
+	return { name: body.name.trim(), description: body.description.trim(), expectedIntervalSeconds: body.expectedIntervalSeconds, graceSeconds: body.graceSeconds, publicStatusEnabled: body.publicStatusEnabled };
+}
+function pulseState(resource: PulseResource): "waiting" | "operational" | "late" | "exhausted" | "expired" {
+	if (resource.status === "exhausted") return "exhausted";
+	if (resource.status === "expired" || resource.status === "manually_destroyed" || Date.now() >= resource.expiresAt.getTime()) return "expired";
+	if (resource.lastPingAt === null) return "waiting";
+	return Date.now() > resource.lastPingAt.getTime() + resource.expectedIntervalSeconds * 1_000 + resource.graceSeconds * 1_000 ? "late" : "operational";
+}
+function publicPulseStatus(resource: PulseResource): object { return { name: resource.name, description: resource.description, state: pulseState(resource), lastPingAt: resource.lastPingAt?.toISOString() ?? null, expectedIntervalSeconds: resource.expectedIntervalSeconds, graceSeconds: resource.graceSeconds, expiresAt: resource.expiresAt.toISOString() }; }
+function ownerPulseStatus(resource: PulseResource): object { return { publicId: resource.publicId, planId: resource.planId, status: resource.status, state: pulseState(resource), heartbeatLimit: resource.heartbeatLimit, heartbeatCount: resource.heartbeatCount, expectedIntervalSeconds: resource.expectedIntervalSeconds, graceSeconds: resource.graceSeconds, name: resource.name, description: resource.description, publicStatusEnabled: resource.publicStatusEnabled, lastPingAt: resource.lastPingAt?.toISOString() ?? null, createdAt: resource.createdAt.toISOString(), expiresAt: resource.expiresAt.toISOString() }; }
 
 function registerCatchRoutes(app: FastifyInstance, options: CatchAppOptions): void {
 	const ingestionRateLimits = new Map<string, RateLimitBucket>();

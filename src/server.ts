@@ -5,11 +5,14 @@ import postgres from "postgres";
 import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import { calculatePlanExpiry, CATCH_PLANS } from "./domain/catch-plans.js";
+import { calculatePulseExpiry, PULSE_PLANS } from "./domain/pulse-plans.js";
 import { calculateWhisperExpiry } from "./domain/whisper-plans.js";
 import { lookupIpLocally } from "./ip-location.js";
 import { LnbitsPaymentAdapter } from "./payment/lnbits-adapter.js";
 import { PaymentRepository } from "./payment/payment-repository.js";
 import { PaymentService } from "./payment/payment-service.js";
+import { PulseRepository } from "./pulse/pulse-repository.js";
+import { generatePulseToken, hashPulseToken } from "./security/pulse-tokens.js";
 import { generateIngestToken, generateOwnerToken, hashToken } from "./security/tokens.js";
 import { CatchRepository } from "./storage/catch-repository.js";
 import { WhisperRepository } from "./whisper/whisper-repository.js";
@@ -18,6 +21,7 @@ const config = loadConfig();
 const database = config.catch.databaseUrl === undefined ? undefined : postgres(config.catch.databaseUrl);
 const catchRepository = database === undefined ? undefined : new CatchRepository(database);
 const whisperRepository = database === undefined ? undefined : new WhisperRepository(database);
+const pulseRepository = database === undefined ? undefined : new PulseRepository(database);
 const catchOptions = catchRepository === undefined || config.catch.tokenPepper === undefined
 	? undefined
 	: {
@@ -36,6 +40,7 @@ const whisperOptions = whisperRepository === undefined || config.catch.tokenPepp
 		provisioningEnabled: config.catch.internalProvisioning,
 		...(config.catch.provisioningSecret === undefined ? {} : { provisioningSecret: config.catch.provisioningSecret }),
 	};
+const pulseOptions = pulseRepository === undefined || config.catch.tokenPepper === undefined ? undefined : { repository: pulseRepository, tokenPepper: config.catch.tokenPepper };
 const paymentService = database === undefined || config.payment.provider !== "lnbits" || config.payment.apiUrl === undefined || config.payment.apiKey === undefined || config.payment.deliveryKey === undefined || config.catch.tokenPepper === undefined
 	? undefined
 	: new PaymentService(
@@ -57,6 +62,15 @@ const paymentService = database === undefined || config.payment.provider !== "ln
 					readToken,
 					expiresAt: calculateWhisperExpiry(order.planId, new Date()),
 				});
+			}
+			if (order.product === "pulse") {
+				const pulsePlan = PULSE_PLANS[order.planId];
+				const ownerToken = generatePulseToken("owner");
+				const pingToken = generatePulseToken("ping");
+				return Promise.resolve({ product: "pulse" as const, publicId: `pulse_${randomBytes(24).toString("base64url")}`, planId: order.planId,
+					ownerTokenHash: hashPulseToken("owner", ownerToken, config.catch.tokenPepper!), pingTokenHash: hashPulseToken("ping", pingToken, config.catch.tokenPepper!),
+					heartbeatLimit: pulsePlan.heartbeatLimit, expectedIntervalSeconds: pulsePlan.suggestedCadenceSeconds, graceSeconds: pulsePlan.minimumGraceSeconds,
+					ownerToken, pingToken, expiresAt: calculatePulseExpiry(order.planId, new Date()) });
 			}
 			const ownerToken = generateOwnerToken();
 			const ingestToken = generateIngestToken();
@@ -82,6 +96,7 @@ const app = buildApp({
 	...(config.trustedProxy === undefined ? {} : { trustedProxy: config.trustedProxy }),
 	...(catchOptions === undefined ? {} : { catch: catchOptions }),
 	...(whisperOptions === undefined ? {} : { whisper: whisperOptions }),
+	...(pulseOptions === undefined ? {} : { pulse: pulseOptions }),
 	...(paymentService === undefined ? {} : { payment: paymentService }),
 });
 

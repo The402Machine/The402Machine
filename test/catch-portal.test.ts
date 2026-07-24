@@ -19,7 +19,7 @@ describe("CATCH owner portal", () => {
 
 		expect(response.statusCode).toBe(200);
 		expect(response.body).toContain("Your CATCH<br /><em>portal.</em>");
-		expect(response.body).toContain('href="/assets/styles.css?v=12"');
+		expect(response.body).toContain('href="/assets/styles.css?v=14"');
 		expect(response.body).toContain('src="/assets/catch-portal.js?v=3"');
 		expect(response.body).toContain('id="portal-import"');
 		expect(response.body).toContain('id="portal-import-submit"');

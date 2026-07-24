@@ -8,6 +8,7 @@ describe("public API documentation", () => {
 		for (const contract of [
 			"POST /api/payments/catch",
 			"POST /api/payments/whisper",
+			"POST /api/payments/pulse",
 			"GET /api/payments/{orderId}",
 			"GET /api/catalog",
 			"POST|PUT|PATCH|DELETE|GET|HEAD|OPTIONS /c/{publicId}",
@@ -26,6 +27,10 @@ describe("public API documentation", () => {
 			"AES-256-GCM",
 			"X-Whisper-Plan",
 			"X-Whisper-Read-Limit: 1",
+			"POST /p/{publicId}",
+			"GET /api/pulse/{publicId}",
+			"PATCH /api/pulse/{publicId}",
+			"DELETE /api/pulse/{publicId}",
 		]) expect(html).toContain(contract);
 		expect(html).toContain("accepted with or without the ingest token");
 		expect(html).toContain("locally resolved approximate IP location");

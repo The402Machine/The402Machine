@@ -28,8 +28,9 @@ const invoice = document.querySelector("#checkout-invoice");
 const deliveryActions = document.querySelector("#checkout-delivery-actions");
 const portalLink = document.querySelector("#checkout-portal");
 const copyPortalButton = document.querySelector("#checkout-copy-portal");
+const portalNote = document.querySelector("#checkout-portal-note");
 
-if (!(dialog instanceof HTMLDialogElement) || !(form instanceof HTMLFormElement) || !(title instanceof HTMLElement) || !(intro instanceof HTMLElement) || !(planChoices instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(noteField instanceof HTMLElement) || !(note instanceof HTMLTextAreaElement) || !(burnField instanceof HTMLElement) || !(burnAfterRead instanceof HTMLInputElement) || !(status instanceof HTMLElement) || !(output instanceof HTMLTextAreaElement) || !(closeButton instanceof HTMLButtonElement) || !(submitButton instanceof HTMLButtonElement) || !(indicator instanceof HTMLElement) || !(paymentPanel instanceof HTMLElement) || !(progress instanceof HTMLElement) || !(qr instanceof HTMLElement) || !(amount instanceof HTMLElement) || !(walletLink instanceof HTMLAnchorElement) || !(webLnButton instanceof HTMLButtonElement) || !(copyButton instanceof HTMLButtonElement) || !(invoice instanceof HTMLTextAreaElement) || !(deliveryActions instanceof HTMLElement) || !(portalLink instanceof HTMLAnchorElement) || !(copyPortalButton instanceof HTMLButtonElement)) throw new Error("Checkout is incomplete");
+if (!(dialog instanceof HTMLDialogElement) || !(form instanceof HTMLFormElement) || !(title instanceof HTMLElement) || !(intro instanceof HTMLElement) || !(planChoices instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(noteField instanceof HTMLElement) || !(note instanceof HTMLTextAreaElement) || !(burnField instanceof HTMLElement) || !(burnAfterRead instanceof HTMLInputElement) || !(status instanceof HTMLElement) || !(output instanceof HTMLTextAreaElement) || !(closeButton instanceof HTMLButtonElement) || !(submitButton instanceof HTMLButtonElement) || !(indicator instanceof HTMLElement) || !(paymentPanel instanceof HTMLElement) || !(progress instanceof HTMLElement) || !(qr instanceof HTMLElement) || !(amount instanceof HTMLElement) || !(walletLink instanceof HTMLAnchorElement) || !(webLnButton instanceof HTMLButtonElement) || !(copyButton instanceof HTMLButtonElement) || !(invoice instanceof HTMLTextAreaElement) || !(deliveryActions instanceof HTMLElement) || !(portalLink instanceof HTMLAnchorElement) || !(copyPortalButton instanceof HTMLButtonElement) || !(portalNote instanceof HTMLElement)) throw new Error("Checkout is incomplete");
 
 let catalog = null;
 let product = "catch";
@@ -39,6 +40,7 @@ let currentInvoice = "";
 let currentPortalUrl = "";
 let checkoutSession = 0;
 let deliveryDispensed = false;
+let quoteAttempt = null;
 
 void configureCheckout();
 
@@ -67,12 +69,12 @@ function disableCheckout() {
 }
 
 function isCatalog(value) {
-	return value?.products?.catch?.plans instanceof Array && value?.products?.whisper?.plans instanceof Array;
+	return value?.products?.catch?.plans instanceof Array && value?.products?.whisper?.plans instanceof Array && value?.products?.pulse?.plans instanceof Array;
 }
 
 document.querySelectorAll("[data-buy]").forEach((button) => button.addEventListener("click", () => {
 	if (!(button instanceof HTMLButtonElement) || catalog === null) return;
-	product = button.dataset.buy === "whisper" ? "whisper" : "catch";
+	product = button.dataset.buy === "whisper" ? "whisper" : button.dataset.buy === "pulse" ? "pulse" : "catch";
 	selectedPlanId = isPlanId(button.dataset.plan) ? button.dataset.plan : "standard";
 	openCheckout();
 }));
@@ -81,9 +83,9 @@ function openCheckout() {
 	checkoutSession += 1;
 	const productData = catalog.products[product];
 	title.textContent = `Dispense ${product.toUpperCase()}`;
-	intro.textContent = product === "catch"
-		? "Choose by lifetime, request quota, and storage. Every CATCH stays inbound-only."
-		: "Choose how long the encrypted message should wait and how many successful reads it allows. Encryption happens in this browser.";
+	intro.textContent = product === "catch" ? "Choose by lifetime, request quota, and storage. Every CATCH stays inbound-only."
+		: product === "whisper" ? "Choose how long the encrypted message should wait and how many successful reads it allows. Encryption happens in this browser."
+			: "Choose a lifetime heartbeat quota. Spend it quickly or distribute it across the full period.";
 	noteField.hidden = product !== "whisper";
 	note.required = product === "whisper";
 	burnAfterRead.checked = false;
@@ -97,6 +99,7 @@ function openCheckout() {
 	paymentPanel.hidden = true;
 	currentInvoice = "";
 	deliveryDispensed = false;
+	quoteAttempt = null;
 	setPaymentStage("review");
 	encryptionKey = "";
 	renderPlanChoices(productData.plans);
@@ -125,9 +128,9 @@ function renderPlanChoices(plans) {
 function updateSummary() {
 	const plan = selectedPlan();
 	if (plan === null) return;
-	const details = product === "catch"
-		? `${formatNumber(plan.requestLimit)} requests · ${formatBytes(plan.storageLimitBytes)} total storage · ${formatBytes(plan.maxBytesPerRequest)} per request`
-		: `${burnAfterRead.checked ? "Burn after the first successful read" : `${formatNumber(plan.readLimit)} successful ${plan.readLimit === 1 ? "read" : "reads"}`} · ${formatBytes(plan.maxCiphertextBytes)} encrypted payload`;
+	const details = product === "catch" ? `${formatNumber(plan.requestLimit)} requests · ${formatBytes(plan.storageLimitBytes)} total storage · ${formatBytes(plan.maxBytesPerRequest)} per request`
+		: product === "whisper" ? `${burnAfterRead.checked ? "Burn after the first successful read" : `${formatNumber(plan.readLimit)} successful ${plan.readLimit === 1 ? "read" : "reads"}`} · ${formatBytes(plan.maxCiphertextBytes)} encrypted payload`
+			: `${formatNumber(plan.heartbeatLimit)} heartbeats for the whole lifetime · ${formatCadence(plan.suggestedCadenceSeconds)} when evenly distributed`;
 	summary.innerHTML = `<div><span>${product.toUpperCase()} / ${plan.planId.toUpperCase()}</span><strong>${formatSats(plan.priceSats)} sats</strong></div><p>${plan.durationLabel}. ${details}.</p>`;
 }
 
@@ -186,7 +189,6 @@ form.addEventListener("submit", async (event) => {
 	const plan = selectedPlan();
 	if (plan === null) return;
 	const session = checkoutSession;
-	const idempotencyKey = crypto.randomUUID();
 	let response;
 	submitButton.disabled = true;
 	try {
@@ -197,11 +199,21 @@ form.addEventListener("submit", async (event) => {
 		if (currentPlan === undefined || currentPlan.priceSats !== plan.priceSats) throw new Error("This plan changed. Close checkout and review the current catalogue.");
 		status.textContent = "Requesting a Lightning invoice…";
 		if (product === "whisper") {
-			const sealed = await sealWhisper(note.value);
-			encryptionKey = sealed.key;
-			response = await fetch("/api/payments/whisper", { method: "POST", headers: { "content-type": "application/octet-stream", "idempotency-key": idempotencyKey, "x-whisper-plan": selectedPlanId, "x-whisper-read-limit": String(effectiveWhisperReadLimit()) }, body: sealed.ciphertext });
+			const intent = `whisper:${selectedPlanId}:${effectiveWhisperReadLimit()}:${note.value}`;
+			if (quoteAttempt?.intent !== intent) {
+				const sealed = await sealWhisper(note.value);
+				quoteAttempt = { intent, idempotencyKey: crypto.randomUUID(), ciphertext: sealed.ciphertext, encryptionKey: sealed.key };
+			}
+			encryptionKey = quoteAttempt.encryptionKey;
+			response = await fetch("/api/payments/whisper", { method: "POST", headers: { "content-type": "application/octet-stream", "idempotency-key": quoteAttempt.idempotencyKey, "x-whisper-plan": selectedPlanId, "x-whisper-read-limit": String(effectiveWhisperReadLimit()) }, body: quoteAttempt.ciphertext });
+		} else if (product === "catch") {
+			const intent = `catch:${selectedPlanId}`;
+			if (quoteAttempt?.intent !== intent) quoteAttempt = { intent, idempotencyKey: crypto.randomUUID() };
+			response = await fetch("/api/payments/catch", { method: "POST", headers: { "content-type": "application/json", "idempotency-key": quoteAttempt.idempotencyKey }, body: JSON.stringify({ planId: selectedPlanId }) });
 		} else {
-			response = await fetch("/api/payments/catch", { method: "POST", headers: { "content-type": "application/json", "idempotency-key": idempotencyKey }, body: JSON.stringify({ planId: selectedPlanId }) });
+			const intent = `pulse:${selectedPlanId}`;
+			if (quoteAttempt?.intent !== intent) quoteAttempt = { intent, idempotencyKey: crypto.randomUUID() };
+			response = await fetch("/api/payments/pulse", { method: "POST", headers: { "content-type": "application/json", "idempotency-key": quoteAttempt.idempotencyKey }, body: JSON.stringify({ planId: selectedPlanId }) });
 		}
 		const quote = await response.json();
 		if (response.status !== 402 || typeof quote.orderId !== "string" || typeof quote.bolt11 !== "string" || quote.amountSats !== plan.priceSats) throw new Error("The payment slot is unavailable.");
@@ -235,12 +247,22 @@ async function pollDelivery(orderId, session) {
 		paymentPanel.hidden = true;
 		if (resource.product === "whisper") {
 			output.value = whisperLink(location.origin, resource.publicId, resource.readToken, encryptionKey);
-		} else {
+		} else if (resource.product === "catch") {
 			const portalUrl = catchPortalLink(location.origin, resource.publicId, resource.ownerToken, resource.ingestToken);
 			currentPortalUrl = portalUrl;
 			portalLink.href = portalUrl;
+			portalLink.textContent = "Open CATCH portal";
+			portalNote.textContent = "Bookmark this private CATCH owner link. It cannot be recovered later.";
 			deliveryActions.hidden = false;
 			output.value = JSON.stringify({ portalUrl: portalUrl, ingestUrl: `${location.origin}/c/${resource.publicId}`, ingestToken: resource.ingestToken, ownerToken: resource.ownerToken, eventsUrl: `${location.origin}/api/catch/${resource.publicId}/events`, expiresAt: resource.expiresAt }, null, 2);
+		} else {
+			const portalUrl = pulsePortalLink(location.origin, resource.publicId, resource.ownerToken, resource.pingToken);
+			currentPortalUrl = portalUrl;
+			portalLink.href = portalUrl;
+			portalLink.textContent = "Open PULSE dashboard";
+			portalNote.textContent = "Bookmark this private PULSE owner link. Enable and copy the public status page from the dashboard if needed.";
+			deliveryActions.hidden = false;
+			output.value = JSON.stringify({ portalUrl, heartbeatUrl: `${location.origin}/p/${resource.publicId}`, ownerToken: resource.ownerToken, pingToken: resource.pingToken, expiresAt: resource.expiresAt }, null, 2);
 		}
 		output.hidden = false;
 		deliveryDispensed = true;
@@ -289,6 +311,13 @@ function catchPortalLink(origin, publicId, ownerToken, ingestToken) {
 	for (const byte of payload) binary += String.fromCharCode(byte);
 	return `${origin}/catch.html#${btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "")}`;
 }
+function pulsePortalLink(origin, publicId, ownerToken, pingToken) {
+	const payload = new TextEncoder().encode(JSON.stringify({ publicId, ownerToken, pingToken }));
+	let binary = "";
+	for (const byte of payload) binary += String.fromCharCode(byte);
+	return `${origin}/pulse.html#${btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "")}`;
+}
 function formatSats(value) { return new Intl.NumberFormat("en-US").format(value); }
 function formatNumber(value) { return new Intl.NumberFormat("en-US").format(value); }
 function formatBytes(value) { return value >= 1024 * 1024 ? `${Number((value / (1024 * 1024)).toFixed(2))} MiB` : `${value / 1024} KiB`; }
+function formatCadence(seconds) { return seconds === 60 ? "about every minute" : seconds < 60 ? `about every ${seconds} seconds` : `about every ${seconds / 60} minutes`; }

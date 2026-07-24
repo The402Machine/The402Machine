@@ -23,6 +23,9 @@ describe("Nginx security boundary", () => {
 		expect(site).toContain("client_max_body_size 5m;");
 		expect(site).toContain("limit_req zone=the402_owner");
 		expect(site).toContain("location = /api/payments/catch");
+		expect(site).toContain("location = /api/payments/pulse");
+		expect(site).toContain("location ^~ /p/");
+		expect(site).toContain("location ^~ /api/pulse/");
 		expect(site).toContain("limit_req zone=the402_payment_quote");
 		expect(site).toContain("location ^~ /api/payments/");
 		expect(site).toContain("limit_req zone=the402_payment_check");

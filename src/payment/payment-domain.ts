@@ -1,7 +1,7 @@
 import type { CatchPlanId } from "../domain/catch-plans.js";
 
 export type PurchasableCatchPlanId = CatchPlanId;
-export type PaymentProduct = "catch" | "whisper";
+export type PaymentProduct = "catch" | "whisper" | "pulse";
 export type PaymentOrderStatus = "created" | "invoice_issued" | "paid" | "dispensed" | "expired" | "failed";
 
 export const CATCH_PRICES_SATS: Readonly<Record<PurchasableCatchPlanId, number>> = Object.freeze({
@@ -11,6 +11,7 @@ export const CATCH_PRICES_SATS: Readonly<Record<PurchasableCatchPlanId, number>>
 });
 
 export const WHISPER_PRICES_SATS: Readonly<Record<PurchasableCatchPlanId, number>> = CATCH_PRICES_SATS;
+export const PULSE_PRICES_SATS: Readonly<Record<PurchasableCatchPlanId, number>> = CATCH_PRICES_SATS;
 
 export function priceForProduct(_product: PaymentProduct, planId: PurchasableCatchPlanId): number {
 	return CATCH_PRICES_SATS[planId];

@@ -38,11 +38,13 @@ beforeAll(async () => {
 	if (port === undefined) throw new Error("Could not determine PostgreSQL test port");
 	databaseUrl = `postgresql://postgres:${password}@127.0.0.1:${port}/the402machine_test`;
 	await waitForPostgres();
-	sql = postgres(databaseUrl, { max: 12 });
-	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql"]) {
+	sql = postgres(databaseUrl, { max: 1 });
+	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${migrationName}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
+	await sql.end();
+	sql = postgres(databaseUrl, { max: 12 });
 	repository = new PaymentRepository(sql, deliveryKey);
 }, 60_000);
 
@@ -124,6 +126,30 @@ describe("PaymentRepository", () => {
 		expect(results.every((result) => result?.product === "whisper" && result.readToken === "read-once")).toBe(true);
 		const rows = await sql<{ count: number }[]>`select count(*)::int as count from whispers where public_id = 'whisper_payment_once_abcdefghijklmnopqrstuv'`;
 		expect(rows[0]?.count).toBe(1);
+	});
+
+
+	it("atomically dispenses an idempotent PULSE delivery", async () => {
+		const order = await repository.createOrder({ idempotencyKey: "idem-pulse-dispense", product: "pulse", planId: "spark" });
+		await repository.attachInvoice(order.id, { paymentHash: "f".repeat(64), bolt11: "lnbc42n1pulse" });
+		await repository.markPaid(order.id);
+		const results = await Promise.all(Array.from({ length: 4 }, () => repository.dispensePaidOrder(order.id, () => Promise.resolve({ product: "pulse", publicId: "pulse_payment_once_abcdefghijklmnopqrstuv", planId: "spark", ownerTokenHash: "a".repeat(64), pingTokenHash: "b".repeat(64), heartbeatLimit: 1_202, expectedIntervalSeconds: 300, graceSeconds: 600, ownerToken: "pulse-owner", pingToken: "pulse-ping", expiresAt: new Date(Date.now() + 60_000) }))));
+		expect(results.every((result) => result?.product === "pulse" && result.ownerToken === "pulse-owner" && result.pingToken === "pulse-ping")).toBe(true);
+		expect((await sql`select id from pulse_resources where public_id = 'pulse_payment_once_abcdefghijklmnopqrstuv'`)).toHaveLength(1);
+	});
+
+	it("consumes a PULSE quota atomically and erases the ping capability at exhaustion", async () => {
+		const publicId = "pulse_quota_once_abcdefghijklmnopqrstuv";
+		await sql`
+			insert into pulse_resources (public_id, plan_id, owner_token_hash, ping_token_hash, heartbeat_limit, expected_interval_seconds, grace_seconds, expires_at)
+			values (${publicId}, 'spark', ${"a".repeat(64)}, ${"b".repeat(64)}, 3, 300, 600, clock_timestamp() + interval '1 hour')
+		`;
+		const pulse = new (await import("../../src/pulse/pulse-repository.js")).PulseRepository(sql);
+		const results = await Promise.all(Array.from({ length: 8 }, () => pulse.acceptHeartbeat(publicId)));
+		expect(results.filter(({ accepted }) => accepted)).toHaveLength(3);
+		expect(results.filter((result) => !result.accepted)).toHaveLength(5);
+		expect(await pulse.getResource(publicId)).toMatchObject({ status: "exhausted", heartbeatCount: 3, heartbeatLimit: 3 });
+		expect(await pulse.getCredentialHashes(publicId)).toEqual({ ownerTokenHash: "a".repeat(64), pingTokenHash: null });
 	});
 
 	it("stores a WHISPER payment payload near 4.02 MiB", async () => {
