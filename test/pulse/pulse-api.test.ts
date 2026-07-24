@@ -74,6 +74,15 @@ describe("PULSE API", () => {
 		expect(response.json()).toEqual({ error: "not found" });
 	});
 
+	it("hides public status as soon as expiresAt passes before the worker runs", async () => {
+		const repository = repositoryFixture();
+		repository.resource.expiresAt = new Date(Date.now() - 1_000);
+		const app = buildApp({ pulse: { repository, tokenPepper: "pepper" } }); apps.push(app);
+		const response = await app.inject({ method: "GET", url: `/api/pulse/${repository.resource.publicId}/public` });
+		expect(response.statusCode).toBe(404);
+		expect(response.json()).toEqual({ error: "not found" });
+	});
+
 	it("generates role-specific high-entropy capabilities", () => {
 		expect(generatePulseToken("owner")).toMatch(/^pulse_own_[A-Za-z0-9_-]{43}$/u);
 		expect(generatePulseToken("ping")).toMatch(/^pulse_ping_[A-Za-z0-9_-]{43}$/u);
