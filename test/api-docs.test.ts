@@ -27,6 +27,7 @@ describe("public API documentation", () => {
 			"AES-256-GCM",
 			"X-Whisper-Plan",
 			"X-Whisper-Read-Limit: 1",
+			"X-Whisper-Reveal-At",
 			"POST /p/{publicId}",
 			"GET /api/pulse/{publicId}",
 			"PATCH /api/pulse/{publicId}",

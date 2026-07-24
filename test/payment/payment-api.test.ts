@@ -48,9 +48,42 @@ describe("public payment API", () => {
 		const response = await app.inject({ method: "POST", url: "/api/payments/whisper", headers: { "idempotency-key": "idempotency-whisper-1", "x-whisper-plan": "spark", "content-type": "application/octet-stream" }, payload: ciphertext });
 		expect(response.statusCode).toBe(402);
 		expect(response.json()).toEqual(quote);
-		expect(calls).toEqual([{ idempotencyKey: "idempotency-whisper-1", product: "whisper", planId: "spark", productPayload: ciphertext, whisperReadLimit: 1 }]);
+		expect(calls).toEqual([{ idempotencyKey: "idempotency-whisper-1", product: "whisper", planId: "spark", productPayload: ciphertext, whisperReadLimit: 1, whisperRevealAt: null }]);
 		const plaintext = await app.inject({ method: "POST", url: "/api/payments/whisper", headers: { "idempotency-key": "idempotency-whisper-2", "x-whisper-plan": "spark", "content-type": "text/plain" }, payload: "secret" });
 		expect(plaintext.statusCode).toBe(400);
+		await app.close();
+	});
+
+	it("accepts a scheduled WHISPER reveal for every plan and persists it in quote identity", async () => {
+		const ciphertext = Buffer.from([1, ...Array.from({ length: 29 }, (_, index) => index)]);
+		const calls: unknown[] = [];
+		const quote: PaymentQuote = { orderId: "order-whisper-scheduled", product: "whisper", planId: "spark", amountSats: 42, bolt11: "lnbc42n1scheduled", paymentHash: "7".repeat(64) };
+		const app = buildApp({ payment: { quote: (input) => { calls.push(input); return Promise.resolve(quote); }, fulfill: () => Promise.resolve({ settled: false }) } });
+		for (const [planId, revealAt] of [
+			["spark", "2026-07-26T12:00:00.000Z"],
+			["standard", "2026-08-01T12:00:00.000Z"],
+			["long", "2027-01-01T12:00:00.000Z"],
+		] as const) {
+			const response = await app.inject({ method: "POST", url: "/api/payments/whisper", headers: { "idempotency-key": `idempotency-scheduled-${planId}`, "x-whisper-plan": planId, "x-whisper-reveal-at": revealAt, "content-type": "application/octet-stream" }, payload: ciphertext });
+			expect(response.statusCode).toBe(402);
+		}
+		expect(calls).toEqual([
+			{ idempotencyKey: "idempotency-scheduled-spark", product: "whisper", planId: "spark", productPayload: ciphertext, whisperReadLimit: 1, whisperRevealAt: new Date("2026-07-26T12:00:00.000Z") },
+			{ idempotencyKey: "idempotency-scheduled-standard", product: "whisper", planId: "standard", productPayload: ciphertext, whisperReadLimit: 42, whisperRevealAt: new Date("2026-08-01T12:00:00.000Z") },
+			{ idempotencyKey: "idempotency-scheduled-long", product: "whisper", planId: "long", productPayload: ciphertext, whisperReadLimit: 402, whisperRevealAt: new Date("2027-01-01T12:00:00.000Z") },
+		]);
+		await app.close();
+	});
+
+	it("rejects malformed or over-horizon scheduled reveals before payment backend work", async () => {
+		const calls: unknown[] = [];
+		const app = buildApp({ payment: { quote: (input) => { calls.push(input); return Promise.reject(new Error("not expected")); }, fulfill: () => Promise.resolve({ settled: false }) } });
+		const ciphertext = Buffer.from([1, ...Array.from({ length: 29 }, (_, index) => index)]);
+		for (const revealAt of ["not-a-date", "9999-01-01T00:00:00.000Z"]) {
+			const response = await app.inject({ method: "POST", url: "/api/payments/whisper", headers: { "idempotency-key": `invalid-reveal-${revealAt}`, "x-whisper-plan": "spark", "x-whisper-reveal-at": revealAt, "content-type": "application/octet-stream" }, payload: ciphertext });
+			expect(response.statusCode).toBe(400);
+		}
+		expect(calls).toHaveLength(0);
 		await app.close();
 	});
 
@@ -61,10 +94,10 @@ describe("public payment API", () => {
 		const burnCiphertext = Buffer.from([1, ...Array.from({ length: 29 }, (_, index) => index)]);
 		const burn = await burnApp.inject({ method: "POST", url: "/api/payments/whisper", headers: { "idempotency-key": "idempotency-whisper-burn", "x-whisper-plan": "standard", "x-whisper-read-limit": "1", "content-type": "application/octet-stream" }, payload: burnCiphertext });
 		expect(burn.statusCode).toBe(402);
-		expect(burnCalls).toEqual([{ idempotencyKey: "idempotency-whisper-burn", product: "whisper", planId: "standard", productPayload: burnCiphertext, whisperReadLimit: 1 }]);
+		expect(burnCalls).toEqual([{ idempotencyKey: "idempotency-whisper-burn", product: "whisper", planId: "standard", productPayload: burnCiphertext, whisperReadLimit: 1, whisperRevealAt: null }]);
 		const allowance = await burnApp.inject({ method: "POST", url: "/api/payments/whisper", headers: { "idempotency-key": "idempotency-whisper-allowance", "x-whisper-plan": "standard", "content-type": "application/octet-stream" }, payload: burnCiphertext });
 		expect(allowance.statusCode).toBe(402);
-		expect(burnCalls.at(-1)).toEqual({ idempotencyKey: "idempotency-whisper-allowance", product: "whisper", planId: "standard", productPayload: burnCiphertext, whisperReadLimit: 42 });
+		expect(burnCalls.at(-1)).toEqual({ idempotencyKey: "idempotency-whisper-allowance", product: "whisper", planId: "standard", productPayload: burnCiphertext, whisperReadLimit: 42, whisperRevealAt: null });
 		const invalid = await burnApp.inject({ method: "POST", url: "/api/payments/whisper", headers: { "idempotency-key": "idempotency-whisper-invalid", "x-whisper-plan": "standard", "x-whisper-read-limit": "2", "content-type": "application/octet-stream" }, payload: burnCiphertext });
 		expect(invalid.statusCode).toBe(400);
 		expect(burnCalls).toHaveLength(2);

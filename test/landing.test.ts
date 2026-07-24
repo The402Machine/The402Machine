@@ -68,7 +68,7 @@ describe("public landing page", () => {
 		expect(response.body).toContain('data-buy="pulse"');
 		expect(response.body).toContain('data-plan="long"');
 		expect(response.body).toContain('href="/assets/styles.css?v=14"');
-		expect(response.body).toContain('src="/assets/checkout.js?v=20"');
+		expect(response.body).toContain('src="/assets/checkout.js?v=21"');
 		expect(response.body).toContain('href="#api"');
 		expect(response.body).toContain('id="api"');
 		expect(response.body).toContain("API / COMPLETE FLOW");
@@ -116,7 +116,7 @@ describe("public landing page", () => {
 		const response = await app.inject({ method: "GET", url: "/whisper.html" });
 
 		expect(response.statusCode).toBe(200);
-		expect(response.body).toContain('src="/assets/whisper-page.js?v=4"');
+		expect(response.body).toContain('src="/assets/whisper-page.js?v=5"');
 		expect(response.headers["content-security-policy"]).toContain("script-src 'self'");
 		expect(response.headers["content-security-policy"]).not.toContain("script-src 'none'");
 	});
@@ -168,6 +168,12 @@ describe("public landing page", () => {
 		expect(checkoutSource).toContain('"x-whisper-read-limit": String(effectiveWhisperReadLimit())');
 		expect(checkoutSource).toContain("burnAfterRead.checked");
 		expect(checkoutSource).toContain("Burn after the first successful read");
+		expect(html).toContain('id="whisper-schedule-field"');
+		expect(html).toContain('id="whisper-reveal-at"');
+		expect(checkoutSource).toContain('"x-whisper-reveal-at"');
+		expect(checkoutSource).toContain("revealAt.toISOString()");
+		expect(checkoutSource).toContain("whisper:${selectedPlanId}:${effectiveWhisperReadLimit()}:${scheduledRevealIntent()}:${note.value}");
+		expect(checkoutSource.indexOf("scheduledRevealIntent()")).toBeLessThan(checkoutSource.indexOf('fetch("/api/payments/whisper"'));
 
 		const [source, qrBundle, webLnBundle] = await Promise.all([
 			readFile(new URL("../public/assets/checkout.js", import.meta.url), "utf8"),

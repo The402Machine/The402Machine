@@ -36,6 +36,7 @@ describe("payment domain", () => {
 			planId: "spark",
 			productPayload: null,
 			whisperReadLimit: null,
+			whisperRevealAt: null,
 			amountSats: 42,
 			status: "created",
 			paymentHash: null,

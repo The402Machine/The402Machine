@@ -9,11 +9,11 @@ class FakeOrderStore implements PaymentOrderStore {
 	private readonly orders = new Map<string, PaymentOrder & { bolt11: string | null }>();
 	public dispenseCalls = 0;
 
-	public createOrder(input: { idempotencyKey: string; product?: PaymentProduct; planId: PurchasableCatchPlanId; productPayload?: Buffer | null; whisperReadLimit?: number | null }): Promise<PaymentOrder> {
+	public createOrder(input: { idempotencyKey: string; product?: PaymentProduct; planId: PurchasableCatchPlanId; productPayload?: Buffer | null; whisperReadLimit?: number | null; whisperRevealAt?: Date | null }): Promise<PaymentOrder> {
 		const existing = [...this.orders.values()].find((order) => order.idempotencyKey === input.idempotencyKey);
 		if (existing !== undefined) return Promise.resolve(existing);
 		const order: PaymentOrder & { bolt11: string | null } = {
-			id: `order-${this.orders.size + 1}`, idempotencyKey: input.idempotencyKey, product: input.product ?? "catch", planId: input.planId, productPayload: input.productPayload ?? null, whisperReadLimit: input.whisperReadLimit ?? null,
+			id: `order-${this.orders.size + 1}`, idempotencyKey: input.idempotencyKey, product: input.product ?? "catch", planId: input.planId, productPayload: input.productPayload ?? null, whisperReadLimit: input.whisperReadLimit ?? null, whisperRevealAt: input.whisperRevealAt ?? null,
 			amountSats: input.planId === "spark" ? 42 : input.planId === "standard" ? 402 : 4_002,
 			status: "created", paymentHash: null, resourcePublicId: null, createdAt: new Date(), paidAt: null, dispensedAt: null, bolt11: null,
 		};

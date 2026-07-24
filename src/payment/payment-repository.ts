@@ -15,6 +15,7 @@ type PaymentOrderRow = {
 	plan_id: PurchasableCatchPlanId;
 	product_payload: Buffer | null;
 	whisper_read_limit: number | null;
+	whisper_reveal_at: Date | null;
 	amount_sats: number;
 	status: PaymentOrderStatus;
 	payment_hash: string | null;
@@ -35,7 +36,7 @@ export type DispensedResource =
 	| { product: "pulse"; resourceId: string; publicId: string; ownerToken: string; pingToken: string; expiresAt: Date };
 
 export type AtomicCatchProvision = ProvisionInput & { product: "catch"; ownerToken: string; ingestToken: string };
-export type AtomicWhisperProvision = { product: "whisper"; publicId: string; planId: PurchasableCatchPlanId; readTokenHash: string; ciphertext: Buffer; readLimit: number; readToken: string; expiresAt: Date };
+export type AtomicWhisperProvision = { product: "whisper"; publicId: string; planId: PurchasableCatchPlanId; readTokenHash: string; ciphertext: Buffer; readLimit: number; readToken: string; revealAt: Date; expiresAt: Date };
 export type AtomicPulseProvision = { product: "pulse"; publicId: string; planId: PurchasableCatchPlanId; ownerTokenHash: string; pingTokenHash: string; heartbeatLimit: number; expectedIntervalSeconds: number; graceSeconds: number; ownerToken: string; pingToken: string; expiresAt: Date };
 export type AtomicProvision = AtomicCatchProvision | AtomicWhisperProvision | AtomicPulseProvision;
 
@@ -44,25 +45,26 @@ export class PaymentRepository {
 
 	public constructor(private readonly sql: Sql, deliveryKey: string) { this.deliveryKey = decodeDeliveryKey(deliveryKey); }
 
-	public async createOrder(input: { idempotencyKey: string; product?: PaymentProduct; planId: PurchasableCatchPlanId; productPayload?: Buffer | null; whisperReadLimit?: number | null }): Promise<PaymentOrder> {
+	public async createOrder(input: { idempotencyKey: string; product?: PaymentProduct; planId: PurchasableCatchPlanId; productPayload?: Buffer | null; whisperReadLimit?: number | null; whisperRevealAt?: Date | null }): Promise<PaymentOrder> {
 		const product = input.product ?? "catch";
 		const planAvailable = product === "catch" ? CATCH_PLANS[input.planId].available : product === "whisper" ? WHISPER_PLANS[input.planId].available : PULSE_PLANS[input.planId].available;
 		if (!planAvailable) throw new Error("Plan is not available");
 		const productPayload = input.productPayload ?? null;
 		const whisperReadLimit = product === "whisper" ? input.whisperReadLimit ?? WHISPER_PLANS[input.planId].readLimit : null;
+		const whisperRevealAt = product === "whisper" ? input.whisperRevealAt ?? null : null;
 		if (product === "catch" && productPayload !== null) throw new Error("CATCH orders cannot contain a product payload");
 		if (product === "pulse" && productPayload !== null) throw new Error("PULSE orders cannot contain a product payload");
 		if (product === "whisper" && (productPayload === null || productPayload.byteLength < 30 || productPayload.byteLength > MAX_WHISPER_CIPHERTEXT_BYTES)) throw new Error("WHISPER ciphertext is invalid");
 		if (product === "whisper" && whisperReadLimit !== 1 && whisperReadLimit !== WHISPER_PLANS[input.planId].readLimit) throw new Error("WHISPER read limit is invalid");
 		const rows = await this.sql<PaymentOrderRow[]>`
-			insert into payment_orders (idempotency_key, product, plan_id, product_payload, whisper_read_limit, amount_sats)
-			values (${input.idempotencyKey}, ${product}, ${input.planId}, ${productPayload}, ${whisperReadLimit}, ${priceForProduct(product, input.planId)})
+			insert into payment_orders (idempotency_key, product, plan_id, product_payload, whisper_read_limit, whisper_reveal_at, amount_sats)
+			values (${input.idempotencyKey}, ${product}, ${input.planId}, ${productPayload}, ${whisperReadLimit}, ${whisperRevealAt}, ${priceForProduct(product, input.planId)})
 			on conflict (idempotency_key) do update set idempotency_key = excluded.idempotency_key
 			returning *, null::text as resource_public_id
 		`;
 		const row = rows[0];
 		if (row === undefined) throw new Error("Payment order creation returned no order");
-		if (row.plan_id !== input.planId || row.product !== product || row.whisper_read_limit !== whisperReadLimit || !buffersEqual(row.product_payload, productPayload)) throw new Error("Idempotency key already belongs to another purchase");
+		if (row.plan_id !== input.planId || row.product !== product || row.whisper_read_limit !== whisperReadLimit || !datesEqual(row.whisper_reveal_at, whisperRevealAt) || !buffersEqual(row.product_payload, productPayload)) throw new Error("Idempotency key already belongs to another purchase");
 		return mapOrder(row);
 	}
 
@@ -152,8 +154,8 @@ async function insertCatch(tx: TransactionSql, input: AtomicCatchProvision): Pro
 
 async function insertWhisper(tx: TransactionSql, input: AtomicWhisperProvision): Promise<string> {
 	const rows = await tx<{ id: string }[]>`
-		insert into whispers (public_id, plan_id, read_token_hash, ciphertext, read_limit, expires_at)
-		values (${input.publicId}, ${input.planId}, ${input.readTokenHash}, ${input.ciphertext}, ${input.readLimit}, ${input.expiresAt}) returning id
+		insert into whispers (public_id, plan_id, read_token_hash, ciphertext, read_limit, whisper_reveal_at, expires_at)
+		values (${input.publicId}, ${input.planId}, ${input.readTokenHash}, ${input.ciphertext}, ${input.readLimit}, ${input.revealAt}, ${input.expiresAt}) returning id
 	`;
 	if (rows[0] === undefined) throw new Error("WHISPER payment provisioning returned no resource");
 	return rows[0].id;
@@ -169,10 +171,11 @@ async function insertPulse(tx: TransactionSql, input: AtomicPulseProvision): Pro
 }
 
 function mapOrder(row: PaymentOrderRow): PaymentOrder {
-	return { id: row.id, idempotencyKey: row.idempotency_key, product: row.product, planId: row.plan_id, productPayload: row.product_payload, whisperReadLimit: row.whisper_read_limit, amountSats: row.amount_sats, status: row.status, paymentHash: row.payment_hash, resourcePublicId: row.resource_public_id, createdAt: row.created_at, paidAt: row.paid_at, dispensedAt: row.dispensed_at };
+	return { id: row.id, idempotencyKey: row.idempotency_key, product: row.product, planId: row.plan_id, productPayload: row.product_payload, whisperReadLimit: row.whisper_read_limit, whisperRevealAt: row.whisper_reveal_at, amountSats: row.amount_sats, status: row.status, paymentHash: row.payment_hash, resourcePublicId: row.resource_public_id, createdAt: row.created_at, paidAt: row.paid_at, dispensedAt: row.dispensed_at };
 }
 
 function buffersEqual(left: Buffer | null, right: Buffer | null): boolean { return left === null || right === null ? left === right : left.equals(right); }
+function datesEqual(left: Date | null, right: Date | null): boolean { return left === null || right === null ? left === right : left.getTime() === right.getTime(); }
 function decodeDeliveryKey(value: string): Buffer { const key = Buffer.from(value, "base64url"); if (key.byteLength !== 32) throw new Error("PAYMENT_DELIVERY_KEY must contain 32 base64url-encoded bytes"); return key; }
 function encryptDelivery(delivery: PaymentDelivery, key: Buffer): Buffer { const nonce = randomBytes(12); const cipher = createCipheriv("aes-256-gcm", key, nonce); const ciphertext = Buffer.concat([cipher.update(JSON.stringify(delivery), "utf8"), cipher.final()]); return Buffer.concat([nonce, cipher.getAuthTag(), ciphertext]); }
 function decryptDelivery(payload: Buffer, key: Buffer): PaymentDelivery { if (payload.byteLength < 29) throw new Error("Stored payment delivery is invalid"); const decipher = createDecipheriv("aes-256-gcm", key, payload.subarray(0, 12)); decipher.setAuthTag(payload.subarray(12, 28)); const parsed: unknown = JSON.parse(Buffer.concat([decipher.update(payload.subarray(28)), decipher.final()]).toString("utf8")); if (!isPaymentDelivery(parsed)) throw new Error("Stored payment delivery is invalid"); return parsed; }

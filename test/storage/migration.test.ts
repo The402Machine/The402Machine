@@ -54,7 +54,7 @@ beforeAll(async () => {
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 1 });
 
-	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql"]) {
+	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -184,6 +184,32 @@ describe("CATCH migration", () => {
 		await expect(sql`update pulse_resources set heartbeat_count = 1203 where id = ${resource!.id}`).rejects.toMatchObject({ code: "23514" });
 		await expect(sql`update pulse_resources set status = 'expired' where id = ${resource!.id}`).rejects.toMatchObject({ code: "23514" });
 		await expect(sql`insert into payment_orders (idempotency_key, product, plan_id, amount_sats) values ('pulse-price', 'pulse', 'standard', 402)`).resolves.toBeDefined();
+	});
+
+	it("adds scheduled WHISPER reveal dates without changing immediate legacy behavior", async () => {
+		expect((await sql`select version from schema_migrations where version = '0013_whisper_scheduled_reveal'`)).toHaveLength(1);
+		const columns = await sql<{ table_name: string; column_name: string; is_nullable: string }[]>`
+			select table_name, column_name, is_nullable from information_schema.columns
+			where table_name in ('payment_orders', 'whispers') and column_name = 'whisper_reveal_at'
+			order by table_name
+		`;
+		expect(columns).toEqual([
+			{ table_name: "payment_orders", column_name: "whisper_reveal_at", is_nullable: "YES" },
+			{ table_name: "whispers", column_name: "whisper_reveal_at", is_nullable: "NO" },
+		]);
+		const [legacy] = await sql<{ immediate: boolean }[]>`
+			insert into whispers (public_id, plan_id, read_token_hash, ciphertext, expires_at)
+			values ('whisper_legacy_immediate_abcdefghijkl', 'spark', 'read-hash', ${Buffer.alloc(30, 7)}, clock_timestamp() + interval '7 days')
+			returning whisper_reveal_at - created_at < interval '1 second' as immediate
+		`;
+		expect(legacy?.immediate).toBe(true);
+		await expect(sql`
+			insert into payment_orders (idempotency_key, product, plan_id, product_payload, whisper_read_limit, whisper_reveal_at, amount_sats)
+			values ('invalid-catch-reveal', 'catch', 'spark', null, null, clock_timestamp() + interval '1 day', 42)
+		`).rejects.toMatchObject({ code: "23514" });
+		const migration = await readFile(new URL("../../migrations/0013_whisper_scheduled_reveal.sql", import.meta.url), "utf8");
+		await expect(sql.unsafe(migration).simple()).resolves.toBeDefined();
+		expect((await sql`select version from schema_migrations where version = '0013_whisper_scheduled_reveal'`)).toHaveLength(1);
 	});
 
 	it("requires live and readable resources to retain both credentials", async () => {

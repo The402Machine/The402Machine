@@ -13,6 +13,7 @@ class FakeWhisperRepository implements WhisperApiRepository {
 	public credentialHash: string | null = hashToken("owner", readToken, pepper);
 	public body: Buffer | null = Buffer.from("opaque-ciphertext");
 	public readsRemaining = 1;
+	public availableAt = new Date(0);
 
 	public create(input: Parameters<WhisperApiRepository["create"]>[0]): Promise<{ id: string; publicId: string }> {
 		this.created = input;
@@ -20,6 +21,9 @@ class FakeWhisperRepository implements WhisperApiRepository {
 	}
 
 	public getCredentialHash(): Promise<string | null> { return Promise.resolve(this.credentialHash); }
+	public getAvailability(): Promise<{ state: "scheduled" | "available"; revealAt: Date; readCount: number; readLimit: number } | null> {
+		return Promise.resolve({ state: this.availableAt.getTime() > Date.now() ? "scheduled" : "available", revealAt: this.availableAt, readCount: 0, readLimit: this.readsRemaining });
+	}
 	public consume(): Promise<Buffer | null> {
 		if (this.body === null || this.readsRemaining <= 0) return Promise.resolve(null);
 		const current = this.body;
@@ -75,6 +79,19 @@ describe("WHISPER HTTP API", () => {
 		expect(first.headers["cache-control"]).toBe("no-store");
 		const second = await app.inject({ method: "GET", url: "/w/whisper_test", headers: bearer(readToken) });
 		expect(second.statusCode).toBe(404);
+	});
+
+	it("does not spend a read before the scheduled reveal time", async () => {
+		const repository = new FakeWhisperRepository();
+		repository.availableAt = new Date(Date.now() + 60_000);
+		const app = buildApp({ whisper: { repository, tokenPepper: pepper } });
+		apps.push(app);
+		const response = await app.inject({ method: "GET", url: "/w/whisper_test", headers: bearer(readToken) });
+		expect(response.statusCode).toBe(425);
+		expect(response.headers["retry-after"]).toBeDefined();
+		expect(response.json()).toMatchObject({ error: "not revealed", revealAt: repository.availableAt.toISOString() });
+		expect(repository.readsRemaining).toBe(1);
+		expect(repository.body?.toString()).toBe("opaque-ciphertext");
 	});
 
 	it("allows a Standard WHISPER to be read up to 42 times", async () => {

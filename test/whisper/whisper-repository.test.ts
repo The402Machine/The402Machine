@@ -38,7 +38,7 @@ beforeAll(async () => {
 	databaseUrl = `postgresql://postgres:${password}@127.0.0.1:${port}/the402machine_test`;
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 12 });
-	for (const migrationName of ["0001_catch.sql", "0003_whisper.sql", "0010_whisper_multiread.sql"]) {
+	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${migrationName}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -50,13 +50,14 @@ afterAll(async () => {
 	try { docker("rm", "--force", container); } catch { /* container already removed */ }
 });
 
-const createWhisper = async (overrides: { expiresAt?: Date; readLimit?: number; planId?: "spark" | "standard" | "long" } = {}) => repository.create({
+const createWhisper = async (overrides: { expiresAt?: Date; revealAt?: Date; readLimit?: number; planId?: "spark" | "standard" | "long" } = {}) => repository.create({
 	publicId: `whisper_${randomUUID().replaceAll("-", "")}`,
 	planId: overrides.planId ?? "spark",
 	readTokenHash: randomUUID().replaceAll("-", ""),
 	ciphertext: Buffer.from("opaque-client-ciphertext"),
 	readLimit: overrides.readLimit ?? 1,
-	expiresAt: overrides.expiresAt ?? new Date(Date.now() + 60_000),
+	revealAt: overrides.revealAt ?? new Date(Date.now() - 1_000),
+	expiresAt: overrides.expiresAt ?? new Date(Date.now() + 2 * 60 * 60 * 1_000),
 });
 
 describe("WhisperRepository", () => {
@@ -82,6 +83,17 @@ describe("WhisperRepository", () => {
 		await new Promise((resolve) => setTimeout(resolve, 150));
 		expect(await repository.consume(whisper.publicId)).toBeNull();
 		expect(await repository.getCredentialHash(whisper.publicId)).toBeNull();
+	});
+
+	it("keeps ciphertext and read allowance intact until revealAt", async () => {
+		const whisper = await createWhisper({ revealAt: new Date(Date.now() + 60_000), expiresAt: new Date(Date.now() + 3 * 60 * 60 * 1_000), readLimit: 42, planId: "standard" });
+		expect(await repository.getAvailability(whisper.publicId)).toMatchObject({ state: "scheduled", readCount: 0, readLimit: 42 });
+		expect(await repository.consume(whisper.publicId)).toBeNull();
+		const [row] = await sql<{ read_count: number; has_ciphertext: boolean; has_credential: boolean }[]>`
+			select read_count, ciphertext is not null as has_ciphertext, read_token_hash is not null as has_credential
+			from whispers where public_id = ${whisper.publicId}
+		`;
+		expect(row).toEqual({ read_count: 0, has_ciphertext: true, has_credential: true });
 	});
 
 	it("purges idle expired whispers in bounded batches", async () => {

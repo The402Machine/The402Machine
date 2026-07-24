@@ -31,6 +31,8 @@ An encrypted message with a fixed read allowance that disappears after its final
 
 The browser helper uses AES-256-GCM. The server receives ciphertext and a read credential, but not the AES key. Each successful retrieval atomically increments the read count; the final allowed read clears the ciphertext and credential. Standard and Long buyers can choose `X-Whisper-Read-Limit: 1` at purchase time to burn the server copy after the first successful read instead of using the full plan allowance.
 
+Every WHISPER plan can also use `X-Whisper-Reveal-At` to schedule a future reveal. The expiry fuse still starts when the order is created, and the reveal must leave at least one hour before expiry. Authenticated requests before that time return `425 Too Early` without consuming a read.
+
 ### PULSE
 
 A temporary heartbeat monitor for cron jobs, backups, agents, and small services. PULSE accepts authenticated `POST` heartbeats, stores only the aggregate count and latest successful timestamp, and renders a private dashboard with an optional public status page.

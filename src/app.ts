@@ -7,7 +7,7 @@ import Fastify, { LogController, type FastifyInstance, type FastifyRequest } fro
 
 import { calculatePlanExpiry, CATCH_PLANS } from "./domain/catch-plans.js";
 import { PULSE_PLANS, validPulseSchedule } from "./domain/pulse-plans.js";
-import { calculateWhisperExpiry, MAX_WHISPER_CIPHERTEXT_BYTES, WHISPER_PLANS } from "./domain/whisper-plans.js";
+import { calculateWhisperSchedule, MAX_WHISPER_CIPHERTEXT_BYTES, WHISPER_PLANS } from "./domain/whisper-plans.js";
 import { CATCH_PRICES_SATS, PULSE_PRICES_SATS, WHISPER_PRICES_SATS } from "./payment/payment-domain.js";
 import type { DispensedResource } from "./payment/payment-repository.js";
 import type { PaymentQuote } from "./payment/payment-service.js";
@@ -38,6 +38,7 @@ export interface CatchApiRepository {
 export interface WhisperApiRepository {
 	create(input: CreateWhisperInput): Promise<{ id: string; publicId: string }>;
 	getCredentialHash(publicId: string): Promise<string | null>;
+	getAvailability(publicId: string): Promise<{ state: "scheduled" | "available"; revealAt: Date; readCount: number; readLimit: number } | null>;
 	consume(publicId: string): Promise<Buffer | null>;
 }
 
@@ -67,7 +68,7 @@ type WhisperAppOptions = {
 type PulseAppOptions = { repository: PulseApiRepository; tokenPepper: string };
 
 type PaymentAppOptions = {
-	quote(input: { idempotencyKey: string; product: "catch" | "whisper" | "pulse"; planId: "spark" | "standard" | "long"; productPayload: Buffer | null; whisperReadLimit?: number | null }): Promise<PaymentQuote>;
+	quote(input: { idempotencyKey: string; product: "catch" | "whisper" | "pulse"; planId: "spark" | "standard" | "long"; productPayload: Buffer | null; whisperReadLimit?: number | null; whisperRevealAt?: Date | null }): Promise<PaymentQuote>;
 	fulfill(orderId: string): Promise<{ settled: false } | { settled: true; resource: DispensedResource }>;
 };
 
@@ -127,12 +128,20 @@ function registerPaymentRoutes(app: FastifyInstance, payment: PaymentAppOptions)
 		const idempotencyKey = request.headers["idempotency-key"];
 		const planId = request.headers["x-whisper-plan"];
 		const requestedReadLimit = request.headers["x-whisper-read-limit"];
+		const requestedRevealAt = request.headers["x-whisper-reveal-at"];
 		if (typeof idempotencyKey !== "string" || idempotencyKey.length < 8 || idempotencyKey.length > 128) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid idempotency key" });
 		if (!isPlanId(planId) || !WHISPER_PLANS[planId].available) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid plan" });
 		const whisperReadLimit = requestedReadLimit === undefined ? WHISPER_PLANS[planId].readLimit : Number(requestedReadLimit);
 		if (whisperReadLimit !== 1 && whisperReadLimit !== WHISPER_PLANS[planId].readLimit) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid read limit" });
+		let whisperRevealAt: Date | null = null;
+		if (requestedRevealAt !== undefined) {
+			if (typeof requestedRevealAt !== "string") return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid reveal date" });
+			whisperRevealAt = new Date(requestedRevealAt);
+			try { calculateWhisperSchedule(planId, new Date(), whisperRevealAt); }
+			catch { return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid reveal date" }); }
+		}
 		if (normalizedContentType(request.headers["content-type"]) !== "application/octet-stream" || !Buffer.isBuffer(request.body) || request.body.byteLength < 30 || request.body.byteLength > WHISPER_PLANS[planId].maxCiphertextBytes) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid ciphertext" });
-		const quote = await payment.quote({ idempotencyKey, product: "whisper", planId, productPayload: request.body, whisperReadLimit });
+		const quote = await payment.quote({ idempotencyKey, product: "whisper", planId, productPayload: request.body, whisperReadLimit, whisperRevealAt });
 		return reply.header("Cache-Control", "no-store").code(402).send(quote);
 	});
 
@@ -238,8 +247,8 @@ function registerWhisperRoutes(app: FastifyInstance, options: WhisperAppOptions)
 			const plan = WHISPER_PLANS[planId];
 			const readToken = generateOwnerToken();
 			const publicId = `whisper_${randomBytes(24).toString("base64url")}`;
-			const expiresAt = calculateWhisperExpiry(planId, new Date());
-			await options.repository.create({ publicId, planId, readTokenHash: hashToken("owner", readToken, options.tokenPepper), ciphertext: request.body, readLimit: plan.readLimit, expiresAt });
+			const { revealAt, expiresAt } = calculateWhisperSchedule(planId, new Date());
+			await options.repository.create({ publicId, planId, readTokenHash: hashToken("owner", readToken, options.tokenPepper), ciphertext: request.body, readLimit: plan.readLimit, revealAt, expiresAt });
 			return reply.header("Cache-Control", "no-store").code(201).send({ publicId, readToken, expiresAt: expiresAt.toISOString(), readLimit: plan.readLimit, maxBytes: plan.maxCiphertextBytes });
 		});
 	}
@@ -249,6 +258,12 @@ function registerWhisperRoutes(app: FastifyInstance, options: WhisperAppOptions)
 		const credentialHash = await options.repository.getCredentialHash(request.params.publicId);
 		if (credentialHash === null || !verifyToken("owner", bearerToken(request) ?? "", credentialHash, options.tokenPepper)) {
 			return reply.header("Cache-Control", "no-store").code(404).send({ error: "not found" });
+		}
+		const availability = await options.repository.getAvailability(request.params.publicId);
+		if (availability === null) return reply.header("Cache-Control", "no-store").code(404).send({ error: "not found" });
+		if (availability.state === "scheduled") {
+			const retryAfter = Math.max(1, Math.ceil((availability.revealAt.getTime() - Date.now()) / 1_000));
+			return reply.header("Cache-Control", "no-store").header("Retry-After", String(retryAfter)).code(425).send({ error: "not revealed", revealAt: availability.revealAt.toISOString() });
 		}
 		const ciphertext = await options.repository.consume(request.params.publicId);
 		if (ciphertext === null) return reply.header("Cache-Control", "no-store").code(404).send({ error: "not found" });

@@ -8,6 +8,7 @@ export type CreateWhisperInput = {
 	readTokenHash: string;
 	ciphertext: Buffer;
 	readLimit: number;
+	revealAt: Date;
 	expiresAt: Date;
 };
 
@@ -16,8 +17,8 @@ export class WhisperRepository {
 
 	public async create(input: CreateWhisperInput): Promise<{ id: string; publicId: string }> {
 		const rows = await this.sql<{ id: string; public_id: string }[]>`
-			insert into whispers (public_id, plan_id, read_token_hash, ciphertext, read_limit, expires_at)
-			values (${input.publicId}, ${input.planId}, ${input.readTokenHash}, ${input.ciphertext}, ${input.readLimit}, ${input.expiresAt})
+			insert into whispers (public_id, plan_id, read_token_hash, ciphertext, read_limit, whisper_reveal_at, expires_at)
+			values (${input.publicId}, ${input.planId}, ${input.readTokenHash}, ${input.ciphertext}, ${input.readLimit}, ${input.revealAt}, ${input.expiresAt})
 			returning id, public_id
 		`;
 		const row = rows[0];
@@ -36,12 +37,22 @@ export class WhisperRepository {
 		return rows[0]?.read_token_hash ?? null;
 	}
 
+	public async getAvailability(publicId: string): Promise<{ state: "scheduled" | "available"; revealAt: Date; readCount: number; readLimit: number } | null> {
+		const rows = await this.sql<{ whisper_reveal_at: Date; read_count: number; read_limit: number; is_available: boolean }[]>`
+			select whisper_reveal_at, read_count, read_limit, clock_timestamp() >= whisper_reveal_at as is_available
+			from whispers
+			where public_id = ${publicId} and status = 'active' and clock_timestamp() < expires_at
+		`;
+		const row = rows[0];
+		return row === undefined ? null : { state: row.is_available ? "available" : "scheduled", revealAt: row.whisper_reveal_at, readCount: row.read_count, readLimit: row.read_limit };
+	}
+
 	public async consume(publicId: string): Promise<Buffer | null> {
 		return this.sql.begin(async (tx) => {
 			const rows = await tx<{ id: string; ciphertext: Buffer; read_count: number; read_limit: number; is_expired: boolean }[]>`
 				select id, ciphertext, read_count, read_limit, clock_timestamp() >= expires_at as is_expired
 				from whispers
-				where public_id = ${publicId} and status = 'active'
+				where public_id = ${publicId} and status = 'active' and clock_timestamp() >= whisper_reveal_at
 				for update
 			`;
 			const row = rows[0];

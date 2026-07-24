@@ -39,7 +39,7 @@ beforeAll(async () => {
 	databaseUrl = `postgresql://postgres:${password}@127.0.0.1:${port}/the402machine_test`;
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 1 });
-	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql"]) {
+	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${migrationName}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -72,6 +72,17 @@ describe("PaymentRepository", () => {
 		const standard = await repository.createOrder({ idempotencyKey: "idem-price-standard", planId: "standard" });
 		const long = await repository.createOrder({ idempotencyKey: "idem-price-long", planId: "long" });
 		expect([spark.amountSats, standard.amountSats, long.amountSats]).toEqual([42, 402, 4_002]);
+	});
+
+	it("treats a scheduled WHISPER reveal as immutable idempotency identity", async () => {
+		const ciphertext = Buffer.concat([Buffer.from([1]), Buffer.alloc(29, 7)]);
+		const revealAt = new Date(Date.now() + 24 * 60 * 60 * 1_000);
+		const first = await repository.createOrder({ idempotencyKey: "idem-whisper-schedule", product: "whisper", planId: "standard", productPayload: ciphertext, whisperReadLimit: 42, whisperRevealAt: revealAt });
+		const repeated = await repository.createOrder({ idempotencyKey: "idem-whisper-schedule", product: "whisper", planId: "standard", productPayload: ciphertext, whisperReadLimit: 42, whisperRevealAt: new Date(revealAt) });
+		expect(first.whisperRevealAt?.toISOString()).toBe(revealAt.toISOString());
+		expect(repeated.id).toBe(first.id);
+		await expect(repository.createOrder({ idempotencyKey: "idem-whisper-schedule", product: "whisper", planId: "standard", productPayload: ciphertext, whisperReadLimit: 42, whisperRevealAt: new Date(revealAt.getTime() + 1_000) })).rejects.toThrow("Idempotency key already belongs to another purchase");
+		await expect(repository.createOrder({ idempotencyKey: "idem-whisper-schedule", product: "whisper", planId: "standard", productPayload: ciphertext, whisperReadLimit: 42, whisperRevealAt: null })).rejects.toThrow("Idempotency key already belongs to another purchase");
 	});
 
 	it("claims one payment hash for only one order", async () => {
@@ -121,7 +132,7 @@ describe("PaymentRepository", () => {
 		await repository.markPaid(order.id);
 		const results = await Promise.all(Array.from({ length: 4 }, () => repository.dispensePaidOrder(order.id, () => Promise.resolve({
 			product: "whisper", publicId: "whisper_payment_once_abcdefghijklmnopqrstuv", planId: "spark", readTokenHash: "read-hash", readLimit: 1,
-			ciphertext, readToken: "read-once", expiresAt: new Date(Date.now() + 60_000),
+			ciphertext, readToken: "read-once", revealAt: new Date(Date.now() - 1_000), expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1_000),
 		}))));
 		expect(results.every((result) => result?.product === "whisper" && result.readToken === "read-once")).toBe(true);
 		const rows = await sql<{ count: number }[]>`select count(*)::int as count from whispers where public_id = 'whisper_payment_once_abcdefghijklmnopqrstuv'`;

@@ -6,7 +6,7 @@ import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import { calculatePlanExpiry, CATCH_PLANS } from "./domain/catch-plans.js";
 import { calculatePulseExpiry, PULSE_PLANS } from "./domain/pulse-plans.js";
-import { calculateWhisperExpiry } from "./domain/whisper-plans.js";
+import { calculateWhisperSchedule } from "./domain/whisper-plans.js";
 import { lookupIpLocally } from "./ip-location.js";
 import { LnbitsPaymentAdapter } from "./payment/lnbits-adapter.js";
 import { PaymentRepository } from "./payment/payment-repository.js";
@@ -51,6 +51,7 @@ const paymentService = database === undefined || config.payment.provider !== "ln
 			if (order.product === "whisper") {
 				if (order.productPayload === null) throw new Error("WHISPER order has no ciphertext");
 				if (order.whisperReadLimit === null) throw new Error("WHISPER order has no read limit");
+				const { revealAt, expiresAt } = calculateWhisperSchedule(order.planId, order.createdAt, order.whisperRevealAt);
 				const readToken = generateOwnerToken();
 				return Promise.resolve({
 					product: "whisper" as const,
@@ -60,7 +61,8 @@ const paymentService = database === undefined || config.payment.provider !== "ln
 					ciphertext: order.productPayload,
 					readLimit: order.whisperReadLimit,
 					readToken,
-					expiresAt: calculateWhisperExpiry(order.planId, new Date()),
+					revealAt,
+					expiresAt,
 				});
 			}
 			if (order.product === "pulse") {

@@ -24,6 +24,7 @@ export type PaymentOrder = {
 	planId: PurchasableCatchPlanId;
 	productPayload: Buffer | null;
 	whisperReadLimit: number | null;
+	whisperRevealAt: Date | null;
 	amountSats: number;
 	status: PaymentOrderStatus;
 	paymentHash: string | null;
@@ -40,6 +41,7 @@ export function createPaymentOrder(input: {
 	planId: PurchasableCatchPlanId;
 	productPayload: Buffer | null;
 	whisperReadLimit?: number | null;
+	whisperRevealAt?: Date | null;
 	createdAt: Date;
 }): PaymentOrder {
 	return {
@@ -49,6 +51,7 @@ export function createPaymentOrder(input: {
 		planId: input.planId,
 		productPayload: input.productPayload,
 		whisperReadLimit: input.whisperReadLimit ?? null,
+		whisperRevealAt: input.whisperRevealAt ?? null,
 		createdAt: input.createdAt,
 		amountSats: priceForProduct(input.product, input.planId),
 		status: "created",
