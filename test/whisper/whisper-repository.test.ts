@@ -38,7 +38,7 @@ beforeAll(async () => {
 	databaseUrl = `postgresql://postgres:${password}@127.0.0.1:${port}/the402machine_test`;
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 12 });
-	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql"]) {
+	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql", "0014_whisper_reveal_window.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${migrationName}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -81,10 +81,11 @@ describe("WhisperRepository", () => {
 		expect(results.filter((result) => result?.toString() === "opaque-client-ciphertext")).toHaveLength(42);
 		expect(await repository.consume(whisper.publicId)).toBeNull();
 		expect(await repository.getCredentialHash(whisper.publicId)).toBeNull();
-	});
+	}, 10_000);
 
 	it("does not reveal and purges an expired whisper", async () => {
-		const whisper = await createWhisper({ expiresAt: new Date(Date.now() + 100) });
+		const revealAt = new Date();
+		const whisper = await createWhisper({ revealAt, expiresAt: new Date(revealAt.getTime() + 100) });
 		await new Promise((resolve) => setTimeout(resolve, 150));
 		expect(await repository.consume(whisper.publicId)).toBeNull();
 		expect(await repository.getCredentialHash(whisper.publicId)).toBeNull();

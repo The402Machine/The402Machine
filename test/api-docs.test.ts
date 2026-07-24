@@ -35,7 +35,9 @@ describe("public API documentation", () => {
 		]) expect(html).toContain(contract);
 		expect(html).toContain("accepted with or without the ingest token");
 		expect(html).toContain("locally resolved approximate IP location");
+		expect(html).toContain("<code>Authorization: Bearer ***</code>. Listing supports");
 		expect(html).not.toContain("enable public ingest");
+		expect(html).not.toContain("Authorization: Bearer *** Listing supports");
 		expect(html).not.toMatch(/catch_(?:own|ing)_[A-Za-z0-9_-]{20,}/u);
 		expect(html).not.toMatch(/lnbc[0-9A-Za-z]{20,}/u);
 	});
