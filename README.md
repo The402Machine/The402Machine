@@ -10,8 +10,8 @@
 
 <p align="center">
   <a href="https://the402machine.com">Live machine</a> ·
-  <a href="https://the402machine.com/demo.html">Interactive demos</a> ·
-  <a href="https://the402machine.com/api.html">API reference</a> ·
+  <a href="https://the402machine.com/demo">Interactive demos</a> ·
+  <a href="https://the402machine.com/api">API reference</a> ·
   <a href="INSTALL.md">Self-hosting guide</a>
 </p>
 
@@ -48,7 +48,7 @@ Each product applies its own lifetime and quota. The live catalogue is the sourc
 
 ## See it before buying
 
-The [demo area](https://the402machine.com/demo.html) contains local, read-only previews of:
+The [demo area](https://the402machine.com/demo) contains local, read-only previews of:
 
 - a CATCH inbox populated with sample events;
 - a WHISPER handoff decrypted entirely in the browser;
@@ -69,7 +69,7 @@ The demos create no invoice, resource, capability or payment request.
 
 The browser checkout and owner interfaces sit on the same HTTP API available to scripts and agents.
 
-Read the dedicated [API reference](https://the402machine.com/api.html) for catalogue discovery, HTTP 402 quotes, payment polling and product operations.
+Read the dedicated [API reference](https://the402machine.com/api) for catalogue discovery, HTTP 402 quotes, payment polling and product operations.
 
 ## Run your own machine
 

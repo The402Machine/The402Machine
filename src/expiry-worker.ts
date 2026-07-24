@@ -1,30 +1,40 @@
-import type { CatchRepository } from "./storage/catch-repository.js";
-
 export type ExpiryWorker = {
 	stop(): Promise<void>;
+};
+
+export type ExpiryJob = {
+	name: string;
+	expireDue(limit: number): Promise<number>;
 };
 
 type ExpiryWorkerOptions = {
 	intervalMs?: number;
 	batchSize?: number;
-	onError?: (error: unknown) => void;
+	maxBatchesPerCycle?: number;
+	onError?: (jobName: string, error: unknown) => void;
 };
 
-export function startExpiryWorker(repository: CatchRepository, options: ExpiryWorkerOptions = {}): ExpiryWorker {
+export function startExpiryWorker(jobs: readonly ExpiryJob[], options: ExpiryWorkerOptions = {}): ExpiryWorker {
 	const intervalMs = options.intervalMs ?? 30_000;
 	const batchSize = options.batchSize ?? 100;
+	const maxBatchesPerCycle = options.maxBatchesPerCycle ?? 10;
 	let stopped = false;
 	let activeRun: Promise<void> | undefined;
 
+	const drain = async (job: ExpiryJob): Promise<void> => {
+		try {
+			for (let batch = 0; !stopped && batch < maxBatchesPerCycle; batch += 1) {
+				if (await job.expireDue(batchSize) < batchSize) return;
+			}
+		} catch (error: unknown) {
+			options.onError?.(job.name, error);
+		}
+	};
+
 	const run = async (): Promise<void> => {
 		if (stopped || activeRun !== undefined) return;
-		activeRun = (async () => {
-			while (!stopped) {
-				const expired = await repository.expireDueResources(batchSize);
-				if (expired < batchSize) return;
-			}
-		})()
-			.catch((error: unknown) => options.onError?.(error))
+		activeRun = Promise.all(jobs.map(drain))
+			.then(() => undefined)
 			.finally(() => { activeRun = undefined; });
 		await activeRun;
 	};

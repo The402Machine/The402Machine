@@ -54,7 +54,7 @@ beforeAll(async () => {
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 1 });
 
-	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql", "0014_whisper_reveal_window.sql"]) {
+	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql", "0014_whisper_reveal_window.sql", "0015_whisper_custom_read_limit.sql", "0016_pulse_public_status_id.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -85,6 +85,24 @@ describe("CATCH migration", () => {
 			event: "catch_events",
 			version: "0001_catch",
 		});
+	});
+
+	it("assigns a unique share-only identifier to every PULSE resource", async () => {
+		const [column] = await sql<{ is_nullable: string }[]>`
+			select is_nullable from information_schema.columns
+			where table_name = 'pulse_resources' and column_name = 'public_status_id'
+		`;
+		expect(column).toEqual({ is_nullable: "NO" });
+		expect((await sql`select version from schema_migrations where version = '0016_pulse_public_status_id'`)).toHaveLength(1);
+		await sql`
+			insert into pulse_resources (public_id, plan_id, owner_token_hash, ping_token_hash, heartbeat_limit, expected_interval_seconds, grace_seconds, expires_at)
+			values ('pulse_migration_identifier_abcdefghijkl', 'spark', ${"a".repeat(64)}, ${"b".repeat(64)}, 3, 300, 600, clock_timestamp() + interval '1 hour')
+		`;
+		const [resource] = await sql<{ public_id: string; public_status_id: string }[]>`
+			select public_id, public_status_id from pulse_resources where public_id = 'pulse_migration_identifier_abcdefghijkl'
+		`;
+		expect(resource?.public_status_id).toMatch(/^pulse_status_[A-Za-z0-9_-]{32}$/u);
+		expect(resource?.public_status_id).not.toBe(resource?.public_id);
 	});
 
 	it("accepts current prices while preserving already issued legacy orders", async () => {
@@ -149,9 +167,14 @@ describe("CATCH migration", () => {
 			insert into payment_orders (idempotency_key, product, plan_id, product_payload, whisper_read_limit, amount_sats)
 			values ('burn-standard', 'whisper', 'standard', ${Buffer.alloc(30, 7)}, 1, 402)
 		`).resolves.toBeDefined();
+		expect((await sql`select version from schema_migrations where version = '0015_whisper_custom_read_limit'`)).toHaveLength(1);
 		await expect(sql`
 			insert into payment_orders (idempotency_key, product, plan_id, product_payload, whisper_read_limit, amount_sats)
-			values ('invalid-standard-read-limit', 'whisper', 'standard', ${Buffer.alloc(30, 7)}, 2, 402)
+			values ('custom-standard-read-limit', 'whisper', 'standard', ${Buffer.alloc(30, 7)}, 12, 402)
+		`).resolves.toBeDefined();
+		await expect(sql`
+			insert into payment_orders (idempotency_key, product, plan_id, product_payload, whisper_read_limit, amount_sats)
+			values ('invalid-standard-read-limit', 'whisper', 'standard', ${Buffer.alloc(30, 7)}, 43, 402)
 		`).rejects.toMatchObject({ code: "23514" });
 		await expect(sql`
 			insert into payment_orders (idempotency_key, product, plan_id, product_payload, whisper_read_limit, amount_sats)

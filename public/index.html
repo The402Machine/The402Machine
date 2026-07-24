@@ -7,15 +7,15 @@
 		<meta name="theme-color" content="#080a08" />
 		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 		<title>The402Machine — Disposable Internet Infrastructure</title>
-		<link rel="stylesheet" href="/assets/styles.css?v=15" />
+		<link rel="stylesheet" href="/assets/styles.css?v=19" />
 	</head>
 	<body>
 		<div class="noise" aria-hidden="true"></div>
 		<header class="topbar">
 			<a class="brand" href="#top" aria-label="The402Machine home"><span class="brand-mark">402</span><span>The402Machine</span></a>
 			<nav aria-label="Main navigation">
-				<a href="/api.html">API</a>
-				<a href="/demo.html">Demos</a>
+				<a href="/api">API</a>
+				<a href="/demo">Demos</a>
 				<a href="#machines">Cartridges</a>
 				<a href="#compare">Compare</a>
 				<a href="#principles">Safety</a>
@@ -31,7 +31,7 @@
 					<p class="lede">Pay once over Lightning. Receive one narrow, temporary capability.<br />No account. No renewal. A visible fuse and a clean exit.</p>
 					<div class="hero-actions">
 						<a class="button primary" href="#machines">Choose a cartridge</a>
-						<a class="button ghost" href="/demo.html">Try the demos</a>
+						<a class="button ghost" href="/demo">Try the demos</a>
 					</div>
 					<ul class="signal-list" aria-label="Product properties">
 						<li>From 42 sats</li><li>HTTP 402</li><li>Lightning native</li><li>No auto-renewal</li><li>Source-available</li>
@@ -67,7 +67,7 @@
 						<div class="card-body">
 							<div class="card-title"><div class="product-heading"><svg class="product-icon" viewBox="0 0 72 72" role="img"><title>CATCH webhook inbox</title><rect x="9" y="30" width="54" height="33" rx="3"/><path d="M9 42h16l6 8h10l6-8h16M36 8v26m-9-9 9 9 9-9"/><rect x="13" y="9" width="10" height="10"/><rect x="49" y="9" width="10" height="10"/></svg><div><p class="product-kicker">INBOUND-ONLY WEBHOOK</p><h3>CATCH</h3></div></div><span>LIVE</span></div>
 							<p class="product-line">Catch webhooks from GitHub, forms, monitors, or devices.<br />Inspect the method, headers, body, source IP, and location in one private inbox, then delete individual events or destroy the whole inbox.</p>
-							<a class="demo-link" href="/demo.html#catch">Preview a demo inbox →</a>
+							<a class="demo-link" href="/demo#catch">Preview a demo inbox →</a>
 							<div class="feature-strip"><span>Inbound only</span><span>Raw bytes</span><span>Hard stop</span></div>
 							<div class="plan-grid" aria-label="CATCH plan comparison">
 								<article class="plan-card"><header><small>SPARK</small><div class="plan-price"><strong>42</strong><span>SATS</span></div><b class="plan-duration">4h 02m</b></header><dl><div><dt>Requests</dt><dd>402</dd></div><div><dt>Storage</dt><dd>2 MiB</dd></div><div><dt>Payload</dt><dd>64 KiB</dd></div></dl><button class="button plan-buy" data-buy="catch" data-plan="spark">Choose Spark</button></article>
@@ -82,7 +82,7 @@
 						<div class="card-body">
 							<div class="card-title"><div class="product-heading"><svg class="product-icon" viewBox="0 0 72 72" role="img"><title>WHISPER encrypted message</title><rect x="9" y="16" width="54" height="43" rx="4"/><path d="m9 22 27 22 27-22M9 59l20-20m34 20L43 39"/><path d="M51 9v14m-7-7h14"/></svg><div><p class="product-kicker">CLIENT-ENCRYPTED DEAD DROP</p><h3>WHISPER</h3></div></div><span>LIVE</span></div>
 							<p class="product-line">Send an encrypted note, password, recovery detail, or private handoff.<br />The message is encrypted in your browser before upload and stays available only for the purchased time and read allowance.</p>
-							<a class="demo-link" href="/demo.html#whisper">Preview a demo handoff →</a>
+							<a class="demo-link" href="/demo#whisper">Preview a demo handoff →</a>
 							<div class="plan-grid" aria-label="WHISPER plan comparison">
 								<article class="plan-card"><header><small>SPARK</small><div class="plan-price"><strong>42</strong><span>SATS</span></div><b class="plan-duration">7 days</b></header><dl><div><dt>Read allowance</dt><dd>1 read</dd></div><div><dt>Encrypted size</dt><dd>Up to 4.02 MiB</dd></div><div><dt>Best for</dt><dd>One private handoff</dd></div></dl><button class="button plan-buy" data-buy="whisper" data-plan="spark">Choose Spark</button></article>
 								<article class="plan-card recommended"><div class="recommendation">BEST BALANCE</div><header><small>STANDARD</small><div class="plan-price"><strong>402</strong><span>SATS</span></div><b class="plan-duration">42 days</b></header><dl><div><dt>Read allowance</dt><dd>Up to 42 reads</dd></div><div><dt>Encrypted size</dt><dd>Up to 4.02 MiB</dd></div><div><dt>Best for</dt><dd>Small team handoff</dd></div></dl><button class="button plan-buy primary" data-buy="whisper" data-plan="standard">Choose Standard</button></article>
@@ -96,7 +96,7 @@
 						<div class="card-body">
 							<div class="card-title"><div class="product-heading"><svg class="product-icon" viewBox="0 0 72 72" role="img"><title>PULSE heartbeat monitor</title><path d="M7 39h13l7-18 11 34 8-25 7 9h12"/><rect x="7" y="8" width="58" height="56" rx="4"/></svg><div><p class="product-kicker">TEMPORARY HEARTBEAT MONITOR</p><h3>PULSE</h3></div></div><span>LIVE</span></div>
 							<p class="product-line">Give a cron job, backup, agent, or service one tiny heartbeat endpoint.<br />Get a polished private dashboard and optional public status page with waiting, operational, late, exhausted, and expired states.</p>
-							<a class="demo-link" href="/demo.html#pulse">Preview a demo monitor →</a>
+							<a class="demo-link" href="/demo#pulse">Preview a demo monitor →</a>
 							<div class="feature-strip"><span>API first</span><span>No request bodies</span><span>Optional public status</span><span>Fixed lifetime quota</span></div>
 							<p>The quota belongs to the full lifetime. Send heartbeats in bursts or distribute them evenly; the cadence below is a practical sizing guide, not a per-minute throttle.</p>
 							<div class="plan-grid" aria-label="PULSE plan comparison">
@@ -122,7 +122,7 @@
 
 			<section class="principles" id="principles"><div class="shell section principles-grid"><div><p class="eyebrow">THE SAFETY INTERLOCK</p><h2>Closed machines.<br />Not generic infrastructure.</h2></div><div class="rules"><div><span>01</span><p><strong>No arbitrary code.</strong> Every cartridge has one job and fixed behavior.</p></div><div><span>02</span><p><strong>No hidden forwarding.</strong> CATCH receives; it never calls a user-supplied destination.</p></div><div><span>03</span><p><strong>No forever plan.</strong> Every purchase shows its fuse before payment.</p></div><div><span>04</span><p><strong>No account recovery.</strong> Save the dispensed keys or link when it appears.</p></div></div></div></section>
 
-			<section class="shell section api-cta"><div><p class="eyebrow">BUILD WITH HTTP 402</p><h2>Prefer the API?</h2><p>The complete payment, provisioning, capability and lifecycle reference now lives on its own page.</p></div><a class="button primary" href="/api.html">Open API documentation</a></section>
+			<section class="shell section api-cta"><div><p class="eyebrow">BUILD WITH HTTP 402</p><h2>Prefer the API?</h2><p>The complete payment, provisioning, capability and lifecycle reference now lives on its own page.</p></div><a class="button primary" href="/api">Open API documentation</a></section>
 
 			<section class="shell section closing"><p class="eyebrow">STATUS / THREE CARTRIDGES LIVE</p><h2>Insert sats.<br />Receive a tiny piece of the Internet.</h2><p>Lightning checkout is live and verified end to end. Choose the smallest plan that fits the job; every cartridge is temporary by design.</p><a class="button primary" href="#machines">Choose a cartridge</a></section>
 		</main>
@@ -133,8 +133,11 @@
 				<p id="checkout-intro" class="checkout-intro"></p>
 				<fieldset><legend>Choose a plan</legend><div id="checkout-plans" class="checkout-plans"></div></fieldset>
 				<label id="whisper-note-field" hidden><span>Message</span><textarea id="whisper-note" maxlength="4000000" rows="7" placeholder="Encrypted in this browser before upload"></textarea><small>Plaintext stays in this browser. Up to 4,000,000 characters; encrypted payload must fit within 4.02 MiB.</small></label>
-				<label id="whisper-schedule-field" hidden><span>Reveal time <small>(optional)</small></span><input id="whisper-reveal-at" type="datetime-local" step="60" /><small>Leave blank for immediate availability. The selected plan still expires from purchase time, and scheduled delivery must leave at least one hour to open it.</small></label>
-				<label id="whisper-burn-field" class="whisper-burn" hidden><input id="whisper-burn-after-read" type="checkbox" /><span><b>Burn after first read</b><small>Delete the encrypted server copy after its first successful read, even when the plan includes more reads.</small></span></label>
+				<section id="whisper-schedule-field" class="whisper-schedule-card" hidden>
+					<div class="whisper-schedule-icon" aria-hidden="true"><svg viewBox="0 0 48 48"><rect x="7" y="10" width="34" height="31" rx="4"/><path d="M14 6v9m20-9v9M7 19h34M15 27h5m5 0h8m-18 7h12"/></svg></div>
+					<label><span>Reveal time <small>(optional)</small></span><input id="whisper-reveal-at" type="datetime-local" step="60" /><small>Choose when the encrypted handoff becomes available. Leave this empty to reveal it immediately. Scheduled delivery must leave at least one hour before expiry.</small></label>
+				</section>
+				<label id="whisper-read-limit-field" class="whisper-read-limit" hidden><span><b>Delete after this many reads</b><small id="whisper-read-limit-note">Choose any successful read count within the selected plan. The default uses the full allowance.</small></span><input id="whisper-read-limit" type="number" min="1" step="1" inputmode="numeric" /></label>
 				<div id="checkout-summary" class="checkout-summary"></div>
 				<button id="checkout-submit" class="button primary" type="submit">Create Lightning invoice</button>
 				<div id="checkout-requesting" class="checkout-requesting" hidden aria-live="polite"><i aria-hidden="true"></i><span><b>Requesting invoice</b><small>Checking the live catalogue and reserving one payment attempt.</small></span></div>
@@ -162,6 +165,7 @@
 				<div id="checkout-delivery-actions" class="checkout-delivery-actions" hidden>
 					<a id="checkout-portal" class="button primary" href="#" target="_blank" rel="noreferrer">Open CATCH portal</a>
 					<button id="checkout-copy-portal" class="button ghost" type="button">Copy portal link</button>
+					<button id="checkout-download" class="button ghost" type="button" hidden>Download purchase JSON</button>
 					<small id="checkout-portal-note">Bookmark this private owner link. It cannot be recovered later.</small>
 				</div>
 			</form>
@@ -169,6 +173,6 @@
 
 		<footer class="footer shell"><span>THE402MACHINE.COM</span><span>PAYMENT REQUIRED / TAKEN LITERALLY</span><span>© 2026</span></footer>
 		<script type="module" src="/assets/landing.js?v=1"></script>
-		<script type="module" src="/assets/checkout.js?v=23"></script>
+		<script type="module" src="/assets/checkout.js?v=26"></script>
 	</body>
 </html>

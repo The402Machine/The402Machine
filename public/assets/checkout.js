@@ -12,8 +12,9 @@ const noteField = document.querySelector("#whisper-note-field");
 const note = document.querySelector("#whisper-note");
 const scheduleField = document.querySelector("#whisper-schedule-field");
 const revealAtInput = document.querySelector("#whisper-reveal-at");
-const burnField = document.querySelector("#whisper-burn-field");
-const burnAfterRead = document.querySelector("#whisper-burn-after-read");
+const readLimitField = document.querySelector("#whisper-read-limit-field");
+const readLimitInput = document.querySelector("#whisper-read-limit");
+const readLimitNote = document.querySelector("#whisper-read-limit-note");
 const status = document.querySelector("#checkout-status");
 const output = document.querySelector("#checkout-output");
 const closeButton = document.querySelector("#checkout-close");
@@ -31,9 +32,10 @@ const invoice = document.querySelector("#checkout-invoice");
 const deliveryActions = document.querySelector("#checkout-delivery-actions");
 const portalLink = document.querySelector("#checkout-portal");
 const copyPortalButton = document.querySelector("#checkout-copy-portal");
+const downloadButton = document.querySelector("#checkout-download");
 const portalNote = document.querySelector("#checkout-portal-note");
 
-if (!(dialog instanceof HTMLDialogElement) || !(form instanceof HTMLFormElement) || !(title instanceof HTMLElement) || !(intro instanceof HTMLElement) || !(planChoices instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(noteField instanceof HTMLElement) || !(note instanceof HTMLTextAreaElement) || !(scheduleField instanceof HTMLElement) || !(revealAtInput instanceof HTMLInputElement) || !(burnField instanceof HTMLElement) || !(burnAfterRead instanceof HTMLInputElement) || !(status instanceof HTMLElement) || !(output instanceof HTMLTextAreaElement) || !(closeButton instanceof HTMLButtonElement) || !(submitButton instanceof HTMLButtonElement) || !(indicator instanceof HTMLElement) || !(requesting instanceof HTMLElement) || !(paymentPanel instanceof HTMLElement) || !(progress instanceof HTMLElement) || !(qr instanceof HTMLElement) || !(amount instanceof HTMLElement) || !(walletLink instanceof HTMLAnchorElement) || !(webLnButton instanceof HTMLButtonElement) || !(copyButton instanceof HTMLButtonElement) || !(invoice instanceof HTMLTextAreaElement) || !(deliveryActions instanceof HTMLElement) || !(portalLink instanceof HTMLAnchorElement) || !(copyPortalButton instanceof HTMLButtonElement) || !(portalNote instanceof HTMLElement)) throw new Error("Checkout is incomplete");
+if (!(dialog instanceof HTMLDialogElement) || !(form instanceof HTMLFormElement) || !(title instanceof HTMLElement) || !(intro instanceof HTMLElement) || !(planChoices instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(noteField instanceof HTMLElement) || !(note instanceof HTMLTextAreaElement) || !(scheduleField instanceof HTMLElement) || !(revealAtInput instanceof HTMLInputElement) || !(readLimitField instanceof HTMLElement) || !(readLimitInput instanceof HTMLInputElement) || !(readLimitNote instanceof HTMLElement) || !(status instanceof HTMLElement) || !(output instanceof HTMLTextAreaElement) || !(closeButton instanceof HTMLButtonElement) || !(submitButton instanceof HTMLButtonElement) || !(indicator instanceof HTMLElement) || !(requesting instanceof HTMLElement) || !(paymentPanel instanceof HTMLElement) || !(progress instanceof HTMLElement) || !(qr instanceof HTMLElement) || !(amount instanceof HTMLElement) || !(walletLink instanceof HTMLAnchorElement) || !(webLnButton instanceof HTMLButtonElement) || !(copyButton instanceof HTMLButtonElement) || !(invoice instanceof HTMLTextAreaElement) || !(deliveryActions instanceof HTMLElement) || !(portalLink instanceof HTMLAnchorElement) || !(copyPortalButton instanceof HTMLButtonElement) || !(downloadButton instanceof HTMLButtonElement) || !(portalNote instanceof HTMLElement)) throw new Error("Checkout is incomplete");
 
 let catalog = null;
 let product = "catch";
@@ -41,6 +43,8 @@ let selectedPlanId = "standard";
 let encryptionKey = "";
 let currentInvoice = "";
 let currentPortalUrl = "";
+let currentPurchaseJson = "";
+let currentPurchaseFilename = "";
 let checkoutSession = 0;
 let deliveryDispensed = false;
 let quoteAttempt = null;
@@ -94,9 +98,8 @@ function openCheckout() {
 	note.required = product === "whisper";
 	scheduleField.hidden = product !== "whisper";
 	revealAtInput.value = "";
-	burnAfterRead.checked = false;
-	updateBurnChoice();
 	renderPlanChoices(productData.plans);
+	updateReadLimitChoice();
 	updateSummary();
 	status.textContent = "Review the plan, then create the Lightning invoice.";
 	dialog.showModal();
@@ -110,8 +113,14 @@ function resetCheckoutState() {
 	output.value = "";
 	deliveryActions.hidden = true;
 	currentPortalUrl = "";
+	currentPurchaseJson = "";
+	currentPurchaseFilename = "";
 	portalLink.href = "#";
+	portalLink.hidden = false;
 	copyPortalButton.textContent = "Copy portal link";
+	copyPortalButton.hidden = false;
+	downloadButton.hidden = true;
+	downloadButton.textContent = "Download purchase JSON";
 	paymentPanel.hidden = true;
 	currentInvoice = "";
 	deliveryDispensed = false;
@@ -131,9 +140,18 @@ function renderPlanChoices(plans) {
 		input.name = "planId";
 		input.value = plan.planId;
 		input.checked = plan.planId === selectedPlanId;
-		input.addEventListener("change", () => { selectedPlanId = plan.planId; updateBurnChoice(); updateSummary(); });
+		input.addEventListener("change", () => { selectedPlanId = plan.planId; updateReadLimitChoice(); updateSummary(); });
 		const copy = document.createElement("span");
-		copy.innerHTML = `<b>${plan.planId.toUpperCase()}</b><strong>${formatSats(plan.priceSats)} <small>SATS</small></strong><small>${plan.durationLabel} · ${plan.bestFor}</small>`;
+		const planName = document.createElement("b");
+		planName.textContent = plan.planId.toUpperCase();
+		const price = document.createElement("strong");
+		price.append(`${formatSats(plan.priceSats)} `);
+		const currency = document.createElement("small");
+		currency.textContent = "SATS";
+		price.append(currency);
+		const planDetails = document.createElement("small");
+		planDetails.textContent = `${plan.durationLabel} · ${plan.bestFor}`;
+		copy.replaceChildren(planName, price, planDetails);
 		label.append(input, copy);
 		return label;
 	}));
@@ -143,21 +161,42 @@ function updateSummary() {
 	const plan = selectedPlan();
 	if (plan === null) return;
 	const details = product === "catch" ? `${formatNumber(plan.requestLimit)} requests · ${formatBytes(plan.storageLimitBytes)} total storage · ${formatBytes(plan.maxBytesPerRequest)} per request`
-		: product === "whisper" ? `${burnAfterRead.checked ? "Burn after the first successful read" : `${formatNumber(plan.readLimit)} successful ${plan.readLimit === 1 ? "read" : "reads"}`} · ${scheduledRevealIntent() === "immediate" ? "available immediately" : `reveals ${formatLocalDate(new Date(scheduledRevealIntent()))}`} · ${formatBytes(plan.maxCiphertextBytes)} encrypted payload`
+		: product === "whisper" ? `${whisperReadLimitSummary(effectiveWhisperReadLimit())} · ${scheduledRevealIntent() === "immediate" ? "available immediately" : `reveals ${formatLocalDate(new Date(scheduledRevealIntent()))}`} · ${formatBytes(plan.maxCiphertextBytes)} encrypted payload`
 			: `${formatNumber(plan.heartbeatLimit)} heartbeats for the whole lifetime · ${formatCadence(plan.suggestedCadenceSeconds)} when evenly distributed`;
-	summary.innerHTML = `<div><span>${product.toUpperCase()} / ${plan.planId.toUpperCase()}</span><strong>${formatSats(plan.priceSats)} sats</strong></div><p>${plan.durationLabel}. ${details}.</p>`;
+	const summaryHeader = document.createElement("div");
+	const summaryProduct = document.createElement("span");
+	summaryProduct.textContent = `${product.toUpperCase()} / ${plan.planId.toUpperCase()}`;
+	const summaryPrice = document.createElement("strong");
+	summaryPrice.textContent = `${formatSats(plan.priceSats)} sats`;
+	summaryHeader.append(summaryProduct, summaryPrice);
+	const summaryDetails = document.createElement("p");
+	summaryDetails.textContent = `${plan.durationLabel}. ${details}.`;
+	summary.replaceChildren(summaryHeader, summaryDetails);
 }
 
-function updateBurnChoice() {
+function updateReadLimitChoice() {
 	const plan = selectedPlan();
-	burnField.hidden = product !== "whisper" || plan === null || plan.readLimit === 1;
-	if (burnField.hidden) burnAfterRead.checked = false;
+	readLimitField.hidden = product !== "whisper" || plan === null || plan.readLimit === 1;
+	if (plan === null) return;
+	readLimitInput.min = "1";
+	readLimitInput.max = String(plan.readLimit);
+	readLimitInput.value = String(plan.readLimit);
+	readLimitNote.textContent = plan.readLimit === 1 ? "This plan deletes the encrypted copy after its only successful read." : `Choose from 1 to ${formatNumber(plan.readLimit)} successful reads. The default uses all ${formatNumber(plan.readLimit)}.`;
 }
 
 function effectiveWhisperReadLimit() {
 	const plan = selectedPlan();
-	return burnAfterRead.checked ? 1 : plan?.readLimit ?? 1;
+	if (plan === null || plan.readLimit === 1) return 1;
+	return readLimitInput.valueAsNumber;
 }
+
+function hasValidWhisperReadLimit() {
+	const plan = selectedPlan();
+	const requested = readLimitInput.valueAsNumber;
+	return plan !== null && Number.isInteger(requested) && requested >= 1 && requested <= plan.readLimit;
+}
+
+function whisperReadLimitSummary(readLimit) { return `Delete after ${formatNumber(readLimit)} successful ${readLimit === 1 ? "read" : "reads"}`; }
 
 function scheduledRevealIntent() {
 	if (revealAtInput.value.length === 0) return "immediate";
@@ -165,7 +204,7 @@ function scheduledRevealIntent() {
 	return Number.isNaN(revealAt.getTime()) ? "invalid" : revealAt.toISOString();
 }
 
-burnAfterRead.addEventListener("change", updateSummary);
+readLimitInput.addEventListener("input", updateSummary);
 revealAtInput.addEventListener("change", updateSummary);
 
 closeButton.addEventListener("click", () => closeCheckout());
@@ -189,6 +228,20 @@ copyPortalButton.addEventListener("click", async () => {
 	} catch {
 		status.textContent = "Could not copy the portal link. Open it and bookmark the page instead.";
 	}
+});
+downloadButton.addEventListener("click", () => {
+	if (currentPurchaseJson.length === 0 || currentPurchaseFilename.length === 0) return;
+	const blob = new Blob([currentPurchaseJson], { type: "application/json;charset=utf-8" });
+	const objectUrl = URL.createObjectURL(blob);
+	const anchor = document.createElement("a");
+	anchor.href = objectUrl;
+	anchor.download = currentPurchaseFilename;
+	anchor.hidden = true;
+	document.body.append(anchor);
+	anchor.click();
+	anchor.remove();
+	URL.revokeObjectURL(objectUrl);
+	downloadButton.textContent = "Purchase JSON downloaded";
 });
 webLnButton.addEventListener("click", async () => {
 	if (currentInvoice.length === 0) return;
@@ -222,6 +275,7 @@ form.addEventListener("submit", async (event) => {
 		if (product === "whisper") {
 			const revealIntent = scheduledRevealIntent();
 			if (revealIntent === "invalid") throw new Error("Choose a valid reveal date or leave it blank for immediate delivery.");
+			if (!hasValidWhisperReadLimit()) throw new Error("Choose a whole-number read limit within the selected plan.");
 			const intent = `whisper:${selectedPlanId}:${effectiveWhisperReadLimit()}:${scheduledRevealIntent()}:${note.value}`;
 			if (quoteAttempt?.intent !== intent) {
 				const sealed = await sealWhisper(note.value);
@@ -272,7 +326,13 @@ async function pollDelivery(orderId, session) {
 		setPaymentStage("paid");
 		paymentPanel.hidden = true;
 		if (resource.product === "whisper") {
-			output.value = whisperLink(location.origin, resource.publicId, resource.readToken, encryptionKey);
+			const privateUrl = whisperLink(location.origin, resource.publicId, resource.readToken, encryptionKey);
+			output.value = privateUrl;
+			setPurchaseBackup(resource, { privateUrl, readToken: resource.readToken, encryptionKey, expiresAt: resource.expiresAt });
+			portalLink.hidden = true;
+			copyPortalButton.hidden = true;
+			portalNote.textContent = "Save this JSON with the private WHISPER link. Anyone with the file can read the message while it remains available.";
+			deliveryActions.hidden = false;
 		} else if (resource.product === "catch") {
 			const portalUrl = catchPortalLink(location.origin, resource.publicId, resource.ownerToken, resource.ingestToken);
 			currentPortalUrl = portalUrl;
@@ -280,7 +340,9 @@ async function pollDelivery(orderId, session) {
 			portalLink.textContent = "Open CATCH portal";
 			portalNote.textContent = "Bookmark this private CATCH owner link. It cannot be recovered later.";
 			deliveryActions.hidden = false;
-			output.value = JSON.stringify({ portalUrl: portalUrl, ingestUrl: `${location.origin}/c/${resource.publicId}`, ingestToken: resource.ingestToken, ownerToken: resource.ownerToken, eventsUrl: `${location.origin}/api/catch/${resource.publicId}/events`, expiresAt: resource.expiresAt }, null, 2);
+			const purchase = { portalUrl, ingestUrl: `${location.origin}/c/${resource.publicId}`, ingestToken: resource.ingestToken, ownerToken: resource.ownerToken, eventsUrl: `${location.origin}/api/catch/${resource.publicId}/events`, expiresAt: resource.expiresAt };
+			output.value = JSON.stringify(purchase, null, 2);
+			setPurchaseBackup(resource, purchase);
 		} else {
 			const portalUrl = pulsePortalLink(location.origin, resource.publicId, resource.ownerToken, resource.pingToken);
 			currentPortalUrl = portalUrl;
@@ -288,7 +350,9 @@ async function pollDelivery(orderId, session) {
 			portalLink.textContent = "Open PULSE dashboard";
 			portalNote.textContent = "Bookmark this private PULSE owner link. Enable and copy the public status page from the dashboard if needed.";
 			deliveryActions.hidden = false;
-			output.value = JSON.stringify({ portalUrl, heartbeatUrl: `${location.origin}/p/${resource.publicId}`, ownerToken: resource.ownerToken, pingToken: resource.pingToken, expiresAt: resource.expiresAt }, null, 2);
+			const purchase = { portalUrl, heartbeatUrl: `${location.origin}/p/${resource.publicId}`, ownerToken: resource.ownerToken, pingToken: resource.pingToken, expiresAt: resource.expiresAt };
+			output.value = JSON.stringify(purchase, null, 2);
+			setPurchaseBackup(resource, purchase);
 		}
 		output.hidden = false;
 		deliveryDispensed = true;
@@ -298,11 +362,16 @@ async function pollDelivery(orderId, session) {
 	if (session === checkoutSession && dialog.open) throw new Error("Invoice still unpaid or expired.");
 }
 
+function setPurchaseBackup(resource, details) {
+	currentPurchaseJson = JSON.stringify({ version: 1, product: resource.product, publicId: resource.publicId, ...details }, null, 2);
+	currentPurchaseFilename = `the402machine-${resource.product}-${resource.publicId}.json`;
+	downloadButton.hidden = false;
+}
+
 function showInvoice(quote) {
 	currentInvoice = quote.bolt11;
 	invoice.value = quote.bolt11;
 	const qrMarkup = renderQr(quote.bolt11);
-	qr.innerHTML = qrMarkup;
 	const qrImage = new Image();
 	const qrUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(qrMarkup)}`;
 	qrImage.alt = "Lightning invoice QR code";
@@ -340,13 +409,13 @@ function catchPortalLink(origin, publicId, ownerToken, ingestToken) {
 	const payload = new TextEncoder().encode(JSON.stringify({ publicId, ownerToken, ingestToken }));
 	let binary = "";
 	for (const byte of payload) binary += String.fromCharCode(byte);
-	return `${origin}/catch.html#${btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "")}`;
+	return `${origin}/catch#${btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "")}`;
 }
 function pulsePortalLink(origin, publicId, ownerToken, pingToken) {
 	const payload = new TextEncoder().encode(JSON.stringify({ publicId, ownerToken, pingToken }));
 	let binary = "";
 	for (const byte of payload) binary += String.fromCharCode(byte);
-	return `${origin}/pulse.html#${btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "")}`;
+	return `${origin}/pulse#${btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "")}`;
 }
 function formatSats(value) { return new Intl.NumberFormat("en-US").format(value); }
 function formatNumber(value) { return new Intl.NumberFormat("en-US").format(value); }

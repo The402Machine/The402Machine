@@ -1,0 +1,1984 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "The402Machine HTTP API",
+    "version": "0.1.0",
+    "description": "Buy temporary CATCH, WHISPER and PULSE capabilities over Lightning. Capabilities are bearer secrets: keep them out of logs, analytics and shared URLs.",
+    "license": {
+      "name": "Source-available; see repository license",
+      "url": "https://github.com/The402Machine/The402Machine"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://the402machine.com",
+      "description": "Production"
+    }
+  ],
+  "tags": [
+    {
+      "name": "System",
+      "description": "Service health and readiness."
+    },
+    {
+      "name": "Payments",
+      "description": "Catalogue, Lightning quotes and settlement polling."
+    },
+    {
+      "name": "CATCH",
+      "description": "Webhook ingestion and private owner operations."
+    },
+    {
+      "name": "WHISPER",
+      "description": "Client-encrypted retrieval with scheduled reveal and bounded reads."
+    },
+    {
+      "name": "PULSE",
+      "description": "Heartbeat ingestion, owner settings and status projections."
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Service health",
+        "tags": [
+          "System"
+        ],
+        "responses": {
+          "200": {
+            "description": "Healthy service",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "service",
+                    "status"
+                  ],
+                  "properties": {
+                    "service": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "const": "ok"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "operationId": "getHealth"
+      }
+    },
+    "/api/catalog": {
+      "get": {
+        "summary": "List products, plans, prices and limits",
+        "tags": [
+          "Payments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Current catalogue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Catalogue"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "operationId": "getApiCatalog"
+      }
+    },
+    "/api/payments/catch": {
+      "post": {
+        "summary": "Create a CATCH Lightning quote",
+        "tags": [
+          "Payments"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanSelection"
+              }
+            }
+          }
+        },
+        "responses": {
+          "402": {
+            "description": "Lightning invoice quote. Poll the returned orderId after paying.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentQuote"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "security": [],
+        "operationId": "postApiPaymentsCatch"
+      }
+    },
+    "/api/payments/pulse": {
+      "post": {
+        "summary": "Create a PULSE Lightning quote",
+        "tags": [
+          "Payments"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanSelection"
+              }
+            }
+          }
+        },
+        "responses": {
+          "402": {
+            "description": "Lightning invoice quote. Poll the returned orderId after paying.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentQuote"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "security": [],
+        "operationId": "postApiPaymentsPulse"
+      }
+    },
+    "/api/payments/whisper": {
+      "post": {
+        "summary": "Create a WHISPER quote from client-encrypted bytes",
+        "tags": [
+          "Payments"
+        ],
+        "description": "Encrypt in the client before upload. The server never receives the AES key.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/WhisperPlan"
+          },
+          {
+            "$ref": "#/components/parameters/WhisperReadLimit"
+          },
+          {
+            "$ref": "#/components/parameters/WhisperRevealAt"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "contentEncoding": "base64"
+              }
+            }
+          }
+        },
+        "responses": {
+          "402": {
+            "description": "Lightning invoice quote. Poll the returned orderId after paying.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentQuote"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "security": [],
+        "operationId": "postApiPaymentsWhisper"
+      }
+    },
+    "/api/payments/{orderId}": {
+      "get": {
+        "summary": "Poll payment and receive the provisioned capability",
+        "tags": [
+          "Payments"
+        ],
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paid and provisioned. Save the returned capability immediately.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettledPayment"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment still pending",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "settled"
+                  ],
+                  "properties": {
+                    "settled": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "security": [],
+        "operationId": "getApiPaymentsOrderid"
+      }
+    },
+    "/c/{publicId}": {
+      "get": {
+        "summary": "Ingest a GET event into CATCH",
+        "tags": [
+          "CATCH"
+        ],
+        "description": "The ingest capability is optional. Valid token-backed events are marked authenticated; tokenless or invalid-token events are recorded as public.",
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {},
+          {
+            "bearerCapability": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {}
+            },
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Accepted"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "description": "CATCH unavailable"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "operationId": "getCPublicid"
+      },
+      "post": {
+        "summary": "Ingest a POST event into CATCH",
+        "tags": [
+          "CATCH"
+        ],
+        "description": "The ingest capability is optional. Valid token-backed events are marked authenticated; tokenless or invalid-token events are recorded as public.",
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {},
+          {
+            "bearerCapability": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {}
+            },
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Accepted"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "description": "CATCH unavailable"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "operationId": "postCPublicid"
+      },
+      "put": {
+        "summary": "Ingest a PUT event into CATCH",
+        "tags": [
+          "CATCH"
+        ],
+        "description": "The ingest capability is optional. Valid token-backed events are marked authenticated; tokenless or invalid-token events are recorded as public.",
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {},
+          {
+            "bearerCapability": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {}
+            },
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Accepted"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "description": "CATCH unavailable"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "operationId": "putCPublicid"
+      },
+      "patch": {
+        "summary": "Ingest a PATCH event into CATCH",
+        "tags": [
+          "CATCH"
+        ],
+        "description": "The ingest capability is optional. Valid token-backed events are marked authenticated; tokenless or invalid-token events are recorded as public.",
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {},
+          {
+            "bearerCapability": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {}
+            },
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Accepted"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "description": "CATCH unavailable"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "operationId": "patchCPublicid"
+      },
+      "delete": {
+        "summary": "Ingest a DELETE event into CATCH",
+        "tags": [
+          "CATCH"
+        ],
+        "description": "The ingest capability is optional. Valid token-backed events are marked authenticated; tokenless or invalid-token events are recorded as public.",
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {},
+          {
+            "bearerCapability": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {}
+            },
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Accepted"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "description": "CATCH unavailable"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "operationId": "deleteCPublicid"
+      },
+      "options": {
+        "summary": "Ingest a OPTIONS event into CATCH",
+        "tags": [
+          "CATCH"
+        ],
+        "description": "The ingest capability is optional. Valid token-backed events are marked authenticated; tokenless or invalid-token events are recorded as public.",
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {},
+          {
+            "bearerCapability": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {}
+            },
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Accepted"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "description": "CATCH unavailable"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "operationId": "optionsCPublicid"
+      }
+    },
+    "/api/catch/{publicId}": {
+      "get": {
+        "summary": "Read CATCH status",
+        "tags": [
+          "CATCH"
+        ],
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerCapability": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private owner status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatchStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "operationId": "getApiCatchPublicid"
+      },
+      "delete": {
+        "summary": "Destroy CATCH and all stored events",
+        "tags": [
+          "CATCH"
+        ],
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerCapability": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Destroyed"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "operationId": "deleteApiCatchPublicid"
+      }
+    },
+    "/api/catch/{publicId}/events": {
+      "get": {
+        "summary": "List CATCH events",
+        "tags": [
+          "CATCH"
+        ],
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "access",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "public",
+                "authenticated"
+              ]
+            }
+          },
+          {
+            "name": "method",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "contentType",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerCapability": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cursor page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatchEventPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "operationId": "getApiCatchPublicidEvents"
+      }
+    },
+    "/api/catch/{publicId}/events/{eventId}": {
+      "delete": {
+        "summary": "Delete one CATCH event",
+        "tags": [
+          "CATCH"
+        ],
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerCapability": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "operationId": "deleteApiCatchPublicidEventsEventid"
+      }
+    },
+    "/w/{publicId}": {
+      "get": {
+        "summary": "Consume one WHISPER read",
+        "tags": [
+          "WHISPER"
+        ],
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerCapability": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Opaque ciphertext",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "contentEncoding": "base64"
+                }
+              }
+            }
+          },
+          "425": {
+            "description": "Scheduled reveal has not arrived",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "not revealed"
+                    },
+                    "revealAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "operationId": "getWPublicid"
+      }
+    },
+    "/p/{publicId}": {
+      "post": {
+        "summary": "Submit a PULSE heartbeat",
+        "tags": [
+          "PULSE"
+        ],
+        "description": "Request bodies are ignored and never stored.",
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerCapability": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Heartbeat accepted"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "operationId": "postPPublicid"
+      }
+    },
+    "/api/pulse/{publicId}": {
+      "get": {
+        "summary": "Read private PULSE status",
+        "tags": [
+          "PULSE"
+        ],
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerCapability": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Owner status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerPulseStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "operationId": "getApiPulsePublicid"
+      },
+      "patch": {
+        "summary": "Update PULSE settings",
+        "tags": [
+          "PULSE"
+        ],
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerCapability": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PulseSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated owner status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "operationId": "patchApiPulsePublicid"
+      },
+      "delete": {
+        "summary": "Destroy PULSE",
+        "tags": [
+          "PULSE"
+        ],
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerCapability": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Destroyed"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "operationId": "deleteApiPulsePublicid"
+      }
+    },
+    "/api/pulse/public/{publicStatusId}": {
+      "get": {
+        "summary": "Read the enabled public PULSE status through its share-only identifier",
+        "tags": [
+          "PULSE"
+        ],
+        "parameters": [
+          {
+            "name": "publicStatusId",
+            "in": "path",
+            "required": true,
+            "description": "Independent read-only share identifier. It is not the heartbeat endpoint identifier.",
+            "schema": {
+              "type": "string",
+              "pattern": "^pulse_status_[A-Za-z0-9_-]{22,}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status-only public projection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicPulseStatus"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "security": [],
+        "operationId": "getApiPulsePublicPublicstatusid"
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerCapability": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Use the exact owner, ingest, read or ping capability dispensed after settlement. Never commit real values."
+      }
+    },
+    "parameters": {
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 128
+        },
+        "example": "replace-with-a-unique-key"
+      },
+      "WhisperPlan": {
+        "name": "X-Whisper-Plan",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/PlanId"
+        }
+      },
+      "WhisperReadLimit": {
+        "name": "X-Whisper-Read-Limit",
+        "in": "header",
+        "required": false,
+        "description": "Whole number from 1 through the selected plan allowance. Defaults to the plan maximum.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 402
+        }
+      },
+      "WhisperRevealAt": {
+        "name": "X-Whisper-Reveal-At",
+        "in": "header",
+        "required": false,
+        "description": "Optional ISO 8601 reveal time inside the purchased lifetime.",
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Invalid request",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Missing or invalid owner capability",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource unavailable or hidden",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "Rate limit exceeded",
+        "headers": {
+          "Retry-After": {
+            "schema": {
+              "type": "integer"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "PlanId": {
+        "type": "string",
+        "enum": [
+          "spark",
+          "standard",
+          "long"
+        ]
+      },
+      "PlanSelection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "planId"
+        ],
+        "properties": {
+          "planId": {
+            "$ref": "#/components/schemas/PlanId"
+          }
+        }
+      },
+      "PaymentQuote": {
+        "type": "object",
+        "required": [
+          "orderId",
+          "product",
+          "planId",
+          "amountSats",
+          "bolt11",
+          "paymentHash"
+        ],
+        "properties": {
+          "orderId": {
+            "type": "string"
+          },
+          "product": {
+            "type": "string",
+            "enum": [
+              "catch",
+              "whisper",
+              "pulse"
+            ]
+          },
+          "planId": {
+            "$ref": "#/components/schemas/PlanId"
+          },
+          "amountSats": {
+            "type": "integer"
+          },
+          "bolt11": {
+            "type": "string"
+          },
+          "paymentHash": {
+            "type": "string"
+          }
+        }
+      },
+      "SettledPayment": {
+        "type": "object",
+        "required": [
+          "settled",
+          "resource"
+        ],
+        "properties": {
+          "settled": {
+            "const": true
+          },
+          "resource": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CatchCapability"
+              },
+              {
+                "$ref": "#/components/schemas/WhisperCapability"
+              },
+              {
+                "$ref": "#/components/schemas/PulseCapability"
+              }
+            ]
+          }
+        }
+      },
+      "CatchCapability": {
+        "type": "object",
+        "required": [
+          "product",
+          "publicId",
+          "ownerToken",
+          "ingestToken",
+          "expiresAt"
+        ],
+        "properties": {
+          "product": {
+            "const": "catch"
+          },
+          "publicId": {
+            "type": "string"
+          },
+          "ownerToken": {
+            "type": "string"
+          },
+          "ingestToken": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "WhisperCapability": {
+        "type": "object",
+        "required": [
+          "product",
+          "publicId",
+          "readToken",
+          "expiresAt"
+        ],
+        "properties": {
+          "product": {
+            "const": "whisper"
+          },
+          "publicId": {
+            "type": "string"
+          },
+          "readToken": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PulseCapability": {
+        "type": "object",
+        "required": [
+          "product",
+          "publicId",
+          "ownerToken",
+          "pingToken",
+          "expiresAt"
+        ],
+        "properties": {
+          "product": {
+            "const": "pulse"
+          },
+          "publicId": {
+            "type": "string"
+          },
+          "ownerToken": {
+            "type": "string"
+          },
+          "pingToken": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PulseSettings": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 240
+          },
+          "expectedIntervalSeconds": {
+            "type": "integer",
+            "minimum": 20,
+            "maximum": 604800
+          },
+          "graceSeconds": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 604800
+          },
+          "publicStatusEnabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PublicPulseStatus": {
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "state",
+          "lastPingAt"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "waiting",
+              "operational",
+              "late",
+              "exhausted",
+              "expired"
+            ]
+          },
+          "lastPingAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "CatchPlan": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "planId",
+          "priceSats",
+          "durationLabel",
+          "bestFor",
+          "available",
+          "requestLimit",
+          "storageLimitBytes",
+          "maxBytesPerRequest"
+        ],
+        "properties": {
+          "planId": {
+            "$ref": "#/components/schemas/PlanId"
+          },
+          "priceSats": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "durationLabel": {
+            "type": "string"
+          },
+          "bestFor": {
+            "type": "string"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "requestLimit": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "storageLimitBytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "maxBytesPerRequest": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "WhisperPlan": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "planId",
+          "priceSats",
+          "durationLabel",
+          "bestFor",
+          "available",
+          "readLimit",
+          "maxCiphertextBytes"
+        ],
+        "properties": {
+          "planId": {
+            "$ref": "#/components/schemas/PlanId"
+          },
+          "priceSats": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "durationLabel": {
+            "type": "string"
+          },
+          "bestFor": {
+            "type": "string"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "readLimit": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "maxCiphertextBytes": {
+            "type": "integer",
+            "minimum": 30
+          }
+        }
+      },
+      "PulsePlan": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "planId",
+          "priceSats",
+          "durationLabel",
+          "bestFor",
+          "available",
+          "heartbeatLimit",
+          "suggestedCadenceSeconds",
+          "minimumGraceSeconds"
+        ],
+        "properties": {
+          "planId": {
+            "$ref": "#/components/schemas/PlanId"
+          },
+          "priceSats": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "durationLabel": {
+            "type": "string"
+          },
+          "bestFor": {
+            "type": "string"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "heartbeatLimit": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "suggestedCadenceSeconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "minimumGraceSeconds": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "Catalogue": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "checkoutEnabled",
+          "currency",
+          "products"
+        ],
+        "properties": {
+          "checkoutEnabled": {
+            "type": "boolean"
+          },
+          "currency": {
+            "const": "sat"
+          },
+          "products": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "catch",
+              "whisper",
+              "pulse"
+            ],
+            "properties": {
+              "catch": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "description",
+                  "plans"
+                ],
+                "properties": {
+                  "description": {
+                    "type": "string"
+                  },
+                  "plans": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/CatchPlan"
+                    }
+                  }
+                }
+              },
+              "whisper": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "description",
+                  "clientEncryption",
+                  "plans"
+                ],
+                "properties": {
+                  "description": {
+                    "type": "string"
+                  },
+                  "clientEncryption": {
+                    "const": "AES-256-GCM"
+                  },
+                  "plans": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/WhisperPlan"
+                    }
+                  }
+                }
+              },
+              "pulse": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "description",
+                  "plans"
+                ],
+                "properties": {
+                  "description": {
+                    "type": "string"
+                  },
+                  "plans": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/PulsePlan"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "CatchStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "publicId",
+          "planId",
+          "status",
+          "requestLimit",
+          "storageLimitBytes",
+          "maxBytesPerRequest",
+          "acceptedRequestCount",
+          "storedBytes",
+          "createdAt",
+          "expiresAt"
+        ],
+        "properties": {
+          "publicId": {
+            "type": "string"
+          },
+          "planId": {
+            "$ref": "#/components/schemas/PlanId"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "suspended",
+              "exhausted",
+              "expired",
+              "manually_destroyed"
+            ]
+          },
+          "requestLimit": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "storageLimitBytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "maxBytesPerRequest": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "acceptedRequestCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "storedBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CatchIpLocation": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "additionalProperties": false,
+        "required": [
+          "ip",
+          "country",
+          "city",
+          "continent",
+          "latitude",
+          "longitude",
+          "source"
+        ],
+        "properties": {
+          "ip": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "continent": {
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "timeZone": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        }
+      },
+      "CatchEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "sequenceNumber",
+          "method",
+          "authenticated",
+          "access",
+          "sourceIp",
+          "ipLocation",
+          "contentType",
+          "headers",
+          "body",
+          "bodyEncoding",
+          "receivedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sequenceNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "HEAD",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE",
+              "OPTIONS"
+            ]
+          },
+          "authenticated": {
+            "type": "boolean"
+          },
+          "access": {
+            "type": "string",
+            "enum": [
+              "public",
+              "authenticated"
+            ]
+          },
+          "sourceIp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ipLocation": {
+            "$ref": "#/components/schemas/CatchIpLocation"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "body": {
+            "type": "string",
+            "contentEncoding": "base64"
+          },
+          "bodyEncoding": {
+            "const": "base64"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CatchEventPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "events",
+          "nextCursor"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatchEvent"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          }
+        }
+      },
+      "OwnerPulseStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "description",
+          "state",
+          "lastPingAt",
+          "publicId",
+          "planId",
+          "status",
+          "heartbeatLimit",
+          "heartbeatCount",
+          "expectedIntervalSeconds",
+          "graceSeconds",
+          "publicStatusEnabled",
+          "createdAt",
+          "expiresAt",
+          "publicStatusId",
+          "heartbeatsRemaining"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "waiting",
+              "operational",
+              "late",
+              "exhausted",
+              "expired"
+            ]
+          },
+          "lastPingAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "publicId": {
+            "type": "string"
+          },
+          "planId": {
+            "$ref": "#/components/schemas/PlanId"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "exhausted",
+              "expired",
+              "manually_destroyed"
+            ]
+          },
+          "heartbeatLimit": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "heartbeatCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "expectedIntervalSeconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "graceSeconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "publicStatusEnabled": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "publicStatusId": {
+            "type": "string",
+            "description": "Independent identifier used only for the optional public status page."
+          },
+          "heartbeatsRemaining": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Private owner-only remaining lifetime heartbeat quota."
+          }
+        }
+      }
+    }
+  }
+}

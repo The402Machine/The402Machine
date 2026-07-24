@@ -25,7 +25,7 @@ button.addEventListener("click", async () => {
 		if (!response.ok) throw new Error("WHISPER is unavailable, expired, or has no reads remaining.");
 		message.textContent = await openWhisper(new Uint8Array(await response.arrayBuffer()), fragmentKey());
 		message.hidden = false;
-		status.textContent = "Decrypted locally. This opening used one read; reloading will use another if any remain.";
+		status.textContent = "Decrypted locally. This opening used one read. The encrypted server copy may now be gone, but this decrypted text stays visible in this tab until you close or reload it.";
 		button.hidden = true;
 	} catch (error) {
 		status.textContent = error instanceof Error ? error.message : "Could not open WHISPER.";

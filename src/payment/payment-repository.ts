@@ -4,7 +4,7 @@ import type { Sql, TransactionSql } from "postgres";
 
 import { CATCH_PLANS } from "../domain/catch-plans.js";
 import { PULSE_PLANS } from "../domain/pulse-plans.js";
-import { MAX_WHISPER_CIPHERTEXT_BYTES, WHISPER_PLANS } from "../domain/whisper-plans.js";
+import { isWhisperReadLimit, MAX_WHISPER_CIPHERTEXT_BYTES, WHISPER_PLANS } from "../domain/whisper-plans.js";
 import type { ProvisionInput } from "../storage/catch-repository.js";
 import { priceForProduct, type PaymentOrder, type PaymentOrderStatus, type PaymentProduct, type PurchasableCatchPlanId } from "./payment-domain.js";
 
@@ -37,7 +37,7 @@ export type DispensedResource =
 
 export type AtomicCatchProvision = ProvisionInput & { product: "catch"; ownerToken: string; ingestToken: string };
 export type AtomicWhisperProvision = { product: "whisper"; publicId: string; planId: PurchasableCatchPlanId; readTokenHash: string; ciphertext: Buffer; readLimit: number; readToken: string; revealAt: Date; expiresAt: Date };
-export type AtomicPulseProvision = { product: "pulse"; publicId: string; planId: PurchasableCatchPlanId; ownerTokenHash: string; pingTokenHash: string; heartbeatLimit: number; expectedIntervalSeconds: number; graceSeconds: number; ownerToken: string; pingToken: string; expiresAt: Date };
+export type AtomicPulseProvision = { product: "pulse"; publicId: string; publicStatusId: string; planId: PurchasableCatchPlanId; ownerTokenHash: string; pingTokenHash: string; heartbeatLimit: number; expectedIntervalSeconds: number; graceSeconds: number; ownerToken: string; pingToken: string; expiresAt: Date };
 export type AtomicProvision = AtomicCatchProvision | AtomicWhisperProvision | AtomicPulseProvision;
 
 export class PaymentRepository {
@@ -55,7 +55,7 @@ export class PaymentRepository {
 		if (product === "catch" && productPayload !== null) throw new Error("CATCH orders cannot contain a product payload");
 		if (product === "pulse" && productPayload !== null) throw new Error("PULSE orders cannot contain a product payload");
 		if (product === "whisper" && (productPayload === null || productPayload.byteLength < 30 || productPayload.byteLength > MAX_WHISPER_CIPHERTEXT_BYTES)) throw new Error("WHISPER ciphertext is invalid");
-		if (product === "whisper" && whisperReadLimit !== 1 && whisperReadLimit !== WHISPER_PLANS[input.planId].readLimit) throw new Error("WHISPER read limit is invalid");
+		if (product === "whisper" && (whisperReadLimit === null || !isWhisperReadLimit(input.planId, whisperReadLimit))) throw new Error("WHISPER read limit is invalid");
 		const rows = await this.sql<PaymentOrderRow[]>`
 			insert into payment_orders (idempotency_key, product, plan_id, product_payload, whisper_read_limit, whisper_reveal_at, amount_sats)
 			values (${input.idempotencyKey}, ${product}, ${input.planId}, ${productPayload}, ${whisperReadLimit}, ${whisperRevealAt}, ${priceForProduct(product, input.planId)})
@@ -163,8 +163,8 @@ async function insertWhisper(tx: TransactionSql, input: AtomicWhisperProvision):
 
 async function insertPulse(tx: TransactionSql, input: AtomicPulseProvision): Promise<string> {
 	const rows = await tx<{ id: string }[]>`
-		insert into pulse_resources (public_id, plan_id, owner_token_hash, ping_token_hash, heartbeat_limit, expected_interval_seconds, grace_seconds, expires_at)
-		values (${input.publicId}, ${input.planId}, ${input.ownerTokenHash}, ${input.pingTokenHash}, ${input.heartbeatLimit}, ${input.expectedIntervalSeconds}, ${input.graceSeconds}, ${input.expiresAt}) returning id
+		insert into pulse_resources (public_id, public_status_id, plan_id, owner_token_hash, ping_token_hash, heartbeat_limit, expected_interval_seconds, grace_seconds, expires_at)
+		values (${input.publicId}, ${input.publicStatusId}, ${input.planId}, ${input.ownerTokenHash}, ${input.pingTokenHash}, ${input.heartbeatLimit}, ${input.expectedIntervalSeconds}, ${input.graceSeconds}, ${input.expiresAt}) returning id
 	`;
 	if (rows[0] === undefined) throw new Error("PULSE payment provisioning returned no resource");
 	return rows[0].id;

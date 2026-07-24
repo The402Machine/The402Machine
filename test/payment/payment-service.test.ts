@@ -21,11 +21,6 @@ class FakeOrderStore implements PaymentOrderStore {
 		return Promise.resolve(order);
 	}
 
-	public attachInvoice(orderId: string, invoice: { paymentHash: string; bolt11: string }): Promise<PaymentOrder> {
-		const order = this.orders.get(orderId)!;
-		Object.assign(order, { status: "invoice_issued", paymentHash: invoice.paymentHash, bolt11: invoice.bolt11 });
-		return Promise.resolve(order);
-	}
 	public ensureInvoice(orderId: string, createInvoice: () => Promise<{ paymentHash: string; bolt11: string }>): Promise<PaymentOrder & { bolt11: string }> {
 		const order = this.orders.get(orderId)!;
 		if (order.paymentHash !== null && order.bolt11 !== null) return Promise.resolve({ ...order, bolt11: order.bolt11 });

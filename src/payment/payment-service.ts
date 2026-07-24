@@ -4,7 +4,6 @@ import type { PaymentOrder, PaymentProduct, PurchasableCatchPlanId } from "./pay
 
 export interface PaymentOrderStore {
 	createOrder(input: { idempotencyKey: string; product?: PaymentProduct; planId: PurchasableCatchPlanId; productPayload?: Buffer | null; whisperReadLimit?: number | null; whisperRevealAt?: Date | null }): Promise<PaymentOrder>;
-	attachInvoice(orderId: string, invoice: { paymentHash: string; bolt11: string }): Promise<PaymentOrder>;
 	ensureInvoice(orderId: string, createInvoice: () => Promise<{ paymentHash: string; bolt11: string }>): Promise<PaymentOrder & { bolt11: string }>;
 	getOrder(orderId: string): Promise<(PaymentOrder & { bolt11: string | null }) | null>;
 	markPaid(orderId: string): Promise<PaymentOrder | null>;

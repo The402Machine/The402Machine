@@ -74,8 +74,8 @@ describe("CATCH owner portal", () => {
 
 		expect(html).toContain('id="checkout-portal"');
 		expect(html).toContain('id="checkout-copy-portal"');
-		expect(checkout).toContain("portalUrl:");
-		expect(checkout).toContain("/catch.html#");
+		expect(checkout).toContain("const purchase = { portalUrl,");
+		expect(checkout).toContain("/catch#");
 		expect(checkout).toContain("portalLink.href = portalUrl");
 		expect(checkout).toContain("deliveryActions.hidden = false");
 	});

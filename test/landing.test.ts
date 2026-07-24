@@ -66,10 +66,10 @@ describe("public landing page", () => {
 		expect(response.body).toContain('data-buy="whisper"');
 		expect(response.body).toContain('data-buy="pulse"');
 		expect(response.body).toContain('data-plan="long"');
-		expect(response.body).toContain('href="/assets/styles.css?v=15"');
-		expect(response.body).toContain('src="/assets/checkout.js?v=23"');
+		expect(response.body).toContain('href="/assets/styles.css?v=19"');
+		expect(response.body).toContain('src="/assets/checkout.js?v=26"');
 		expect(response.body).toContain('src="/assets/landing.js?v=1"');
-		expect(response.body).toContain('href="/api.html"');
+		expect(response.body).toContain('href="/api"');
 		expect(response.body).not.toContain('id="api"');
 		expect(response.body).not.toContain("API / COMPLETE FLOW");
 		expect(response.body).not.toContain("POST|PUT|PATCH|DELETE|GET|HEAD|OPTIONS /c/{publicId}");
@@ -77,9 +77,9 @@ describe("public landing page", () => {
 		expect(response.body).toContain('rel="icon" href="/favicon.svg"');
 		expect(response.body).toContain('id="machine-product"');
 		expect(response.body).toContain('data-machine-product="pulse"');
-		expect(response.body).toContain('href="/demo.html#catch"');
-		expect(response.body).toContain('href="/demo.html#whisper"');
-		expect(response.body).toContain('href="/demo.html#pulse"');
+		expect(response.body).toContain('href="/demo#catch"');
+		expect(response.body).toContain('href="/demo#whisper"');
+		expect(response.body).toContain('href="/demo#pulse"');
 		expect(response.body).toContain("Try the demos");
 		expect(response.body).not.toContain("general-purpose hosting — just");
 		expect(response.body).toContain('id="checkout-payment"');
@@ -113,13 +113,42 @@ describe("public landing page", () => {
 		expect(demo.body).toContain('id="demo-pulse-public-preview"');
 		expect(demo.body).toContain('role="tablist"');
 		expect(demo.body).toContain('role="tabpanel"');
-		expect(demo.body).toContain('src="/assets/demo.js?v=2"');
+		expect(demo.body).toContain('src="/assets/demo.js?v=3"');
 		expect(favicon.statusCode).toBe(200);
 		expect(favicon.headers["content-type"]).toContain("image/svg+xml");
 	});
 
+	it("serves every public page without exposing the .html filename", async () => {
+		const app = buildApp();
+		apps.push(app);
+		for (const [url, expected] of [
+			["/api", "API / COMPLETE FLOW"],
+			["/demo", "FULL PRODUCT EXPERIENCE"],
+			["/catch", "CATCH / OWNER CAPABILITY"],
+			["/whisper", "WHISPER / CLIENT-SIDE DECRYPTION"],
+			["/pulse", "PULSE / PRIVATE CAPABILITY"],
+			["/pulse-public", "SHAREABLE STATUS / READ ONLY"],
+		] as const) {
+			const response = await app.inject({ method: "GET", url });
+			expect(response.statusCode, url).toBe(200);
+			expect(response.headers["content-type"], url).toContain("text/html");
+			expect(response.body, url).toContain(expected);
+		}
+	});
+
+	it("declares the site favicon on every public HTML page", async () => {
+		const pages = ["index.html", "api.html", "demo.html", "catch.html", "whisper.html", "pulse.html", "pulse-public.html"];
+		for (const page of pages) {
+			const html = await readFile(new URL(`../public/${page}`, import.meta.url), "utf8");
+			expect(html, page).toContain('<link rel="icon" href="/favicon.svg" type="image/svg+xml" />');
+		}
+	});
+
 	it("keeps the full product demos local while simulating live dashboard activity", async () => {
-		const source = await readFile(new URL("../public/assets/demo.js", import.meta.url), "utf8");
+		const [source, html] = await Promise.all([
+			readFile(new URL("../public/assets/demo.js", import.meta.url), "utf8"),
+			readFile(new URL("../public/demo.html", import.meta.url), "utf8"),
+		]);
 
 		expect(source).toContain("createMockCatchEvent");
 		expect(source).toContain("renderCatchEvents");
@@ -134,6 +163,16 @@ describe("public landing page", () => {
 		expect(source).not.toContain("sendBeacon");
 		expect(source).not.toContain("localStorage");
 		expect(source).not.toContain("sessionStorage");
+		expect(html).toContain("The plaintext stays visible until you close it");
+		expect(html).toContain("The encrypted server copy is deleted on the final successful read, but the plaintext already decrypted in this tab stays visible until you close it.");
+		expect(html).toContain("Delete after 1 successful read");
+		expect(source).toContain("The encrypted server copy is now gone. This plaintext stays visible in this tab until you close it.");
+		expect(source).toContain("This successful opening deletes the synthetic server copy, while the plaintext remains visible in this tab.");
+		expect(source).toContain("Close plaintext and finish demo");
+		expect(source.indexOf("whisperState.destroyed = whisperState.reads === 0")).toBeLessThan(source.indexOf("whisperElements.message.hidden = false"));
+		expect(source.indexOf("if (whisperState.revealed) return;")).toBeLessThan(source.indexOf("if (whisperState.destroyed || whisperState.reads <= 0)"));
+		expect(source).toContain('whisperElements.close.textContent = "Close plaintext"');
+		expect(source).not.toContain("Closing it completes the final-read burn simulation.");
 	});
 
 	it("serves a polished PULSE status surface without indexing private portals", async () => {
@@ -142,13 +181,19 @@ describe("public landing page", () => {
 		expect(response.statusCode).toBe(200);
 		expect(response.body).toContain("PULSE OWNER");
 		expect(response.body).toContain('name="robots" content="noindex,nofollow,noarchive"');
-		expect(response.body).toContain('src="/assets/pulse-page.js?v=4"');
-		expect(response.body).toContain('id="pulse-signal-track"');
+		expect(response.body).toContain('src="/assets/pulse-page.js?v=5"');
+		expect(response.body).toContain('id="pulse-timeline"');
+		expect(response.body).toContain('id="pulse-refresh-status"');
+		expect(response.body).toContain('id="pulse-quota-remaining"');
+		expect(response.body).toContain('id="pulse-interval-slider"');
+		expect(response.body).toContain('id="pulse-interval-human"');
+		expect(response.body).toContain('id="pulse-grace-slider"');
+		expect(response.body).toContain('id="pulse-grace-human"');
 		expect(response.body).toContain("Copy heartbeat URL");
 		expect(response.body).toContain("Enable public page");
 		expect(response.body).toContain("Disable public page");
 		expect(response.body).toContain('id="pulse-public-card"');
-		expect(response.body).toContain('href="/pulse-public.html"');
+		expect(response.body).toContain('href="/pulse-public"');
 		expect(response.body).not.toContain('id="pulse-public-input"');
 	});
 
@@ -158,7 +203,7 @@ describe("public landing page", () => {
 		expect(response.statusCode).toBe(200);
 		expect(response.body).toContain("PUBLIC PULSE STATUS");
 		expect(response.body).toContain("not currently shared");
-		expect(response.body).toContain('src="/assets/pulse-public.js?v=2"');
+		expect(response.body).toContain('src="/assets/pulse-public.js?v=3"');
 		expect(response.body).not.toContain("Copy heartbeat URL");
 		expect(response.body).not.toContain("Copy curl command");
 		expect(response.body).not.toContain("HEARTBEAT CAPABILITY");
@@ -170,20 +215,30 @@ describe("public landing page", () => {
 		expect(source).not.toContain("expectedIntervalSeconds");
 		expect(source).not.toContain("graceSeconds");
 		expect(source).not.toContain("expiresAt");
+		expect(source).toContain("/api/pulse/public/");
+		expect(source).toContain("^pulse_(?:status_)?");
 	});
 
 	it("renders incoming PULSE heartbeats as a bounded live signal history", async () => {
 		const source = await readFile(new URL("../public/assets/pulse-page.js", import.meta.url), "utf8");
 		expect(source).toContain("appendHeartbeatObservation");
 		expect(source).toContain("heartbeatCount");
-		expect(source).toContain("pulse-signal-node");
-		expect(source).toContain("setInterval(() => void refresh(), 3_000)");
+		expect(source).toContain("pulse-timeline-cell");
+		expect(source).toContain("const REFRESH_INTERVAL_MS = 3_000");
+		expect(source).toContain("setInterval(() => void refresh(), REFRESH_INTERVAL_MS)");
+		expect(source).toContain('refreshStatus.textContent = refreshing ? "Updating…"');
+		expect(source).toContain("heartbeatsRemaining");
+		expect(source).toContain("formatScheduleDuration");
+		expect(source).toContain("syncScheduleControls");
+		expect(source).toContain("const SCHEDULE_STEPS =");
+		expect(source).toContain("closestScheduleStep");
+		expect(source).toContain("data.publicStatusId");
 		expect(source).toContain('enabled ? "Copy public status link" : "Enable public page"');
 		expect(source).toContain("publicUrl.disabled = !enabled");
 		expect(source).toContain("saveSettings({ publicStatusEnabled: enabled }");
 		expect(source).toContain('hash.startsWith("public=")');
-		expect(source).toContain("location.replace(`/pulse-public.html#");
-		expect(await readFile(new URL("../public/demo.html", import.meta.url), "utf8")).toContain("/pulse-public.html#pulse_demo_local_402machine_01");
+		expect(source).toContain("location.replace(`/pulse-public#");
+		expect(await readFile(new URL("../public/demo.html", import.meta.url), "utf8")).toContain("/pulse-public#pulse_status_demo_local_402machine_01");
 	});
 
 	it("exposes the landing stylesheet", async () => {
@@ -204,7 +259,7 @@ describe("public landing page", () => {
 		const response = await app.inject({ method: "GET", url: "/whisper.html" });
 
 		expect(response.statusCode).toBe(200);
-		expect(response.body).toContain('src="/assets/whisper-page.js?v=5"');
+		expect(response.body).toContain('src="/assets/whisper-page.js?v=6"');
 		expect(response.headers["content-security-policy"]).toContain("script-src 'self'");
 		expect(response.headers["content-security-policy"]).not.toContain("script-src 'none'");
 	});
@@ -249,15 +304,21 @@ describe("public landing page", () => {
 	it("presents the invoice as a QR, Lightning link, WebLN action, and pending state", async () => {
 		const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
 		const checkoutSource = await readFile(new URL("../public/assets/checkout.js", import.meta.url), "utf8");
-		expect(html).toContain('id="whisper-burn-field"');
-		expect(html).toContain('id="whisper-burn-after-read"');
-		expect(html).toContain("Burn after first read");
-		expect(html).toContain("even when the plan includes more reads");
+		expect(html).toContain('class="whisper-schedule-card"');
+		expect(html).toContain('id="whisper-read-limit-field"');
+		expect(html).toContain('id="whisper-read-limit"');
+		expect(html).toContain("Delete after this many reads");
+		expect(html).not.toContain("Burn after first read");
 		expect(checkoutSource).toContain('"x-whisper-read-limit": String(effectiveWhisperReadLimit())');
-		expect(checkoutSource).toContain("burnAfterRead.checked");
-		expect(checkoutSource).toContain("Burn after the first successful read");
+		expect(checkoutSource).toContain("readLimitInput.max = String(plan.readLimit)");
+		expect(checkoutSource).toContain("readLimitInput.valueAsNumber");
+		expect(checkoutSource).toContain("hasValidWhisperReadLimit()");
+		expect(checkoutSource).toContain("Choose a whole-number read limit within the selected plan.");
+		expect(checkoutSource).toContain("Delete after ${formatNumber(readLimit)} successful");
 		expect(html).toContain('id="whisper-schedule-field"');
 		expect(html).toContain('id="whisper-reveal-at"');
+		expect(html).toContain('class="whisper-schedule-icon"');
+		expect(html).toContain("Choose when the encrypted handoff becomes available");
 		expect(checkoutSource).toContain('"x-whisper-reveal-at"');
 		expect(checkoutSource).toContain("revealAt.toISOString()");
 		expect(checkoutSource).toContain("whisper:${selectedPlanId}:${effectiveWhisperReadLimit()}:${scheduledRevealIntent()}:${note.value}");
@@ -299,6 +360,29 @@ describe("public landing page", () => {
 		expect(webLnBundle).toContain("requestProvider");
 	});
 
+	it("renders catalogue copy without inserting remote strings as HTML", async () => {
+		const source = await readFile(new URL("../public/assets/checkout.js", import.meta.url), "utf8");
+		expect(source).not.toContain("copy.innerHTML");
+		expect(source).not.toContain("summary.innerHTML");
+		expect(source).not.toContain("qr.innerHTML");
+		expect(source).toContain("copy.replaceChildren");
+		expect(source).toContain("summary.replaceChildren");
+	});
+
+	it("downloads dispensed purchase credentials as a JSON backup", async () => {
+		const [html, source] = await Promise.all([
+			readFile(new URL("../public/index.html", import.meta.url), "utf8"),
+			readFile(new URL("../public/assets/checkout.js", import.meta.url), "utf8"),
+		]);
+		expect(html).toContain('id="checkout-download"');
+		expect(html).toContain("Download purchase JSON");
+		expect(source).toContain('new Blob([currentPurchaseJson], { type: "application/json;charset=utf-8" })');
+		expect(source).toContain("URL.createObjectURL");
+		expect(source).toContain("URL.revokeObjectURL");
+		expect(source).toContain("anchor.download = currentPurchaseFilename");
+		expect(source).toContain("downloadButton.hidden = false");
+	});
+
 	it("keeps checkout open on backdrop and Escape, and confirms X after dispensing credentials", async () => {
 		const source = await readFile(new URL("../public/assets/checkout.js", import.meta.url), "utf8");
 
@@ -317,8 +401,10 @@ describe("public landing page", () => {
 
 		expect(html).toContain("Confirm before opening");
 		expect(html).toContain("one of its available reads");
+		expect(html).toContain("Once it is visible here, it stays on screen until you close or reload this tab");
 		expect(source).toContain("window.confirm");
 		expect(source).toContain("uses one available read");
+		expect(source).toContain("The encrypted server copy may now be gone, but this decrypted text stays visible in this tab until you close or reload it.");
 		expect(source.indexOf("window.confirm")).toBeLessThan(source.indexOf("fetch(`/w/"));
 	});
 });

@@ -21,7 +21,7 @@ else {
 
 async function refresh() {
 	try {
-		const response = await fetch(`/api/pulse/${encodeURIComponent(publicId)}/public`, { cache: "no-store" });
+		const response = await fetch(`/api/pulse/public/${encodeURIComponent(publicId)}`, { cache: "no-store" });
 		if (!response.ok) return showError();
 		current = await response.json();
 		render(current);
@@ -48,7 +48,7 @@ function renderClock() {
 
 function parsePublicId() {
 	const value = decodeURIComponent(location.hash.slice(1));
-	return /^pulse_[A-Za-z0-9_-]{22,}$/u.test(value) ? value : null;
+	return /^pulse_(?:status_)?[A-Za-z0-9_-]{22,}$/u.test(value) ? value : null;
 }
 function showError() { dashboard.hidden = true; errorPanel.hidden = false; connection.textContent = "NOT SHARED"; connection.classList.remove("online"); }
 function relativeTime(value) { const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1_000)); return seconds < 60 ? `${seconds}s ago` : seconds < 3600 ? `${Math.floor(seconds / 60)}m ago` : `${Math.floor(seconds / 3600)}h ago`; }

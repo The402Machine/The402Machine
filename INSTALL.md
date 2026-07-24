@@ -135,7 +135,7 @@ Verify:
 - migration job exited successfully;
 - web healthy;
 - expiry worker running;
-- `/health`, `/`, `/api.html`, `/demo.html`, `/whisper.html` and `/pulse.html` return HTTP 200;
+- `/health`, `/`, `/api`, `/demo`, `/catch`, `/whisper`, `/pulse` and `/pulse-public` return HTTP 200;
 - PostgreSQL has no published port;
 - production and repository commits match;
 - service logs contain no fatal or migration errors.

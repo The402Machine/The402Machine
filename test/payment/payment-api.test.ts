@@ -98,9 +98,14 @@ describe("public payment API", () => {
 		const allowance = await burnApp.inject({ method: "POST", url: "/api/payments/whisper", headers: { "idempotency-key": "idempotency-whisper-allowance", "x-whisper-plan": "standard", "content-type": "application/octet-stream" }, payload: burnCiphertext });
 		expect(allowance.statusCode).toBe(402);
 		expect(burnCalls.at(-1)).toEqual({ idempotencyKey: "idempotency-whisper-allowance", product: "whisper", planId: "standard", productPayload: burnCiphertext, whisperReadLimit: 42, whisperRevealAt: null });
-		const invalid = await burnApp.inject({ method: "POST", url: "/api/payments/whisper", headers: { "idempotency-key": "idempotency-whisper-invalid", "x-whisper-plan": "standard", "x-whisper-read-limit": "2", "content-type": "application/octet-stream" }, payload: burnCiphertext });
-		expect(invalid.statusCode).toBe(400);
-		expect(burnCalls).toHaveLength(2);
+		const custom = await burnApp.inject({ method: "POST", url: "/api/payments/whisper", headers: { "idempotency-key": "idempotency-whisper-custom", "x-whisper-plan": "standard", "x-whisper-read-limit": "12", "content-type": "application/octet-stream" }, payload: burnCiphertext });
+		expect(custom.statusCode).toBe(402);
+		expect(burnCalls.at(-1)).toEqual({ idempotencyKey: "idempotency-whisper-custom", product: "whisper", planId: "standard", productPayload: burnCiphertext, whisperReadLimit: 12, whisperRevealAt: null });
+		for (const invalidReadLimit of ["0", "43", "1.5", "not-a-number"]) {
+			const invalid = await burnApp.inject({ method: "POST", url: "/api/payments/whisper", headers: { "idempotency-key": `idempotency-whisper-invalid-${invalidReadLimit}`, "x-whisper-plan": "standard", "x-whisper-read-limit": invalidReadLimit, "content-type": "application/octet-stream" }, payload: burnCiphertext });
+			expect(invalid.statusCode).toBe(400);
+		}
+		expect(burnCalls).toHaveLength(3);
 		await burnApp.close();
 
 		const calls: unknown[] = [];

@@ -12,28 +12,19 @@ if (config.catch.databaseUrl === undefined) {
 }
 
 const database = postgres(config.catch.databaseUrl);
-const worker = startExpiryWorker(new CatchRepository(database), {
-	onError: (error) => { console.error("CATCH expiry worker failed", error); },
-});
+const catchRepository = new CatchRepository(database);
 const whisperRepository = new WhisperRepository(database);
 const pulseRepository = new PulseRepository(database);
-const drainWhispers = async (): Promise<void> => {
-	while (await whisperRepository.expireDue(100) === 100) {
-		// Drain the complete overdue backlog before returning to the interval.
-	}
-};
-const drainPulse = async (): Promise<void> => { while (await pulseRepository.expireDue(100) === 100) { /* drain overdue PULSE resources */ } };
-const whisperTimer = setInterval(() => {
-	void drainWhispers().catch((error: unknown) => { console.error("WHISPER expiry worker failed", error); });
-	void drainPulse().catch((error: unknown) => { console.error("PULSE expiry worker failed", error); });
-}, 30_000);
-whisperTimer.unref();
-void drainWhispers().catch((error: unknown) => { console.error("WHISPER expiry worker failed", error); });
-void drainPulse().catch((error: unknown) => { console.error("PULSE expiry worker failed", error); });
+const worker = startExpiryWorker([
+	{ name: "CATCH", expireDue: (limit) => catchRepository.expireDueResources(limit) },
+	{ name: "WHISPER", expireDue: (limit) => whisperRepository.expireDue(limit) },
+	{ name: "PULSE", expireDue: (limit) => pulseRepository.expireDue(limit) },
+], {
+	onError: (jobName, error) => { console.error(`${jobName} expiry worker failed`, error); },
+});
 
 const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
-	console.info(`CATCH expiry worker stopping after ${signal}`);
-	clearInterval(whisperTimer);
+	console.info(`Expiry worker stopping after ${signal}`);
 	await worker.stop();
 	await database.end();
 };
@@ -41,4 +32,4 @@ const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
 process.once("SIGINT", () => { void shutdown("SIGINT"); });
 process.once("SIGTERM", () => { void shutdown("SIGTERM"); });
 
-console.info("CATCH expiry worker started");
+console.info("Expiry worker started");

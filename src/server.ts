@@ -69,7 +69,7 @@ const paymentService = database === undefined || config.payment.provider !== "ln
 				const pulsePlan = PULSE_PLANS[order.planId];
 				const ownerToken = generatePulseToken("owner");
 				const pingToken = generatePulseToken("ping");
-				return Promise.resolve({ product: "pulse" as const, publicId: `pulse_${randomBytes(24).toString("base64url")}`, planId: order.planId,
+				return Promise.resolve({ product: "pulse" as const, publicId: `pulse_${randomBytes(24).toString("base64url")}`, publicStatusId: `pulse_status_${randomBytes(24).toString("base64url")}`, planId: order.planId,
 					ownerTokenHash: hashPulseToken("owner", ownerToken, config.catch.tokenPepper!), pingTokenHash: hashPulseToken("ping", pingToken, config.catch.tokenPepper!),
 					heartbeatLimit: pulsePlan.heartbeatLimit, expectedIntervalSeconds: pulsePlan.suggestedCadenceSeconds, graceSeconds: pulsePlan.minimumGraceSeconds,
 					ownerToken, pingToken, expiresAt: calculatePulseExpiry(order.planId, new Date()) });

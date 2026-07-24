@@ -6,11 +6,12 @@ import fastifyStatic from "@fastify/static";
 import Fastify, { LogController, type FastifyInstance, type FastifyRequest } from "fastify";
 
 import { calculatePlanExpiry, CATCH_PLANS } from "./domain/catch-plans.js";
-import { PULSE_PLANS, validPulseSchedule } from "./domain/pulse-plans.js";
-import { calculateWhisperSchedule, MAX_WHISPER_CIPHERTEXT_BYTES, WHISPER_PLANS } from "./domain/whisper-plans.js";
+import { PULSE_PLANS } from "./domain/pulse-plans.js";
+import { calculateWhisperSchedule, isWhisperReadLimit, MAX_WHISPER_CIPHERTEXT_BYTES, WHISPER_PLANS } from "./domain/whisper-plans.js";
 import { CATCH_PRICES_SATS, PULSE_PRICES_SATS, WHISPER_PRICES_SATS } from "./payment/payment-domain.js";
 import type { DispensedResource } from "./payment/payment-repository.js";
 import type { PaymentQuote } from "./payment/payment-service.js";
+import { ownerPulseStatus, parsePulseSettings, publicPulseStatus } from "./pulse/pulse-contract.js";
 import type { AcceptPulseResult, PulseResource, PulseSettings } from "./pulse/pulse-repository.js";
 import { verifyPulseToken } from "./security/pulse-tokens.js";
 import { generateIngestToken, generateOwnerToken, hashToken, verifyToken } from "./security/tokens.js";
@@ -44,6 +45,7 @@ export interface WhisperApiRepository {
 
 export interface PulseApiRepository {
 	getResource(publicId: string): Promise<PulseResource | null>;
+	getPublicResource(publicStatusId: string): Promise<PulseResource | null>;
 	getCredentialHashes(publicId: string): Promise<{ ownerTokenHash: string | null; pingTokenHash: string | null } | null>;
 	acceptHeartbeat(publicId: string): Promise<AcceptPulseResult>;
 	updateSettings(publicId: string, settings: PulseSettings): Promise<PulseResource | null>;
@@ -85,6 +87,7 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
 	const app = Fastify({
 		logger: options.logger ?? false,
 		bodyLimit: Math.max(MAX_INGEST_BYTES, MAX_WHISPER_BYTES),
+		exposeHeadRoutes: false,
 		logController: new LogController({ disableRequestLogging: true }),
 		trustProxy: options.trustedProxy ?? false,
 	});
@@ -100,7 +103,7 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
 		},
 		crossOriginEmbedderPolicy: false,
 	});
-	void app.register(fastifyStatic, { root: join(import.meta.dirname, "..", "public"), index: "index.html", cacheControl: true, maxAge: "1h" });
+	void app.register(fastifyStatic, { root: join(import.meta.dirname, "..", "public"), index: "index.html", extensions: ["html"], cacheControl: true, maxAge: "1h" });
 	app.get("/health", () => ({ service: "the402machine", status: "ok" }));
 
 	if (options.catch !== undefined) registerCatchRoutes(app, options.catch);
@@ -132,7 +135,7 @@ function registerPaymentRoutes(app: FastifyInstance, payment: PaymentAppOptions)
 		if (typeof idempotencyKey !== "string" || idempotencyKey.length < 8 || idempotencyKey.length > 128) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid idempotency key" });
 		if (!isPlanId(planId) || !WHISPER_PLANS[planId].available) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid plan" });
 		const whisperReadLimit = requestedReadLimit === undefined ? WHISPER_PLANS[planId].readLimit : Number(requestedReadLimit);
-		if (whisperReadLimit !== 1 && whisperReadLimit !== WHISPER_PLANS[planId].readLimit) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid read limit" });
+		if (!isWhisperReadLimit(planId, whisperReadLimit)) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid read limit" });
 		let whisperRevealAt: Date | null = null;
 		if (requestedRevealAt !== undefined) {
 			if (typeof requestedRevealAt !== "string") return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid reveal date" });
@@ -281,10 +284,10 @@ function registerPulseRoutes(app: FastifyInstance, options: PulseAppOptions): vo
 		const result = await options.repository.acceptHeartbeat(request.params.publicId);
 		return result.accepted ? reply.header("Cache-Control", "no-store").code(204).send() : reply.header("Cache-Control", "no-store").code(404).send({ error: "not found" });
 	});
-	app.get<{ Params: { publicId: string } }>("/api/pulse/:publicId/public", async (request, reply) => {
-		const resource = await options.repository.getResource(request.params.publicId);
-		if (resource === null || !resource.publicStatusEnabled || resource.expiresAt.getTime() <= Date.now() || resource.status === "expired" || resource.status === "manually_destroyed") return reply.header("Cache-Control", "public, max-age=15").code(404).send({ error: "not found" });
-		return reply.header("Cache-Control", "public, max-age=15").send(publicPulseStatus(resource));
+	app.get<{ Params: { publicStatusId: string } }>("/api/pulse/public/:publicStatusId", async (request, reply) => {
+		const resource = await options.repository.getPublicResource(request.params.publicStatusId);
+		if (resource === null || !resource.publicStatusEnabled || resource.expiresAt.getTime() <= Date.now() || resource.status === "expired" || resource.status === "manually_destroyed") return reply.header("Cache-Control", "no-store").code(404).send({ error: "not found" });
+		return reply.header("Cache-Control", "no-store").send(publicPulseStatus(resource));
 	});
 	app.get<{ Params: { publicId: string } }>("/api/pulse/:publicId", async (request, reply) => {
 		if (!consumeRateLimit(ownerRateLimits, request.ip, 30, 60_000)) return rateLimited(reply);
@@ -313,25 +316,6 @@ async function authorizePulseOwner(request: FastifyRequest<{ Params: { publicId:
 	const credentials = await options.repository.getCredentialHashes(request.params.publicId);
 	return credentials?.ownerTokenHash !== null && credentials !== null && verifyPulseToken("owner", bearerToken(request) ?? "", credentials.ownerTokenHash, options.tokenPepper);
 }
-function parsePulseSettings(body: Partial<PulseSettings> | undefined, current: PulseResource): PulseSettings | null {
-	if (body === undefined || body === null || typeof body !== "object" || Array.isArray(body)) return null;
-	const name = body.name === undefined ? current.name : body.name;
-	const description = body.description === undefined ? current.description : body.description;
-	const expectedIntervalSeconds = body.expectedIntervalSeconds === undefined ? current.expectedIntervalSeconds : body.expectedIntervalSeconds;
-	const graceSeconds = body.graceSeconds === undefined ? current.graceSeconds : body.graceSeconds;
-	const publicStatusEnabled = body.publicStatusEnabled === undefined ? current.publicStatusEnabled : body.publicStatusEnabled;
-	if (typeof name !== "string" || name.trim().length < 1 || name.trim().length > 80 || typeof description !== "string" || description.length > 240 || typeof publicStatusEnabled !== "boolean" || typeof expectedIntervalSeconds !== "number" || typeof graceSeconds !== "number" || !validPulseSchedule(current.planId, expectedIntervalSeconds, graceSeconds)) return null;
-	return { name: name.trim(), description: description.trim(), expectedIntervalSeconds, graceSeconds, publicStatusEnabled };
-}
-function pulseState(resource: PulseResource): "waiting" | "operational" | "late" | "exhausted" | "expired" {
-	if (resource.status === "exhausted") return "exhausted";
-	if (resource.status === "expired" || resource.status === "manually_destroyed" || Date.now() >= resource.expiresAt.getTime()) return "expired";
-	if (resource.lastPingAt === null) return "waiting";
-	return Date.now() > resource.lastPingAt.getTime() + resource.expectedIntervalSeconds * 1_000 + resource.graceSeconds * 1_000 ? "late" : "operational";
-}
-function publicPulseStatus(resource: PulseResource): object { return { name: resource.name, description: resource.description, state: pulseState(resource), lastPingAt: resource.lastPingAt?.toISOString() ?? null }; }
-function ownerPulseStatus(resource: PulseResource): object { return { publicId: resource.publicId, planId: resource.planId, status: resource.status, state: pulseState(resource), heartbeatLimit: resource.heartbeatLimit, heartbeatCount: resource.heartbeatCount, expectedIntervalSeconds: resource.expectedIntervalSeconds, graceSeconds: resource.graceSeconds, name: resource.name, description: resource.description, publicStatusEnabled: resource.publicStatusEnabled, lastPingAt: resource.lastPingAt?.toISOString() ?? null, createdAt: resource.createdAt.toISOString(), expiresAt: resource.expiresAt.toISOString() }; }
-
 function registerCatchRoutes(app: FastifyInstance, options: CatchAppOptions): void {
 	const ingestionRateLimits = new Map<string, RateLimitBucket>();
 	const provisioningRateLimits = new Map<string, RateLimitBucket>();
@@ -377,7 +361,7 @@ function registerCatchRoutes(app: FastifyInstance, options: CatchAppOptions): vo
 		if (options.lookupIp !== undefined) void enrichEventIp(options, request.params.publicId, accepted.eventId, sourceIp);
 		return reply.code(204).send();
 	};
-	for (const method of ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] as const) app.route({ method, url: "/c/:publicId", handler: ingestHandler });
+	for (const method of ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] as const) app.route({ method, url: "/c/:publicId", handler: ingestHandler });
 
 	app.get<{ Params: { publicId: string } }>("/api/catch/:publicId", async (request, reply) => {
 		if (!consumeRateLimit(ownerRateLimits, request.ip, 30, 60_000)) return rateLimited(reply);

@@ -7,7 +7,7 @@ export default defineConfig(
 		ignores: ["dist/**", "coverage/**", "node_modules/**", "eslint.config.js"],
 	},
 	{
-		files: ["src/**/*.ts", "test/**/*.ts"],
+		files: ["src/**/*.ts", "test/**/*.ts", "vitest.config.ts"],
 		extends: [eslint.configs.recommended, ...tseslint.configs.recommendedTypeChecked],
 		languageOptions: {
 			parserOptions: {

@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
@@ -6,37 +5,18 @@ import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { CatchRepository } from "../../src/storage/catch-repository.js";
+import { startPostgresTestContainer, type PostgresTestContainer } from "../support/postgres-container.js";
 
-const image = "postgres:17-alpine";
 const container = `the402machine-expiry-test-${randomUUID()}`;
 const password = "catch-test-password";
 let databaseUrl = "";
 let sql: ReturnType<typeof postgres>;
 let repository: CatchRepository;
-
-const docker = (...args: string[]): string => execFileSync("docker", args, { encoding: "utf8" }).trim();
-
-const waitForPostgres = async (): Promise<void> => {
-	for (let attempt = 0; attempt < 40; attempt += 1) {
-		try {
-			const probe = postgres(databaseUrl, { max: 1, connect_timeout: 1 });
-			await probe`select 1`;
-			await probe.end();
-			return;
-		} catch {
-			await new Promise((resolve) => setTimeout(resolve, 250));
-		}
-	}
-	throw new Error("PostgreSQL test container did not become ready");
-};
+let postgresContainer: PostgresTestContainer;
 
 beforeAll(async () => {
-	docker("pull", image);
-	docker("run", "--detach", "--rm", "--name", container, "--publish", "127.0.0.1::5432", "--env", `POSTGRES_PASSWORD=${password}`, "--env", "POSTGRES_DB=the402machine_test", image);
-	const port = docker("port", container, "5432/tcp").split(":").at(-1);
-	if (port === undefined) throw new Error("Could not determine PostgreSQL test port");
-	databaseUrl = `postgresql://postgres:${password}@127.0.0.1:${port}/the402machine_test`;
-	await waitForPostgres();
+	postgresContainer = await startPostgresTestContainer({ name: container, password });
+	databaseUrl = postgresContainer.databaseUrl;
 	sql = postgres(databaseUrl, { max: 4 });
 	const migration = await readFile(new URL("../../migrations/0001_catch.sql", import.meta.url), "utf8");
 	await sql.unsafe(migration).simple();
@@ -45,8 +25,8 @@ beforeAll(async () => {
 
 afterAll(async () => {
 	await sql?.end();
-	try { docker("rm", "--force", container); } catch { /* container already removed */ }
-});
+	postgresContainer?.stop();
+}, 30_000);
 
 const provisionExpiredResource = async (): Promise<string> => {
 	const publicId = `catch_${randomUUID().replaceAll("-", "")}`;

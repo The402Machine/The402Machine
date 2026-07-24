@@ -1,24 +1,24 @@
-import type { Sql } from "postgres";
+import type { Sql, TransactionSql } from "postgres";
 
 import type { CatchPlanId } from "../domain/catch-plans.js";
 
 export type PulseStatus = "active" | "exhausted" | "expired" | "manually_destroyed";
 export type PulseResource = {
-	id: string; publicId: string; planId: CatchPlanId; status: PulseStatus;
+	id: string; publicId: string; publicStatusId: string; planId: CatchPlanId; status: PulseStatus;
 	ownerTokenHash: string | null; pingTokenHash: string | null;
 	heartbeatLimit: number; heartbeatCount: number; expectedIntervalSeconds: number; graceSeconds: number;
 	name: string; description: string; publicStatusEnabled: boolean; lastPingAt: Date | null;
 	createdAt: Date; expiresAt: Date;
 };
 export type CreatePulseInput = {
-	publicId: string; planId: CatchPlanId; ownerTokenHash: string; pingTokenHash: string; heartbeatLimit: number;
+	publicId: string; publicStatusId: string; planId: CatchPlanId; ownerTokenHash: string; pingTokenHash: string; heartbeatLimit: number;
 	expectedIntervalSeconds: number; graceSeconds: number; expiresAt: Date;
 };
 export type PulseSettings = { name: string; description: string; expectedIntervalSeconds: number; graceSeconds: number; publicStatusEnabled: boolean };
 export type AcceptPulseResult = { accepted: true; heartbeatCount: number; lastPingAt: Date; exhausted: boolean } | { accepted: false; reason: "not_found" | "expired" | "exhausted" };
 
 type Row = {
-	id: string; public_id: string; plan_id: CatchPlanId; status: PulseStatus; owner_token_hash: string | null; ping_token_hash: string | null;
+	id: string; public_id: string; public_status_id: string; plan_id: CatchPlanId; status: PulseStatus; owner_token_hash: string | null; ping_token_hash: string | null;
 	heartbeat_limit: number; heartbeat_count: number; expected_interval_seconds: number; grace_seconds: number; name: string; description: string;
 	public_status_enabled: boolean; last_ping_at: Date | null; created_at: Date; expires_at: Date;
 };
@@ -28,21 +28,55 @@ export class PulseRepository {
 
 	public async create(input: CreatePulseInput): Promise<PulseResource> {
 		const rows = await this.sql<Row[]>`
-			insert into pulse_resources (public_id, plan_id, owner_token_hash, ping_token_hash, heartbeat_limit, expected_interval_seconds, grace_seconds, expires_at)
-			values (${input.publicId}, ${input.planId}, ${input.ownerTokenHash}, ${input.pingTokenHash}, ${input.heartbeatLimit}, ${input.expectedIntervalSeconds}, ${input.graceSeconds}, ${input.expiresAt}) returning *
+			insert into pulse_resources (public_id, public_status_id, plan_id, owner_token_hash, ping_token_hash, heartbeat_limit, expected_interval_seconds, grace_seconds, expires_at)
+			values (${input.publicId}, ${input.publicStatusId}, ${input.planId}, ${input.ownerTokenHash}, ${input.pingTokenHash}, ${input.heartbeatLimit}, ${input.expectedIntervalSeconds}, ${input.graceSeconds}, ${input.expiresAt}) returning *
 		`;
 		if (rows[0] === undefined) throw new Error("PULSE creation returned no resource");
 		return mapRow(rows[0]);
 	}
 
 	public async getResource(publicId: string): Promise<PulseResource | null> {
-		const rows = await this.sql<Row[]>`select * from pulse_resources where public_id = ${publicId}`;
-		return rows[0] === undefined ? null : mapRow(rows[0]);
+		return this.sql.begin(async (tx) => {
+			const row = await lockResource(tx, publicId);
+			if (row === undefined) return null;
+			if (row.is_expired && isExpirable(row.status)) {
+				await expireLockedResource(tx, row.id);
+				return null;
+			}
+			return mapRow(row);
+		});
+	}
+
+	public async getPublicResource(publicStatusId: string): Promise<PulseResource | null> {
+		return this.sql.begin(async (tx) => {
+			const rows = await tx<LockedRow[]>`
+				select *, clock_timestamp() >= expires_at as is_expired
+				from pulse_resources
+				where public_status_id = ${publicStatusId}
+					or (public_id = ${publicStatusId} and ${publicStatusId} !~ '^pulse_status_')
+				order by (public_status_id = ${publicStatusId}) desc
+				limit 1 for update
+			`;
+			const row = rows[0];
+			if (row === undefined) return null;
+			if (row.is_expired && isExpirable(row.status)) {
+				await expireLockedResource(tx, row.id);
+				return null;
+			}
+			return mapRow(row);
+		});
 	}
 
 	public async getCredentialHashes(publicId: string): Promise<{ ownerTokenHash: string | null; pingTokenHash: string | null } | null> {
-		const rows = await this.sql<{ owner_token_hash: string | null; ping_token_hash: string | null }[]>`select owner_token_hash, ping_token_hash from pulse_resources where public_id = ${publicId}`;
-		return rows[0] === undefined ? null : { ownerTokenHash: rows[0].owner_token_hash, pingTokenHash: rows[0].ping_token_hash };
+		return this.sql.begin(async (tx) => {
+			const row = await lockResource(tx, publicId);
+			if (row === undefined) return null;
+			if (row.is_expired && isExpirable(row.status)) {
+				await expireLockedResource(tx, row.id);
+				return null;
+			}
+			return { ownerTokenHash: row.owner_token_hash, pingTokenHash: row.ping_token_hash };
+		});
 	}
 
 	public async acceptHeartbeat(publicId: string): Promise<AcceptPulseResult> {
@@ -52,8 +86,8 @@ export class PulseRepository {
 			`;
 			const row = rows[0];
 			if (row === undefined) return { accepted: false, reason: "not_found" };
-			if (row.is_expired && (row.status === "active" || row.status === "exhausted")) {
-				await tx`update pulse_resources set status = 'expired', owner_token_hash = null, ping_token_hash = null, name = 'Expired monitor', description = '', public_status_enabled = false, last_ping_at = null, expired_at = clock_timestamp(), updated_at = clock_timestamp() where id = ${row.id}`;
+			if (row.is_expired && isExpirable(row.status)) {
+				await expireLockedResource(tx, row.id);
 				return { accepted: false, reason: "expired" };
 			}
 			if (row.status !== "active") return { accepted: false, reason: row.status === "exhausted" ? "exhausted" : "not_found" };
@@ -75,17 +109,40 @@ export class PulseRepository {
 	}
 
 	public async updateSettings(publicId: string, settings: PulseSettings): Promise<PulseResource | null> {
-		const rows = await this.sql<Row[]>`
-			update pulse_resources set name = ${settings.name}, description = ${settings.description}, expected_interval_seconds = ${settings.expectedIntervalSeconds},
-				grace_seconds = ${settings.graceSeconds}, public_status_enabled = ${settings.publicStatusEnabled}, updated_at = clock_timestamp()
-			where public_id = ${publicId} and status in ('active', 'exhausted') returning *
-		`;
-		return rows[0] === undefined ? null : mapRow(rows[0]);
+		return this.sql.begin(async (tx) => {
+			const resource = await lockResource(tx, publicId);
+			if (resource === undefined) return null;
+			if (resource.is_expired && isExpirable(resource.status)) {
+				await expireLockedResource(tx, resource.id);
+				return null;
+			}
+			if (!isExpirable(resource.status)) return null;
+			const rows = await tx<Row[]>`
+				update pulse_resources set name = ${settings.name}, description = ${settings.description}, expected_interval_seconds = ${settings.expectedIntervalSeconds},
+					grace_seconds = ${settings.graceSeconds}, public_status_enabled = ${settings.publicStatusEnabled}, updated_at = clock_timestamp()
+				where id = ${resource.id} returning *
+			`;
+			return rows[0] === undefined ? null : mapRow(rows[0]);
+		});
 	}
 
 	public async destroy(publicId: string): Promise<boolean> {
-		const result = await this.sql`update pulse_resources set status = 'manually_destroyed', owner_token_hash = null, ping_token_hash = null, destroyed_at = clock_timestamp(), updated_at = clock_timestamp() where public_id = ${publicId} and status in ('active', 'exhausted')`;
-		return result.count === 1;
+		return this.sql.begin(async (tx) => {
+			const resource = await lockResource(tx, publicId);
+			if (resource === undefined) return false;
+			if (resource.is_expired && isExpirable(resource.status)) {
+				await expireLockedResource(tx, resource.id);
+				return false;
+			}
+			if (!isExpirable(resource.status)) return false;
+			const result = await tx`
+				update pulse_resources
+				set status = 'manually_destroyed', owner_token_hash = null, ping_token_hash = null,
+					destroyed_at = clock_timestamp(), updated_at = clock_timestamp()
+				where id = ${resource.id}
+			`;
+			return result.count === 1;
+		});
 	}
 
 	public async expireDue(requestedLimit = 100): Promise<number> {
@@ -99,6 +156,30 @@ export class PulseRepository {
 	}
 }
 
+type LockedRow = Row & { is_expired: boolean };
+
+async function lockResource(tx: TransactionSql, publicId: string): Promise<LockedRow | undefined> {
+	const rows = await tx<LockedRow[]>`
+		select *, clock_timestamp() >= expires_at as is_expired
+		from pulse_resources where public_id = ${publicId} for update
+	`;
+	return rows[0];
+}
+
+async function expireLockedResource(tx: TransactionSql, resourceId: string): Promise<void> {
+	await tx`
+		update pulse_resources
+		set status = 'expired', owner_token_hash = null, ping_token_hash = null,
+			name = 'Expired monitor', description = '', public_status_enabled = false,
+			last_ping_at = null, expired_at = coalesce(expired_at, clock_timestamp()), updated_at = clock_timestamp()
+		where id = ${resourceId} and status in ('active', 'exhausted')
+	`;
+}
+
+function isExpirable(status: PulseStatus): status is "active" | "exhausted" {
+	return status === "active" || status === "exhausted";
+}
+
 function mapRow(row: Row): PulseResource {
-	return { id: row.id, publicId: row.public_id, planId: row.plan_id, status: row.status, ownerTokenHash: row.owner_token_hash, pingTokenHash: row.ping_token_hash, heartbeatLimit: row.heartbeat_limit, heartbeatCount: row.heartbeat_count, expectedIntervalSeconds: row.expected_interval_seconds, graceSeconds: row.grace_seconds, name: row.name, description: row.description, publicStatusEnabled: row.public_status_enabled, lastPingAt: row.last_ping_at, createdAt: row.created_at, expiresAt: row.expires_at };
+	return { id: row.id, publicId: row.public_id, publicStatusId: row.public_status_id, planId: row.plan_id, status: row.status, ownerTokenHash: row.owner_token_hash, pingTokenHash: row.ping_token_hash, heartbeatLimit: row.heartbeat_limit, heartbeatCount: row.heartbeat_count, expectedIntervalSeconds: row.expected_interval_seconds, graceSeconds: row.grace_seconds, name: row.name, description: row.description, publicStatusEnabled: row.public_status_enabled, lastPingAt: row.last_ping_at, createdAt: row.created_at, expiresAt: row.expires_at };
 }

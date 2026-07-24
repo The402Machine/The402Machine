@@ -24,7 +24,7 @@ export async function openWhisper(ciphertext, encodedKey) {
 }
 
 export function whisperLink(baseUrl, publicId, readToken, key) {
-	const url = new URL(`/whisper.html`, baseUrl);
+	const url = new URL(`/whisper`, baseUrl);
 	url.searchParams.set("id", publicId);
 	url.searchParams.set("token", readToken);
 	url.hash = key;

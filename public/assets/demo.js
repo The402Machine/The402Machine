@@ -181,6 +181,7 @@ function resetWhisper() {
 	whisperElements.message.hidden = true;
 	whisperElements.cipher.hidden = whisperState.destroyed;
 	whisperElements.close.hidden = true;
+	whisperElements.close.textContent = "Close plaintext";
 	whisperElements.open.hidden = false;
 	renderWhisperState();
 }
@@ -188,6 +189,7 @@ function resetWhisper() {
 function renderWhisperState() {
 	const now = Date.now();
 	const sealed = whisperState.scenario === "scheduled" && now < whisperState.revealAt;
+	if (whisperState.revealed) return;
 	if (whisperState.destroyed || whisperState.reads <= 0) {
 		whisperElements.state.textContent = whisperState.scenario === "expired" ? "EXPIRED" : "BURNED";
 		whisperElements.state.dataset.status = "expired";
@@ -209,17 +211,24 @@ function renderWhisperState() {
 	} else {
 		whisperElements.state.textContent = "READY"; whisperElements.state.dataset.status = "active";
 		if (!whisperState.revealed) whisperElements.status.textContent = "The synthetic ciphertext is available. Confirm to decrypt it locally and use one demo read.";
-		whisperElements.warning.innerHTML = whisperState.scenario === "burn" ? "<strong>Burn after first read.</strong> This successful opening immediately erases the synthetic server copy." : "<strong>Each opening counts.</strong> A real successful request consumes one read. The final allowed read erases the encrypted server copy.";
+		whisperElements.warning.innerHTML = whisperState.scenario === "burn" ? "<strong>Delete after 1 successful read.</strong> This successful opening deletes the synthetic server copy, while the plaintext remains visible in this tab." : "<strong>Each opening counts.</strong> A real successful request consumes one read. The final allowed read erases the encrypted server copy.";
 	}
 }
 
 function attemptWhisperRead() {
 	if (whisperState.destroyed || whisperState.reads <= 0 || (whisperState.scenario === "scheduled" && Date.now() < whisperState.revealAt)) return;
 	whisperState.reads -= 1; whisperState.revealed = true;
+	whisperState.destroyed = whisperState.reads === 0;
 	whisperElements.cipher.hidden = true; whisperElements.message.hidden = false; whisperElements.open.hidden = true; whisperElements.close.hidden = false;
 	whisperElements.log.textContent = `Decrypted locally at ${new Intl.DateTimeFormat(undefined, { timeStyle: "medium" }).format(new Date())}. One demo read was used.`;
-	whisperElements.status.textContent = whisperState.reads === 0 ? "Plaintext is visible. Closing it completes the final-read burn simulation." : `Plaintext is visible. ${whisperState.reads} demo read${whisperState.reads === 1 ? " remains" : "s remain"}.`;
+	whisperElements.status.textContent = whisperState.destroyed ? "The encrypted server copy is now gone. This plaintext stays visible in this tab until you close it." : `Plaintext is visible. ${whisperState.reads} demo read${whisperState.reads === 1 ? " remains" : "s remain"}.`;
 	whisperElements.reads.textContent = `${whisperState.reads} READ${whisperState.reads === 1 ? "" : "S"} LEFT`;
+	if (whisperState.destroyed) {
+		whisperElements.state.textContent = "OPEN / COPY GONE";
+		whisperElements.state.dataset.status = "expired";
+		whisperElements.warning.innerHTML = "<strong>Final read completed.</strong> The synthetic server copy is already erased. Closing this plaintext only clears the local screen.";
+		whisperElements.close.textContent = "Close plaintext and finish demo";
+	}
 }
 
 whisperElements.scenario.addEventListener("change", resetWhisper);
@@ -227,8 +236,7 @@ whisperElements.reset.addEventListener("click", resetWhisper);
 whisperElements.open.addEventListener("click", attemptWhisperRead);
 whisperElements.close.addEventListener("click", () => {
 	whisperElements.message.hidden = true; whisperElements.close.hidden = true; whisperState.revealed = false;
-	if (whisperState.reads === 0) whisperState.destroyed = true;
-	else { whisperElements.cipher.hidden = false; whisperElements.open.hidden = false; whisperElements.log.textContent = "Plaintext cleared from the screen. The remaining allowance is still simulated locally."; }
+	if (!whisperState.destroyed) { whisperElements.cipher.hidden = false; whisperElements.open.hidden = false; whisperElements.log.textContent = "Plaintext cleared from the screen. The remaining allowance is still simulated locally."; }
 	renderWhisperState();
 });
 

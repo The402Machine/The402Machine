@@ -6,8 +6,9 @@
 	<meta name="robots" content="noindex,nofollow,noarchive" />
 	<meta name="referrer" content="no-referrer" />
 	<meta name="theme-color" content="#080a08" />
+	<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 	<title>PULSE owner dashboard — The402Machine</title>
-	<link rel="stylesheet" href="/assets/styles.css?v=17" />
+	<link rel="stylesheet" href="/assets/styles.css?v=18" />
 </head>
 <body class="portal-body pulse-body">
 	<div class="noise" aria-hidden="true"></div>
@@ -17,23 +18,24 @@
 		<section id="pulse-dashboard" hidden>
 			<header class="pulse-hero">
 				<div><p class="eyebrow">LIVE HEARTBEAT MONITOR</p><h1 id="pulse-name">Untitled monitor</h1><p id="pulse-description" class="lede">Waiting for status…</p></div>
-				<div id="pulse-state" class="pulse-state" data-state="waiting"><i></i><span>WAITING</span></div>
+				<div class="pulse-state-stack"><div id="pulse-state" class="pulse-state" data-state="waiting"><i></i><span>WAITING</span></div><small id="pulse-refresh-status" class="pulse-refresh-status">Connecting…</small></div>
 			</header>
 			<section class="pulse-overview">
 				<article><small>LAST HEARTBEAT</small><strong id="pulse-last">Never</strong><span id="pulse-last-relative">Waiting for the first ping</span></article>
 				<article><small>NEXT EXPECTED</small><strong id="pulse-next">—</strong><span id="pulse-schedule">Schedule unavailable</span></article>
 				<article><small>TIME REMAINING</small><strong id="pulse-expiry">—</strong><span>Automatic hard stop</span></article>
 			</section>
-			<section class="pulse-history-card"><header><div><p class="eyebrow">LIVE SIGNAL</p><h2>Incoming heartbeats</h2></div><span id="pulse-history-count">0 RECEIVED</span></header><div id="pulse-signal-track" class="pulse-signal-track" aria-label="Recent heartbeat observations"></div><p id="pulse-history-copy">The dashboard polls the aggregate counter and adds one visual pulse for each heartbeat received while this page is open.</p></section>
+			<section class="pulse-history-card"><header><div><p class="eyebrow">RECENT SIGNALS</p><h2>Heartbeat timeline</h2></div><span id="pulse-history-count">0 RECEIVED</span></header><div id="pulse-timeline" class="pulse-owner-timeline" aria-label="Recent heartbeat observations"></div><div class="demo-history-legend"><span><i class="ok"></i>Received while open</span><span><i class="baseline"></i>Latest known signal</span></div><p id="pulse-history-copy">The timeline updates from the aggregate heartbeat counter while this dashboard is open.</p></section>
+			<section class="pulse-quota-card"><div><p class="eyebrow">PRIVATE LIFETIME QUOTA</p><h2><strong id="pulse-quota-remaining">—</strong> heartbeats left</h2><p id="pulse-quota-used">Loading quota…</p></div><div class="pulse-quota-meter" aria-hidden="true"><i id="pulse-quota-meter"></i></div></section>
 			<section id="pulse-owner" class="pulse-owner" hidden>
 				<article class="pulse-capability"><p class="eyebrow">HEARTBEAT CAPABILITY</p><h2>Wire your job.</h2><input id="pulse-heartbeat-url" readonly /><div class="reader-actions"><button id="pulse-copy-url" class="button primary" type="button">Copy heartbeat URL</button><button id="pulse-copy-curl" class="button ghost" type="button">Copy curl command</button></div><p>Send an authenticated POST. Bodies are ignored and never stored. Keep this endpoint and its authorization token private.</p></article>
-				<article id="pulse-public-card" class="pulse-public-card" data-enabled="false"><p class="eyebrow">SHAREABLE STATUS PAGE</p><h2>Public view.</h2><p id="pulse-public-copy">Disabled by default. Enable it when you want a safe status-only page with no heartbeat endpoint, token, curl command, owner settings or quota details.</p><label><span>Public page URL</span><input id="pulse-public-url" readonly disabled placeholder="Enable the public page to create its link" /></label><div class="reader-actions"><button id="pulse-copy-public" class="button primary" type="button">Enable public page</button><a id="pulse-open-public" class="button ghost" href="/pulse-public.html" target="_blank" rel="noreferrer" hidden>Open public page</a><button id="pulse-disable-public" class="button ghost" type="button" hidden>Disable public page</button></div><p id="pulse-public-status" class="pulse-settings-status" role="status"></p></article>
-				<form id="pulse-settings" class="pulse-settings"><p class="eyebrow">MONITOR SETTINGS</p><label><span>Name</span><input id="pulse-name-input" maxlength="80" required /></label><label><span>Description</span><textarea id="pulse-description-input" maxlength="240" rows="3"></textarea></label><div class="pulse-form-grid"><label><span>Expected every (seconds)</span><input id="pulse-interval-input" type="number" min="20" max="604800" step="1" required /></label><label><span>Late grace (seconds)</span><input id="pulse-grace-input" type="number" min="60" max="604800" step="1" required /></label></div><button class="button primary" type="submit">Save monitor settings</button><p id="pulse-settings-status" class="pulse-settings-status" role="status"></p></form>
+				<article id="pulse-public-card" class="pulse-public-card" data-enabled="false"><p class="eyebrow">SHAREABLE STATUS PAGE</p><h2>Public view.</h2><p id="pulse-public-copy">Disabled by default. Enable it when you want a safe status-only page with no heartbeat endpoint, token, curl command, owner settings or quota details.</p><label><span>Public page URL</span><input id="pulse-public-url" readonly disabled placeholder="Enable the public page to create its link" /></label><div class="reader-actions"><button id="pulse-copy-public" class="button primary" type="button">Enable public page</button><a id="pulse-open-public" class="button ghost" href="/pulse-public" target="_blank" rel="noreferrer" hidden>Open public page</a><button id="pulse-disable-public" class="button ghost" type="button" hidden>Disable public page</button></div><p id="pulse-public-status" class="pulse-settings-status" role="status"></p></article>
+				<form id="pulse-settings" class="pulse-settings"><p class="eyebrow">MONITOR SETTINGS</p><label><span>Name</span><input id="pulse-name-input" maxlength="80" required /></label><label><span>Description</span><textarea id="pulse-description-input" maxlength="240" rows="3"></textarea></label><div class="pulse-schedule-control"><div><span>Expected heartbeat interval</span><strong id="pulse-interval-human">—</strong></div><input id="pulse-interval-slider" type="range" min="20" max="604800" step="1" /><label><span>Exact seconds</span><input id="pulse-interval-input" type="number" min="20" max="604800" step="1" required /></label><small>How often your job should send a heartbeat.</small></div><div class="pulse-schedule-control"><div><span>Late grace period</span><strong id="pulse-grace-human">—</strong></div><input id="pulse-grace-slider" type="range" min="60" max="604800" step="1" /><label><span>Exact seconds</span><input id="pulse-grace-input" type="number" min="60" max="604800" step="1" required /></label><small>Extra time allowed after the expected heartbeat before PULSE reports late.</small></div><button class="button primary" type="submit">Save monitor settings</button><p id="pulse-settings-status" class="pulse-settings-status" role="status"></p></form>
 				<section class="portal-danger"><div><p class="eyebrow">DESTRUCTIVE ACTION</p><h2>Destroy PULSE.</h2><p>Erases both private capabilities and disables the public page immediately. This cannot be undone.</p></div><button id="pulse-destroy" class="button danger" type="button">Destroy monitor</button></section>
 			</section>
 		</section>
 	</main>
 	<footer class="footer shell"><span>THE402MACHINE.COM</span><span>OWNER CAPABILITY / KEEP PRIVATE</span><span>NO ACCOUNT RECOVERY</span></footer>
-	<script type="module" src="/assets/pulse-page.js?v=4"></script>
+	<script type="module" src="/assets/pulse-page.js?v=5"></script>
 </body>
 </html>

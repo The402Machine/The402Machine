@@ -3,41 +3,96 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<meta name="description" content="The402Machine HTTP 402 and capability API documentation." />
+		<meta name="description" content="Complete The402Machine HTTP 402 API documentation with downloadable OpenAPI and Postman contracts." />
 		<meta name="theme-color" content="#080a08" />
 		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 		<title>API — The402Machine</title>
-		<link rel="stylesheet" href="/assets/styles.css?v=15" />
+		<link rel="stylesheet" href="/assets/styles.css?v=20" />
 	</head>
 	<body>
 		<div class="noise" aria-hidden="true"></div>
-		<header class="topbar"><a class="brand" href="/" aria-label="The402Machine home"><span class="brand-mark">402</span><span>The402Machine</span></a><nav aria-label="Documentation navigation"><a href="/">Home</a><a href="/demo.html">Demos</a><a href="https://github.com/The402Machine/The402Machine" target="_blank" rel="noopener noreferrer">Source ↗</a></nav></header>
+		<header class="topbar"><a class="brand" href="/" aria-label="The402Machine home"><span class="brand-mark">402</span><span>The402Machine</span></a><nav aria-label="Documentation navigation"><a href="#quickstart">Quickstart</a><a href="#reference">Reference</a><a href="/demo">Demos</a><a href="https://github.com/The402Machine/The402Machine" target="_blank" rel="noopener noreferrer">Source ↗</a></nav></header>
 		<main>
-			<section class="shell docs-hero"><p class="eyebrow">HTTP API / COMPLETE FLOW</p><h1>Buy, pay, receive.<br /><em>Then let it expire.</em></h1><p class="lede">Everything the browser checkout does is available over HTTP. Payment settlement and provisioning are confirmed by the server.</p></section>
-			<section class="api-section"><div class="shell section">
-				<div class="api-flow" aria-label="API payment flow"><span>1 · Catalogue</span><i>→</i><span>2 · HTTP 402 quote</span><i>→</i><span>3 · Pay BOLT11</span><i>→</i><span>4 · Poll order</span><i>→</i><span>5 · Capability</span></div>
-				<div class="api-grid">
-					<article><p class="eyebrow">DISCOVER + PAY</p><h3>Lightning checkout</h3><code>GET /api/catalog</code><code>POST /api/payments/catch</code><code>POST /api/payments/whisper</code><code>POST /api/payments/pulse</code><code>GET /api/payments/{orderId}</code><p>Send a unique <b>Idempotency-Key</b>. A quote returns HTTP 402 with the order ID, amount and BOLT11. Poll until server-side settlement has provisioned the resource.</p><details><summary>CATCH purchase example</summary><pre>curl -i -X POST https://the402machine.com/api/payments/catch \
-  -H 'Idempotency-Key: your-unique-key' \
-  -H 'Content-Type: application/json' \
-  --data '{"planId":"spark"}'
+			<section class="shell docs-hero api-docs-hero">
+				<div><p class="eyebrow">HTTP API / COMPLETE FLOW</p><h1>Buy, pay, receive.<br /><em>Then let it expire.</em></h1><p class="lede">Everything the browser checkout does is available over HTTP. Start with the catalogue, receive an HTTP 402 Lightning quote, poll settlement, then use the narrowly scoped capability returned by the server.</p></div>
+				<aside class="api-base-card"><small>Base URL</small><code>https://the402machine.com</code><span>JSON unless an endpoint explicitly uses raw bytes.</span></aside>
+			</section>
 
-curl https://the402machine.com/api/payments/{orderId}</pre></details><p class="api-note">WHISPER accepts client-encrypted <code>application/octet-stream</code> with <code>X-Whisper-Plan</code>. Never upload plaintext.</p></article>
-					<article><p class="eyebrow">CATCH / INGEST</p><h3>Receive webhook traffic</h3><code>POST|PUT|PATCH|DELETE|GET|HEAD|OPTIONS /c/{publicId}</code><p>Requests are accepted with or without the ingest token. CATCH records bounded request data, trusted <code>sourceIp</code>, locally resolved approximate IP location as <code>ipLocation</code>, and authentication provenance. It never calls a user destination.</p><details><summary>Authenticated event example</summary><pre>curl -X PUT https://the402machine.com/c/{publicId} \
-  -H 'Authorization: Bearer ***' \
-  -H 'Content-Type: application/json' \
-  --data '{"event":"canary"}'</pre></details></article>
-					<article><p class="eyebrow">CATCH / OWNER</p><h3>Inspect and manage</h3><code>GET /api/catch/{publicId}</code><code>GET /api/catch/{publicId}/events</code><code>DELETE /api/catch/{publicId}/events/{eventId}</code><code>DELETE /api/catch/{publicId}</code><p>Use <code>Authorization: Bearer ***</code>. Listing supports <code>cursor</code>, <code>access=public|authenticated</code>, method, content type and text filters. Bodies return an explicit <code>bodyEncoding</code>.</p><details><summary>Paginated listing</summary><pre>curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;access=authenticated'
+			<section class="shell api-downloads" aria-labelledby="api-download-title">
+				<div><p class="eyebrow">READY TO IMPORT</p><h2 id="api-download-title">Use the format your tools understand.</h2><p>Both files describe the public API only. They contain placeholders, never live invoices, tokens or capabilities.</p></div>
+				<div class="api-download-grid">
+					<a class="api-download-card" href="/openapi.json" download><span>01</span><div><strong>OpenAPI 3.1</strong><small>Swagger UI, Redoc, code generators and validators</small></div><b>Download JSON ↓</b></a>
+					<a class="api-download-card" href="/the402machine.postman_collection.json" download><span>02</span><div><strong>Postman collection</strong><small>22 prepared requests grouped by product</small></div><b>Download JSON ↓</b></a>
+				</div>
+			</section>
 
-curl 'https://the402machine.com/api/catch/{publicId}/events?cursor={nextCursor}'</pre></details></article>
-					<article><p class="eyebrow">WHISPER / ENCRYPTED DELIVERY</p><h3>Encrypt before upload</h3><code>POST /api/payments/whisper</code><code>GET /w/{publicId}</code><p>Upload opaque AES-256-GCM ciphertext with <code>X-Whisper-Plan</code>. Use <code>X-Whisper-Read-Limit: 1</code> for burn after first read or <code>X-Whisper-Reveal-At</code> for scheduled reveal. The key never enters the API response.</p><details><summary>Encrypted retrieval</summary><pre>curl https://the402machine.com/w/{publicId} \
-  -H 'Authorization: Bearer ***' \
-  --output encrypted.bin</pre></details></article>
-					<article><p class="eyebrow">PULSE / HEARTBEAT STATUS</p><h3>Ping, inspect, publish</h3><code>POST /p/{publicId}</code><code>GET /api/pulse/{publicId}</code><code>PATCH /api/pulse/{publicId}</code><code>DELETE /api/pulse/{publicId}</code><p>PULSE accepts a bounded authenticated heartbeat. It stores no request body and never calls another URL.</p><details><summary>Heartbeat example</summary><pre>curl -X POST https://the402machine.com/p/{publicId} \
-  -H 'Authorization: Bearer ***'</pre></details></article>
+			<section id="quickstart" class="api-section"><div class="shell section">
+				<div class="api-section-heading"><div><p class="eyebrow">QUICKSTART</p><h2>One purchase flow.<br />Three temporary tools.</h2></div><p>Use a new idempotency key for each intended purchase. Repeating the same request with the same key returns the same order rather than creating another invoice.</p></div>
+				<div class="api-flow" aria-label="API payment flow"><span>1 · Catalogue</span><i>→</i><span>2 · Quote + pay</span><i>→</i><span>3 · Poll + save capability</span></div>
+				<div class="api-quick-grid">
+					<article><small>STEP 1</small><h3>Inspect the live catalogue</h3><pre>curl https://the402machine.com/api/catalog</pre><p>Plan prices, lifetimes, quotas and availability come from the same catalogue used by the browser checkout.</p></article>
+					<article><small>STEP 2</small><h3>Create a Lightning quote</h3><pre>curl -i -X POST https://the402machine.com/api/payments/catch \
+  -H 'Idempotency-Key: replace-with-a-unique-key' \
+  -H 'Content-Type: application/json' \
+  --data '{"planId":"spark"}'</pre><p>The expected response is HTTP 402 with <code>orderId</code>, <code>amountSats</code> and <code>bolt11</code>.</p></article>
+					<article><small>STEP 3</small><h3>Poll until provisioned</h3><pre>curl https://the402machine.com/api/payments/{orderId}</pre><p>HTTP 402 means payment is still pending. HTTP 200 returns the product capability once. Save it immediately.</p></article>
 				</div>
 			</div></section>
+
+			<section class="shell section api-foundations">
+				<div class="api-section-heading"><div><p class="eyebrow">BEFORE YOU CALL IT</p><h2>Protocol rules.</h2></div><p>The API deliberately uses capability URLs and bearer tokens instead of user accounts. Treat every dispensed token as a password.</p></div>
+				<div class="api-foundation-grid">
+					<article><span>AUTH</span><h3>Authentication model</h3><p>Owner, ingest, read and ping tokens have different roles. Send the correct value as <code>Authorization: Bearer ***</code>. Do not put bearer capabilities in query strings, logs, analytics or shared Postman environments.</p></article>
+					<article><span>PAYMENT</span><h3>HTTP 402 is expected</h3><p>Quote creation and unpaid order polling return <code>402 Payment Required</code>. A paid order returns <code>200</code> only after server-side settlement and provisioning complete.</p></article>
+					<article><span>PRIVACY</span><h3>WHISPER stays opaque</h3><p>Encrypt WHISPER content locally with AES-256-GCM. Upload only <code>application/octet-stream</code> ciphertext. The encryption key never belongs in an API request.</p></article>
+					<article><span>LIFECYCLE</span><h3>Expiry is final</h3><p>Capabilities disappear at expiry, exhaustion or explicit destruction. Private responses use <code>Cache-Control: no-store</code>; clients should not assume recovery is possible.</p></article>
+				</div>
+				<div class="api-response-codes"><h3>Response codes</h3><dl><div><dt>200 / 204</dt><dd>Success or successful no-content operation.</dd></div><div><dt>400</dt><dd>Invalid plan, payload, ciphertext, settings or schedule.</dd></div><div><dt>401</dt><dd>Owner authentication failed where existence is not hidden.</dd></div><div><dt>402</dt><dd>Lightning payment is required or still pending.</dd></div><div><dt>404</dt><dd>Unavailable, expired, consumed, destroyed or deliberately hidden resource.</dd></div><div><dt>425</dt><dd>A scheduled WHISPER has not reached its reveal time.</dd></div><div><dt>429</dt><dd>Rate limit reached. Respect <code>Retry-After</code>.</dd></div></dl></div>
+			</section>
+
+			<section id="reference" class="api-section api-reference"><div class="shell section">
+				<div class="api-section-heading"><div><p class="eyebrow">Public endpoints</p><h2>Endpoint reference.</h2></div><p>Operational provisioning endpoints are intentionally excluded. These are the routes intended for buyers, integrations and public status consumers.</p></div>
+				<nav class="api-jump" aria-label="Endpoint groups"><a href="#payments">Payments</a><a href="#catch-api">CATCH</a><a href="#whisper-api">WHISPER</a><a href="#pulse-api">PULSE</a></nav>
+
+				<section id="payments" class="api-endpoint-group"><header><span>01</span><div><p class="eyebrow">PAYMENTS</p><h3>Discover, quote and settle</h3></div></header>
+					<div class="api-endpoint-list">
+						<article><div class="api-route"><b data-method="get">GET</b><code>/api/catalog</code><span>Public</span></div><p><span class="api-contract-label">GET /api/catalog</span> Returns products, plans, prices, lifetimes, quotas and current availability.</p></article>
+						<article><div class="api-route"><b data-method="post">POST</b><code>/api/payments/catch</code><span>Idempotency-Key</span></div><p><span class="api-contract-label">POST /api/payments/catch</span> JSON body: <code>{"planId":"spark|standard|long"}</code>. Returns a CATCH invoice quote with HTTP 402.</p></article>
+						<article><div class="api-route"><b data-method="post">POST</b><code>/api/payments/whisper</code><span>Raw ciphertext</span></div><p><span class="api-contract-label">POST /api/payments/whisper</span> Requires <code>X-Whisper-Plan</code>. Set <code>X-Whisper-Read-Limit</code> to any whole number from 1 through the selected plan allowance. Optional <code>X-Whisper-Reveal-At</code> schedules reveal. Body must be client-encrypted AES-256-GCM bytes.</p></article>
+						<article><div class="api-route"><b data-method="post">POST</b><code>/api/payments/pulse</code><span>Idempotency-Key</span></div><p><span class="api-contract-label">POST /api/payments/pulse</span> JSON body: <code>{"planId":"spark|standard|long"}</code>. Returns a PULSE invoice quote with HTTP 402.</p></article>
+						<article><div class="api-route"><b data-method="get">GET</b><code>/api/payments/{orderId}</code><span>Public</span></div><p><span class="api-contract-label">GET /api/payments/{orderId}</span> Poll payment state. HTTP 200 returns the provisioned CATCH, WHISPER or PULSE capability.</p></article>
+					</div>
+				</section>
+
+				<section id="catch-api" class="api-endpoint-group"><header><span>02</span><div><p class="eyebrow">CATCH</p><h3>Receive and inspect webhook traffic</h3></div></header>
+					<div class="api-endpoint-list">
+						<article><div class="api-route"><b data-method="any">ANY</b><code>/c/{publicId}</code><span>Optional ingest token</span></div><p><span class="api-contract-label">POST|PUT|PATCH|DELETE|GET|HEAD|OPTIONS /c/{publicId}</span> Requests are accepted with or without the ingest token. Valid token-backed events are marked authenticated; tokenless or invalid-token requests remain public. Supported bodies are bounded JSON, text and form data.</p></article>
+						<article><div class="api-route"><b data-method="get">GET</b><code>/api/catch/{publicId}</code><span>Owner token</span></div><p><span class="api-contract-label">GET /api/catch/{publicId}</span> Private resource status, lifetime and quota usage.</p></article>
+						<article><div class="api-route"><b data-method="get">GET</b><code>/api/catch/{publicId}/events</code><span>Owner token</span></div><p><span class="api-contract-label">GET /api/catch/{publicId}/events</span> Cursor pagination with <code>limit</code>, <code>cursor</code>, <code>access=public|authenticated</code>, <code>method</code>, <code>contentType</code> and <code>q</code> filters. Bodies declare <code>bodyEncoding</code>; events include trusted <code>sourceIp</code> and locally resolved approximate IP location as <code>ipLocation</code> when available.</p></article>
+						<article><div class="api-route"><b data-method="delete">DELETE</b><code>/api/catch/{publicId}/events/{eventId}</code><span>Owner token</span></div><p><span class="api-contract-label">DELETE /api/catch/{publicId}/events/{eventId}</span> Permanently deletes one stored event.</p></article>
+						<article><div class="api-route"><b data-method="delete">DELETE</b><code>/api/catch/{publicId}</code><span>Owner token</span></div><p><span class="api-contract-label">DELETE /api/catch/{publicId}</span> Destroys the inbox, stored events and both CATCH capabilities.</p></article>
+					</div>
+				</section>
+
+				<section id="whisper-api" class="api-endpoint-group"><header><span>03</span><div><p class="eyebrow">WHISPER</p><h3>Deliver client-encrypted bytes</h3></div></header>
+					<div class="api-endpoint-list">
+						<article><div class="api-route"><b data-method="get">GET</b><code>/w/{publicId}</code><span>Read token</span></div><p><span class="api-contract-label">GET /w/{publicId}</span> Returns <code>application/octet-stream</code> ciphertext and spends one successful read. Scheduled messages return HTTP 425 with <code>Retry-After</code> before reveal. Exhausted, expired and invalid capabilities return 404.</p></article>
+					</div>
+				</section>
+
+				<section id="pulse-api" class="api-endpoint-group"><header><span>04</span><div><p class="eyebrow">PULSE</p><h3>Ping, configure and publish status</h3></div></header>
+					<div class="api-endpoint-list">
+						<article><div class="api-route"><b data-method="post">POST</b><code>/p/{publicId}</code><span>Ping token</span></div><p><span class="api-contract-label">POST /p/{publicId}</span> Records one heartbeat. Request bodies are ignored and never stored.</p></article>
+						<article><div class="api-route"><b data-method="get">GET</b><code>/api/pulse/{publicId}</code><span>Owner token</span></div><p><span class="api-contract-label">GET /api/pulse/{publicId}</span> Returns private monitor state, counters, settings and expiry.</p></article>
+						<article><div class="api-route"><b data-method="patch">PATCH</b><code>/api/pulse/{publicId}</code><span>Owner token</span></div><p><span class="api-contract-label">PATCH /api/pulse/{publicId}</span> Updates any subset of <code>name</code>, <code>description</code>, <code>expectedIntervalSeconds</code>, <code>graceSeconds</code> and <code>publicStatusEnabled</code>.</p></article>
+						<article><div class="api-route"><b data-method="get">GET</b><code>/api/pulse/public/{publicStatusId}</code><span>Public</span></div><p>When enabled, exposes only name, description, derived state and last signal time through an independent share-only identifier. It never exposes the heartbeat identifier, capabilities or operational settings.</p></article>
+						<article><div class="api-route"><b data-method="delete">DELETE</b><code>/api/pulse/{publicId}</code><span>Owner token</span></div><p><span class="api-contract-label">DELETE /api/pulse/{publicId}</span> Destroys the monitor, both private capabilities and public sharing.</p></article>
+					</div>
+				</section>
+			</div></section>
+
+			<section class="shell section api-final-cta"><div><p class="eyebrow">MACHINE-READABLE</p><h2>Need exact schemas?</h2><p>The OpenAPI file is the detailed contract for parameters, request bodies, security schemes and response shapes. Import the Postman collection when you want prepared requests and editable variables.</p></div><div><a class="button primary" href="/openapi.json" download>Download OpenAPI</a><a class="button ghost" href="/the402machine.postman_collection.json" download>Download Postman</a></div></section>
 		</main>
-		<footer class="footer shell"><span>THE402MACHINE.COM</span><a href="/">BACK TO THE MACHINE</a><span>HTTP 402</span></footer>
+		<footer class="footer shell"><span>THE402MACHINE.COM</span><a href="/">BACK TO THE MACHINE</a><span>HTTP 402 / CAPABILITY API</span></footer>
 	</body>
 </html>

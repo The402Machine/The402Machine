@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
@@ -6,40 +5,21 @@ import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { PaymentRepository } from "../../src/payment/payment-repository.js";
+import { startPostgresTestContainer, type PostgresTestContainer } from "../support/postgres-container.js";
 
-const image = "postgres:17-alpine";
 const container = `the402machine-payment-test-${randomUUID()}`;
 const password = "payment-test-password";
 let databaseUrl = "";
 let sql: ReturnType<typeof postgres>;
 let repository: PaymentRepository;
+let postgresContainer: PostgresTestContainer;
 const deliveryKey = Buffer.alloc(32, 7).toString("base64url");
 
-const docker = (...args: string[]): string => execFileSync("docker", args, { encoding: "utf8" }).trim();
-
-const waitForPostgres = async (): Promise<void> => {
-	for (let attempt = 0; attempt < 40; attempt += 1) {
-		try {
-			const probe = postgres(databaseUrl, { max: 1, connect_timeout: 1 });
-			await probe`select 1`;
-			await probe.end();
-			return;
-		} catch {
-			await new Promise((resolve) => setTimeout(resolve, 250));
-		}
-	}
-	throw new Error("PostgreSQL payment test container did not become ready");
-};
-
 beforeAll(async () => {
-	docker("pull", image);
-	docker("run", "--detach", "--rm", "--name", container, "--publish", "127.0.0.1::5432", "--env", `POSTGRES_PASSWORD=${password}`, "--env", "POSTGRES_DB=the402machine_test", image);
-	const port = docker("port", container, "5432/tcp").split(":").at(-1);
-	if (port === undefined) throw new Error("Could not determine PostgreSQL test port");
-	databaseUrl = `postgresql://postgres:${password}@127.0.0.1:${port}/the402machine_test`;
-	await waitForPostgres();
+	postgresContainer = await startPostgresTestContainer({ name: container, password });
+	databaseUrl = postgresContainer.databaseUrl;
 	sql = postgres(databaseUrl, { max: 1 });
-	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql", "0014_whisper_reveal_window.sql"]) {
+	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql", "0014_whisper_reveal_window.sql", "0015_whisper_custom_read_limit.sql", "0016_pulse_public_status_id.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${migrationName}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -50,7 +30,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
 	await sql?.end();
-	try { docker("rm", "--force", container); } catch { /* container already removed */ }
+	postgresContainer?.stop();
 });
 
 describe("PaymentRepository", () => {
@@ -67,6 +47,9 @@ describe("PaymentRepository", () => {
 		expect(burn.whisperReadLimit).toBe(1);
 		expect(repeated.id).toBe(burn.id);
 		await expect(repository.createOrder({ idempotencyKey: "idem-whisper-burn-policy", product: "whisper", planId: "standard", productPayload: ciphertext, whisperReadLimit: 42 })).rejects.toThrow("Idempotency key already belongs to another purchase");
+		const custom = await repository.createOrder({ idempotencyKey: "idem-whisper-custom-limit", product: "whisper", planId: "standard", productPayload: ciphertext, whisperReadLimit: 12 });
+		expect(custom.whisperReadLimit).toBe(12);
+		await expect(repository.createOrder({ idempotencyKey: "idem-whisper-invalid-limit", product: "whisper", planId: "standard", productPayload: ciphertext, whisperReadLimit: 43 })).rejects.toThrow("WHISPER read limit is invalid");
 
 		const spark = await repository.createOrder({ idempotencyKey: "idem-price-spark", planId: "spark" });
 		const standard = await repository.createOrder({ idempotencyKey: "idem-price-standard", planId: "standard" });
@@ -145,9 +128,9 @@ describe("PaymentRepository", () => {
 		const order = await repository.createOrder({ idempotencyKey: "idem-pulse-dispense", product: "pulse", planId: "spark" });
 		await repository.attachInvoice(order.id, { paymentHash: "f".repeat(64), bolt11: "lnbc42n1pulse" });
 		await repository.markPaid(order.id);
-		const results = await Promise.all(Array.from({ length: 4 }, () => repository.dispensePaidOrder(order.id, () => Promise.resolve({ product: "pulse", publicId: "pulse_payment_once_abcdefghijklmnopqrstuv", planId: "spark", ownerTokenHash: "a".repeat(64), pingTokenHash: "b".repeat(64), heartbeatLimit: 1_202, expectedIntervalSeconds: 300, graceSeconds: 600, ownerToken: "pulse-owner", pingToken: "pulse-ping", expiresAt: new Date(Date.now() + 60_000) }))));
+		const results = await Promise.all(Array.from({ length: 4 }, () => repository.dispensePaidOrder(order.id, () => Promise.resolve({ product: "pulse", publicId: "pulse_payment_once_abcdefghijklmnopqrstuv", publicStatusId: "pulse_status_abcdefghijklmnopqrstuvwx12345678", planId: "spark", ownerTokenHash: "a".repeat(64), pingTokenHash: "b".repeat(64), heartbeatLimit: 1_202, expectedIntervalSeconds: 300, graceSeconds: 600, ownerToken: "pulse-owner", pingToken: "pulse-ping", expiresAt: new Date(Date.now() + 60_000) }))));
 		expect(results.every((result) => result?.product === "pulse" && result.ownerToken === "pulse-owner" && result.pingToken === "pulse-ping")).toBe(true);
-		expect((await sql`select id from pulse_resources where public_id = 'pulse_payment_once_abcdefghijklmnopqrstuv'`)).toHaveLength(1);
+		expect((await sql`select id from pulse_resources where public_id = 'pulse_payment_once_abcdefghijklmnopqrstuv' and public_status_id = 'pulse_status_abcdefghijklmnopqrstuvwx12345678'`)).toHaveLength(1);
 	});
 
 	it("consumes a PULSE quota atomically and erases the ping capability at exhaustion", async () => {
@@ -190,6 +173,57 @@ describe("PaymentRepository", () => {
 		expect(await pulse.getResource(publicId)).toMatchObject({
 			status: "expired", name: "Expired monitor", description: "", publicStatusEnabled: false, lastPingAt: null,
 		});
+	});
+
+	it("expires PULSE credentials on owner access before the worker runs", async () => {
+		const publicId = "pulse_expired_owner_abcdefghijklmnopqrstuv";
+		await sql`
+			insert into pulse_resources (public_id, plan_id, owner_token_hash, ping_token_hash, heartbeat_limit, expected_interval_seconds, grace_seconds, name, description, public_status_enabled, last_ping_at, expires_at)
+			values (${publicId}, 'spark', ${"a".repeat(64)}, ${"b".repeat(64)}, 3, 300, 600, 'Sensitive owner', 'Private owner view', true, clock_timestamp() - interval '2 minutes', clock_timestamp() + interval '100 milliseconds')
+		`;
+		await new Promise((resolve) => setTimeout(resolve, 150));
+		const pulse = new (await import("../../src/pulse/pulse-repository.js")).PulseRepository(sql);
+		expect(await pulse.getCredentialHashes(publicId)).toBeNull();
+		expect(await pulse.getResource(publicId)).toMatchObject({
+			status: "expired", name: "Expired monitor", description: "", publicStatusEnabled: false, lastPingAt: null,
+		});
+	});
+
+	it("hides an expired PULSE owner resource before the worker runs", async () => {
+		const publicId = "pulse_expired_resource_abcdefghijklmnopqrstuv";
+		await sql`
+			insert into pulse_resources (public_id, plan_id, owner_token_hash, ping_token_hash, heartbeat_limit, expected_interval_seconds, grace_seconds, name, description, public_status_enabled, last_ping_at, expires_at)
+			values (${publicId}, 'spark', ${"a".repeat(64)}, ${"b".repeat(64)}, 3, 300, 600, 'Sensitive resource', 'Private resource view', true, clock_timestamp() - interval '2 minutes', clock_timestamp() + interval '100 milliseconds')
+		`;
+		await new Promise((resolve) => setTimeout(resolve, 150));
+		const pulse = new (await import("../../src/pulse/pulse-repository.js")).PulseRepository(sql);
+		expect(await pulse.getResource(publicId)).toBeNull();
+		const rows = await sql<{ status: string; name: string; public_status_enabled: boolean }[]>`select status, name, public_status_enabled from pulse_resources where public_id = ${publicId}`;
+		expect(rows[0]).toEqual({ status: "expired", name: "Expired monitor", public_status_enabled: false });
+	});
+
+	it("rejects PULSE settings updates after lifetime expiry before the worker runs", async () => {
+		const publicId = "pulse_expired_settings_abcdefghijklmnopqrstuv";
+		await sql`
+			insert into pulse_resources (public_id, plan_id, owner_token_hash, ping_token_hash, heartbeat_limit, expected_interval_seconds, grace_seconds, expires_at)
+			values (${publicId}, 'spark', ${"a".repeat(64)}, ${"b".repeat(64)}, 3, 300, 600, clock_timestamp() + interval '100 milliseconds')
+		`;
+		await new Promise((resolve) => setTimeout(resolve, 150));
+		const pulse = new (await import("../../src/pulse/pulse-repository.js")).PulseRepository(sql);
+		expect(await pulse.updateSettings(publicId, { name: "Too late", description: "", expectedIntervalSeconds: 300, graceSeconds: 600, publicStatusEnabled: true })).toBeNull();
+		expect(await pulse.getResource(publicId)).toMatchObject({ status: "expired", publicStatusEnabled: false });
+	});
+
+	it("rejects PULSE destruction after lifetime expiry before the worker runs", async () => {
+		const publicId = "pulse_expired_destroy_abcdefghijklmnopqrstuv";
+		await sql`
+			insert into pulse_resources (public_id, plan_id, owner_token_hash, ping_token_hash, heartbeat_limit, expected_interval_seconds, grace_seconds, expires_at)
+			values (${publicId}, 'spark', ${"a".repeat(64)}, ${"b".repeat(64)}, 3, 300, 600, clock_timestamp() + interval '100 milliseconds')
+		`;
+		await new Promise((resolve) => setTimeout(resolve, 150));
+		const pulse = new (await import("../../src/pulse/pulse-repository.js")).PulseRepository(sql);
+		expect(await pulse.destroy(publicId)).toBe(false);
+		expect(await pulse.getResource(publicId)).toMatchObject({ status: "expired", publicStatusEnabled: false });
 	});
 
 	it("stores a WHISPER payment payload near 4.02 MiB", async () => {

@@ -16,6 +16,10 @@ export const WHISPER_PLANS: Readonly<Record<CatchPlanId, WhisperPlan>> = {
 	long: { id: "long", durationSeconds: 402 * 24 * 60 * 60, readLimit: 402, maxCiphertextBytes: MAX_WHISPER_CIPHERTEXT_BYTES, available: true },
 };
 
+export function isWhisperReadLimit(planId: CatchPlanId, value: number): boolean {
+	return Number.isInteger(value) && value >= 1 && value <= WHISPER_PLANS[planId].readLimit;
+}
+
 export function calculateWhisperExpiry(planId: CatchPlanId, activatedAt: Date): Date {
 	if (Number.isNaN(activatedAt.getTime())) throw new Error("A valid activation date is required");
 	return new Date(activatedAt.getTime() + WHISPER_PLANS[planId].durationSeconds * 1_000);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateWhisperExpiry, calculateWhisperSchedule, WHISPER_PLANS } from "../../src/domain/whisper-plans.js";
+import { calculateWhisperExpiry, calculateWhisperSchedule, isWhisperReadLimit, WHISPER_PLANS } from "../../src/domain/whisper-plans.js";
 
 describe("WHISPER plan catalogue", () => {
 	it("scales the unread lifetime and successful read allowance", () => {
@@ -9,6 +9,16 @@ describe("WHISPER plan catalogue", () => {
 			standard: { id: "standard", durationSeconds: 42 * 24 * 60 * 60, readLimit: 42, maxCiphertextBytes: 4_215_276, available: true },
 			long: { id: "long", durationSeconds: 402 * 24 * 60 * 60, readLimit: 402, maxCiphertextBytes: 4_215_276, available: true },
 		});
+	});
+
+	it("accepts whole-number deletion thresholds within each plan allowance", () => {
+		expect(isWhisperReadLimit("spark", 1)).toBe(true);
+		expect(isWhisperReadLimit("spark", 2)).toBe(false);
+		expect(isWhisperReadLimit("standard", 12)).toBe(true);
+		expect(isWhisperReadLimit("standard", 42)).toBe(true);
+		expect(isWhisperReadLimit("standard", 43)).toBe(false);
+		expect(isWhisperReadLimit("long", 402)).toBe(true);
+		expect(isWhisperReadLimit("long", 1.5)).toBe(false);
 	});
 
 	it("calculates expiry from activation without mutating the input", () => {

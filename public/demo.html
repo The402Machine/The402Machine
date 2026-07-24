@@ -14,7 +14,7 @@
 		<div class="noise" aria-hidden="true"></div>
 		<header class="topbar">
 			<a class="brand" href="/" aria-label="The402Machine home"><span class="brand-mark">402</span><span>The402Machine</span></a>
-			<nav aria-label="Main navigation"><a href="/">Home</a><a href="/api.html">API</a><a href="https://github.com/The402Machine/The402Machine" target="_blank" rel="noopener noreferrer">Source ↗</a></nav>
+			<nav aria-label="Main navigation"><a href="/">Home</a><a href="/api">API</a><a href="https://github.com/The402Machine/The402Machine" target="_blank" rel="noopener noreferrer">Source ↗</a></nav>
 		</header>
 
 		<main class="shell demo-shell">
@@ -76,15 +76,15 @@
 				<div class="demo-whisper-layout">
 					<aside class="demo-scenario-panel">
 						<p class="eyebrow">DELIVERY SCENARIO</p>
-						<label><span>Message state</span><select id="demo-whisper-scenario"><option value="ready">Ready now · 3 reads</option><option value="scheduled">Scheduled reveal</option><option value="burn">Burn after first read</option><option value="expired">Expired delivery</option></select></label>
-						<div class="demo-scenario-note"><strong>Real behavior, mock state.</strong><p>The controls below reproduce ready, 425 Too Early, final-read destruction and expiry states.</p></div>
+						<label><span>Message state</span><select id="demo-whisper-scenario"><option value="ready">Ready now · 3 reads</option><option value="scheduled">Scheduled reveal</option><option value="burn">Delete after 1 successful read</option><option value="expired">Expired delivery</option></select></label>
+						<div class="demo-scenario-note"><strong>Real behavior, mock state.</strong><p>The controls below reproduce ready, 425 Too Early, final-read destruction and expiry states. The plaintext stays visible until you close it.</p></div>
 						<dl class="demo-detail-list"><div><dt>Encryption</dt><dd>AES-256-GCM</dd></div><div><dt>Server view</dt><dd>Opaque ciphertext</dd></div><div><dt>Decryption</dt><dd>Inside your browser</dd></div><div><dt>Demo storage</dt><dd>Memory only</dd></div></dl>
 					</aside>
 					<section id="demo-whisper-reader" class="whisper-panel demo-whisper-reader">
 						<div class="demo-reader-head"><div><p class="eyebrow">WHISPER / CLIENT-SIDE DECRYPTION</p><span id="demo-whisper-state" class="portal-status-badge">READY</span></div><span id="demo-whisper-reads" class="demo-read-counter">3 READS LEFT</span></div>
 						<h2>Open privately.<br /><em>Spend one read.</em></h2>
 						<p id="demo-whisper-status" class="lede">The synthetic ciphertext is available. Confirm to decrypt it locally and use one demo read.</p>
-						<div id="demo-whisper-warning" class="whisper-warning"><strong>Each opening counts.</strong> A real successful request consumes one read. The final allowed read erases the encrypted server copy.</div>
+						<div id="demo-whisper-warning" class="whisper-warning"><strong>Each opening counts.</strong> The encrypted server copy is deleted on the final successful read, but the plaintext already decrypted in this tab stays visible until you close it.</div>
 						<div id="demo-whisper-schedule" class="demo-reveal-clock" hidden><small>SEALED UNTIL</small><strong id="demo-whisper-reveal-time">00:00:20</strong><span>No read is consumed while sealed.</span></div>
 						<div id="demo-whisper-cipher" class="demo-cipher"><span>OPAQUE CIPHERTEXT</span><code id="demo-whisper-ciphertext">7f 4a 2c 91 0d a8 c3 42 6e b1 17 84 f9 20 d4 03</code><i></i></div>
 						<pre id="demo-whisper-message" class="whisper-message" hidden>Recovery handoff
@@ -112,7 +112,7 @@ Reference: DEMO-402</pre>
 					<section class="pulse-history-card demo-pulse-history"><header><div><p class="eyebrow">RECENT SIGNALS</p><h2>Heartbeat timeline</h2></div><span>LIVE MOCK DATA</span></header><div id="demo-pulse-timeline" class="demo-pulse-timeline" aria-label="Recent heartbeat results"></div><div class="demo-history-legend"><span><i class="ok"></i>On time</span><span><i class="late"></i>Late</span><span><i class="missed"></i>Missed</span></div><p id="demo-pulse-history-copy">Automatic demo heartbeats are running.</p></section>
 
 					<section class="pulse-owner">
-						<article class="pulse-capability"><p class="eyebrow">HEARTBEAT CAPABILITY</p><h2>Wire your job.</h2><input value="https://the402machine.com/p/pulse_demo_local" readonly /><div class="reader-actions"><button class="button primary" data-demo-copy="Demo heartbeat URL copied" type="button">Copy heartbeat URL</button><button class="button ghost" data-demo-copy="Demo cURL copied" type="button">Copy curl command</button></div><p>This URL is inert. The demo never sends a request or stores a request body.</p><label><span>Public status page</span><input value="https://the402machine.com/pulse-public.html#pulse_demo_local_402machine_01" readonly /></label><button class="button ghost" data-demo-copy="Demo status link copied" type="button">Copy public status link</button><div class="demo-pulse-controls"><button id="demo-pulse-ping" class="button primary" type="button">Send heartbeat</button><button id="demo-pulse-auto" class="button ghost" type="button">Pause auto pings</button><button id="demo-pulse-exhaust" class="button ghost" type="button">Simulate exhausted</button></div></article>
+						<article class="pulse-capability"><p class="eyebrow">HEARTBEAT CAPABILITY</p><h2>Wire your job.</h2><input value="https://the402machine.com/p/pulse_demo_local" readonly /><div class="reader-actions"><button class="button primary" data-demo-copy="Demo heartbeat URL copied" type="button">Copy heartbeat URL</button><button class="button ghost" data-demo-copy="Demo cURL copied" type="button">Copy curl command</button></div><p>This URL is inert. The demo never sends a request or stores a request body.</p><label><span>Public status page</span><input value="https://the402machine.com/pulse-public#pulse_status_demo_local_402machine_01" readonly /></label><button class="button ghost" data-demo-copy="Demo status link copied" type="button">Copy public status link</button><div class="demo-pulse-controls"><button id="demo-pulse-ping" class="button primary" type="button">Send heartbeat</button><button id="demo-pulse-auto" class="button ghost" type="button">Pause auto pings</button><button id="demo-pulse-exhaust" class="button ghost" type="button">Simulate exhausted</button></div></article>
 						<form id="demo-pulse-settings" class="pulse-settings"><p class="eyebrow">STATUS PAGE SETTINGS</p><label><span>Name</span><input id="demo-pulse-name-input" maxlength="80" value="Nightly backup" required /></label><label><span>Description</span><textarea id="demo-pulse-description-input" maxlength="240" rows="3">Encrypted NAS snapshot and off-site verification.</textarea></label><div class="pulse-form-grid"><label><span>Expected every (seconds)</span><input id="demo-pulse-interval-input" type="number" min="5" max="60" value="12" required /></label><label><span>Late grace (seconds)</span><input id="demo-pulse-grace-input" type="number" min="3" max="60" value="8" required /></label></div><label class="pulse-toggle"><input id="demo-pulse-public-input" type="checkbox" checked /><span>Public status page enabled</span></label><button class="button primary" type="submit">Save status page</button><p id="demo-pulse-settings-status" class="pulse-settings-status" role="status">Changes stay in this tab.</p></form>
 						<section class="portal-danger demo-danger"><div><p class="eyebrow">DESTRUCTIVE ACTION / SIMULATED</p><h2>Destroy PULSE.</h2><p>Experience the terminal state without invalidating anything real.</p></div><button id="demo-pulse-destroy" class="button danger" type="button">Simulate destruction</button></section>
 					</section>
@@ -122,6 +122,6 @@ Reference: DEMO-402</pre>
 		</main>
 
 		<footer class="footer shell"><span>FULL DASHBOARD SIMULATION</span><span>NO RESOURCE CREATED</span><a href="/#machines">SEE LIVE PLANS</a></footer>
-		<script type="module" src="/assets/demo.js?v=2"></script>
+		<script type="module" src="/assets/demo.js?v=3"></script>
 	</body>
 </html>
