@@ -3,50 +3,125 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<meta name="description" content="Read-only previews of The402Machine CATCH, WHISPER and PULSE products." />
+		<meta name="description" content="Full local simulations of The402Machine CATCH, WHISPER and PULSE dashboards." />
 		<meta name="theme-color" content="#080a08" />
 		<meta name="robots" content="noindex,nofollow" />
 		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-		<title>Demos — The402Machine</title>
-		<link rel="stylesheet" href="/assets/styles.css?v=15" />
+		<title>Full product demos — The402Machine</title>
+		<link rel="stylesheet" href="/assets/styles.css?v=16" />
 	</head>
 	<body class="demo-body">
 		<div class="noise" aria-hidden="true"></div>
-		<header class="topbar"><a class="brand" href="/" aria-label="The402Machine home"><span class="brand-mark">402</span><span>The402Machine</span></a><nav><a href="/">Home</a><a href="/api.html">API</a><a href="https://github.com/The402Machine/The402Machine" target="_blank" rel="noopener noreferrer">Source ↗</a></nav></header>
-		<main class="shell demo-shell">
-			<header class="demo-hero"><p class="eyebrow">TRY BEFORE YOU BUY</p><h1>Touch the controls.<br /><em>Spend zero sats.</em></h1><p class="lede">These previews are local and read-only. They do not create resources, invoices, capabilities or network requests.</p></header>
-			<nav class="demo-tabs" aria-label="Choose a product demo"><button class="active" data-demo-tab="catch">CATCH</button><button data-demo-tab="whisper">WHISPER</button><button data-demo-tab="pulse">PULSE</button></nav>
+		<header class="topbar">
+			<a class="brand" href="/" aria-label="The402Machine home"><span class="brand-mark">402</span><span>The402Machine</span></a>
+			<nav aria-label="Main navigation"><a href="/">Home</a><a href="/api.html">API</a><a href="https://github.com/The402Machine/The402Machine" target="_blank" rel="noopener noreferrer">Source ↗</a></nav>
+		</header>
 
-			<section id="catch" class="demo-panel active" data-demo-panel="catch">
-				<header><div><p class="eyebrow">Demo CATCH inbox</p><h2>Webhook activity</h2></div><span class="portal-status-badge">ACTIVE</span></header>
-				<div class="demo-metrics"><article><small>REQUESTS</small><strong>17 / 402</strong></article><article><small>STORAGE</small><strong>28 KiB</strong></article><article><small>EXPIRES</small><strong>03:41:22</strong></article></div>
-				<div class="demo-events">
-					<article class="portal-event"><div class="portal-event-head"><div><strong>POST</strong><span class="portal-event-access authenticated">AUTHENTICATED</span></div><time>just now</time></div><pre>{ "event": "deployment.finished", "status": "ok" }</pre></article>
-					<article class="portal-event"><div class="portal-event-head"><div><strong>PUT</strong><span class="portal-event-access public">PUBLIC</span></div><time>2 min ago</time></div><pre>temperature=21.4&amp;sensor=garage</pre></article>
-				</div>
-				<button class="button ghost" data-demo-add type="button">Simulate incoming event</button>
+		<main class="shell demo-shell">
+			<header class="demo-hero">
+				<p class="eyebrow">FULL PRODUCT EXPERIENCE</p>
+				<h1>The dashboard after payment.<br /><em>Filled with live mock data.</em></h1>
+				<p class="lede">Use the filters, inspect events, open messages, change monitor settings and trigger state changes. Everything happens inside this tab. No invoice, capability, backend write or external request is created.</p>
+				<div class="demo-safety-strip" aria-label="Demo safety properties"><span>LIVE MOCK DATA</span><span>NO PAYMENT</span><span>NO NETWORK</span><span>RESETS ON RELOAD</span></div>
+			</header>
+
+			<nav class="demo-tabs" aria-label="Choose a product demo" role="tablist">
+				<button id="demo-tab-catch" class="active" data-demo-tab="catch" type="button" role="tab" aria-controls="catch"><small>A1</small><strong>CATCH</strong><span>Owner inbox</span></button>
+				<button id="demo-tab-whisper" data-demo-tab="whisper" type="button" role="tab" aria-controls="whisper"><small>B1</small><strong>WHISPER</strong><span>Private reader</span></button>
+				<button id="demo-tab-pulse" data-demo-tab="pulse" type="button" role="tab" aria-controls="pulse"><small>C1</small><strong>PULSE</strong><span>Monitor dashboard</span></button>
+			</nav>
+
+			<section id="catch" class="demo-workspace demo-catch" data-demo-panel="catch" role="tabpanel" aria-labelledby="demo-tab-catch">
+				<div class="demo-mode-banner"><div><span class="demo-live-dot"></span><strong>SIMULATED OWNER PORTAL</strong></div><p>New synthetic requests arrive automatically while this tab is open.</p><button class="button ghost" id="demo-catch-reset" type="button">Reset inbox</button></div>
+				<section class="portal-status-panel">
+					<div class="portal-status-head"><div><p class="eyebrow">LIVE RESOURCE</p><h2>SPARK CATCH</h2></div><span class="portal-status-badge">ACTIVE</span></div>
+					<div class="portal-countdown"><span>TIME REMAINING</span><strong id="demo-catch-remaining">4h 01m 42s</strong><small>Expires today at 14:02</small></div>
+					<div class="portal-metrics">
+						<article><span>REQUESTS USED</span><strong id="demo-catch-requests">17 / 402</strong><div class="portal-meter"><i id="demo-catch-request-meter"></i></div><small id="demo-catch-request-detail">385 requests remaining</small></article>
+						<article><span>STORAGE USED</span><strong id="demo-catch-storage">28 KiB / 2 MiB</strong><div class="portal-meter"><i id="demo-catch-storage-meter"></i></div><small id="demo-catch-storage-detail">1.97 MiB remaining</small></article>
+						<article><span>PER REQUEST</span><strong>64 KiB</strong><small>Hard payload ceiling</small></article>
+					</div>
+				</section>
+
+				<section class="portal-grid">
+					<article class="portal-card portal-ingest-card">
+						<div class="portal-card-head"><div><p class="eyebrow">SEND EVENTS HERE</p><h2>Ingest endpoint</h2></div><span>DEMO</span></div>
+						<label><span>URL</span><input value="https://the402machine.com/c/catch_demo_local" readonly /></label>
+						<div class="portal-code-row"><code>Authorization: Bearer demo-only-token</code></div>
+						<div class="portal-actions"><button class="button primary" data-demo-copy="Demo endpoint copied" type="button">Copy endpoint</button><button class="button" data-demo-copy="Demo header copied" type="button">Copy auth header</button><button class="button ghost" data-demo-copy="Demo cURL copied" type="button">Copy cURL example</button></div>
+						<p class="portal-hint">These controls copy inert example values. No real capability exists and no request leaves the browser.</p>
+						<button id="demo-catch-add" class="button ghost demo-wide-button" type="button">Generate an event now</button>
+					</article>
+
+					<article class="portal-card portal-events-card">
+						<div class="portal-card-head"><div><p class="eyebrow">FILTERED FEED</p><h2>Events</h2></div><span id="demo-catch-live-label">LIVE MOCK DATA</span></div>
+						<div class="portal-event-filters">
+							<label><span>Access</span><select id="demo-catch-access"><option value="">All</option><option value="public">Public</option><option value="authenticated">Authenticated</option></select></label>
+							<label><span>Method</span><select id="demo-catch-method"><option value="">All</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>GET</option></select></label>
+							<label><span>Content type</span><select id="demo-catch-content-type"><option value="">All</option><option value="application/json">application/json</option><option value="text/plain">text/plain</option><option value="application/x-www-form-urlencoded">form-urlencoded</option></select></label>
+							<label class="portal-event-search"><span>Search body</span><input id="demo-catch-search" type="search" maxlength="120" placeholder="deployment, sensor, order…" /></label>
+							<label><span>Page size</span><select id="demo-catch-page-size"><option>5</option><option selected>10</option><option>20</option></select></label>
+						</div>
+						<p id="demo-catch-status" class="portal-hint" role="status">Synthetic events appear newest first.</p>
+						<div id="demo-catch-events" class="portal-events" aria-live="polite"></div>
+						<div class="portal-pagination"><button id="demo-catch-prev" class="button ghost" type="button">Previous</button><span id="demo-catch-page">Page 1</span><button id="demo-catch-next" class="button ghost" type="button">Next</button></div>
+					</article>
+				</section>
+
+				<section class="portal-danger demo-danger"><div><p class="eyebrow">DESTRUCTIVE ACTION / SIMULATED</p><h2>Destroy this CATCH.</h2><p>Try the final state safely. Reloading restores the complete demo inbox.</p></div><button id="demo-catch-destroy" class="button danger" type="button">Simulate destruction</button></section>
 			</section>
 
-			<section id="whisper" class="demo-panel" data-demo-panel="whisper" hidden>
-				<header><div><p class="eyebrow">Demo WHISPER reader</p><h2>Encrypted handoff</h2></div><span class="portal-status-badge">1 READ</span></header>
-				<div class="whisper-warning"><strong>Preview only.</strong> A real opening spends one read. This demo never contacts the server.</div>
-				<div class="demo-cipher" data-demo-cipher>7f 4a 2c 91 · encrypted payload · 0d a8 c3 42</div>
-				<pre class="whisper-message" data-demo-message hidden>Recovery handoff
+			<section id="whisper" class="demo-workspace demo-whisper" data-demo-panel="whisper" role="tabpanel" aria-labelledby="demo-tab-whisper" hidden>
+				<div class="demo-mode-banner"><div><span class="demo-live-dot whisper-dot"></span><strong>SIMULATED PRIVATE READER</strong></div><p>Choose a delivery state and experience the same read lifecycle without consuming anything.</p><button id="demo-whisper-reset" class="button ghost" type="button">Reset reader</button></div>
+				<div class="demo-whisper-layout">
+					<aside class="demo-scenario-panel">
+						<p class="eyebrow">DELIVERY SCENARIO</p>
+						<label><span>Message state</span><select id="demo-whisper-scenario"><option value="ready">Ready now · 3 reads</option><option value="scheduled">Scheduled reveal</option><option value="burn">Burn after first read</option><option value="expired">Expired delivery</option></select></label>
+						<div class="demo-scenario-note"><strong>Real behavior, mock state.</strong><p>The controls below reproduce ready, 425 Too Early, final-read destruction and expiry states.</p></div>
+						<dl class="demo-detail-list"><div><dt>Encryption</dt><dd>AES-256-GCM</dd></div><div><dt>Server view</dt><dd>Opaque ciphertext</dd></div><div><dt>Decryption</dt><dd>Inside your browser</dd></div><div><dt>Demo storage</dt><dd>Memory only</dd></div></dl>
+					</aside>
+					<section id="demo-whisper-reader" class="whisper-panel demo-whisper-reader">
+						<div class="demo-reader-head"><div><p class="eyebrow">WHISPER / CLIENT-SIDE DECRYPTION</p><span id="demo-whisper-state" class="portal-status-badge">READY</span></div><span id="demo-whisper-reads" class="demo-read-counter">3 READS LEFT</span></div>
+						<h2>Open privately.<br /><em>Spend one read.</em></h2>
+						<p id="demo-whisper-status" class="lede">The synthetic ciphertext is available. Confirm to decrypt it locally and use one demo read.</p>
+						<div id="demo-whisper-warning" class="whisper-warning"><strong>Each opening counts.</strong> A real successful request consumes one read. The final allowed read erases the encrypted server copy.</div>
+						<div id="demo-whisper-schedule" class="demo-reveal-clock" hidden><small>SEALED UNTIL</small><strong id="demo-whisper-reveal-time">00:00:20</strong><span>No read is consumed while sealed.</span></div>
+						<div id="demo-whisper-cipher" class="demo-cipher"><span>OPAQUE CIPHERTEXT</span><code id="demo-whisper-ciphertext">7f 4a 2c 91 0d a8 c3 42 6e b1 17 84 f9 20 d4 03</code><i></i></div>
+						<pre id="demo-whisper-message" class="whisper-message" hidden>Recovery handoff
 
 1. Open the offline vault.
 2. Verify the fingerprint shown in person.
-3. Rotate this secret after use.</pre>
-				<button class="button primary" data-demo-open type="button">Decrypt demo locally</button>
+3. Rotate this secret after use.
+
+Reference: DEMO-402</pre>
+						<div class="reader-actions"><button id="demo-whisper-open" class="button primary" type="button">Open WHISPER</button><button id="demo-whisper-close" class="button ghost" type="button" hidden>Close plaintext</button></div>
+						<p id="demo-whisper-log" class="demo-operation-log" role="status">No read has been used.</p>
+					</section>
+				</div>
 			</section>
 
-			<section id="pulse" class="demo-panel" data-demo-panel="pulse" hidden>
-				<header><div><p class="eyebrow">Demo PULSE monitor</p><h2>Nightly backup</h2></div><div class="pulse-state" data-demo-pulse-state data-state="operational"><i></i><span>OPERATIONAL</span></div></header>
-				<div class="pulse-overview"><article><small>LAST HEARTBEAT</small><strong data-demo-last>18 seconds ago</strong><span>Expected every 5 minutes</span></article><article><small>LIFETIME QUOTA</small><strong data-demo-heartbeats>318 / 1,202</strong><span>Whole purchased lifetime</span></article><article><small>EXPIRES</small><strong>3d 17h</strong><span>Automatic hard stop</span></article></div>
-				<div class="pulse-history-card"><header><div><p class="eyebrow">CURRENT SIGNAL</p><h2>Heartbeat history</h2></div><span>LIVE PREVIEW</span></header><div class="pulse-timeline"></div><p>A real monitor moves through waiting, operational, late, exhausted and expired states.</p></div>
-				<button class="button primary" data-demo-ping type="button">Simulate heartbeat</button>
+			<section id="pulse" class="demo-workspace demo-pulse" data-demo-panel="pulse" role="tabpanel" aria-labelledby="demo-tab-pulse" hidden>
+				<div class="demo-mode-banner"><div><span class="demo-live-dot pulse-dot"></span><strong>SIMULATED OWNER DASHBOARD</strong></div><p>The clock advances live. Pause automatic pings to watch the monitor become late.</p><button id="demo-pulse-reset" class="button ghost" type="button">Reset monitor</button></div>
+				<section id="demo-pulse-dashboard">
+					<header class="pulse-hero"><div><p class="eyebrow">LIVE HEARTBEAT MONITOR</p><h2 id="demo-pulse-name">Nightly backup</h2><p id="demo-pulse-description" class="lede">Encrypted NAS snapshot and off-site verification.</p></div><div id="demo-pulse-state" class="pulse-state" data-state="operational"><i></i><span>OPERATIONAL</span></div></header>
+					<section class="pulse-overview">
+						<article><small>LAST HEARTBEAT</small><strong id="demo-pulse-last">Just now</strong><span id="demo-pulse-last-relative">Signal received locally</span></article>
+						<article><small>NEXT EXPECTED</small><strong id="demo-pulse-next">In 12 seconds</strong><span id="demo-pulse-schedule">Every 12s · 8s grace</span></article>
+						<article><small>TIME REMAINING</small><strong id="demo-pulse-expiry">4d 01h</strong><span>Automatic hard stop</span></article>
+					</section>
+					<section class="pulse-history-card demo-pulse-history"><header><div><p class="eyebrow">RECENT SIGNALS</p><h2>Heartbeat timeline</h2></div><span>LIVE MOCK DATA</span></header><div id="demo-pulse-timeline" class="demo-pulse-timeline" aria-label="Recent heartbeat results"></div><div class="demo-history-legend"><span><i class="ok"></i>On time</span><span><i class="late"></i>Late</span><span><i class="missed"></i>Missed</span></div><p id="demo-pulse-history-copy">Automatic demo heartbeats are running.</p></section>
+
+					<section class="pulse-owner">
+						<article class="pulse-capability"><p class="eyebrow">HEARTBEAT CAPABILITY</p><h2>Wire your job.</h2><input value="https://the402machine.com/p/pulse_demo_local" readonly /><div class="reader-actions"><button class="button primary" data-demo-copy="Demo heartbeat URL copied" type="button">Copy heartbeat URL</button><button class="button ghost" data-demo-copy="Demo cURL copied" type="button">Copy curl command</button></div><p>This URL is inert. The demo never sends a request or stores a request body.</p><label><span>Public status page</span><input value="https://the402machine.com/pulse.html#public=pulse_demo" readonly /></label><button class="button ghost" data-demo-copy="Demo status link copied" type="button">Copy public status link</button><div class="demo-pulse-controls"><button id="demo-pulse-ping" class="button primary" type="button">Send heartbeat</button><button id="demo-pulse-auto" class="button ghost" type="button">Pause auto pings</button><button id="demo-pulse-exhaust" class="button ghost" type="button">Simulate exhausted</button></div></article>
+						<form id="demo-pulse-settings" class="pulse-settings"><p class="eyebrow">STATUS PAGE SETTINGS</p><label><span>Name</span><input id="demo-pulse-name-input" maxlength="80" value="Nightly backup" required /></label><label><span>Description</span><textarea id="demo-pulse-description-input" maxlength="240" rows="3">Encrypted NAS snapshot and off-site verification.</textarea></label><div class="pulse-form-grid"><label><span>Expected every (seconds)</span><input id="demo-pulse-interval-input" type="number" min="5" max="60" value="12" required /></label><label><span>Late grace (seconds)</span><input id="demo-pulse-grace-input" type="number" min="3" max="60" value="8" required /></label></div><label class="pulse-toggle"><input id="demo-pulse-public-input" type="checkbox" checked /><span>Public status page enabled</span></label><button class="button primary" type="submit">Save status page</button><p id="demo-pulse-settings-status" class="pulse-settings-status" role="status">Changes stay in this tab.</p></form>
+						<section class="portal-danger demo-danger"><div><p class="eyebrow">DESTRUCTIVE ACTION / SIMULATED</p><h2>Destroy PULSE.</h2><p>Experience the terminal state without invalidating anything real.</p></div><button id="demo-pulse-destroy" class="button danger" type="button">Simulate destruction</button></section>
+					</section>
+					<section id="demo-pulse-public-preview" class="demo-public-preview"><header><div><p class="eyebrow">PUBLIC STATUS PREVIEW</p><h2 id="demo-public-name">Nightly backup</h2></div><span id="demo-public-state">ALL SYSTEMS OPERATIONAL</span></header><p id="demo-public-description">Encrypted NAS snapshot and off-site verification.</p><div><small>LAST SIGNAL</small><strong id="demo-public-last">Just now</strong></div></section>
+				</section>
 			</section>
 		</main>
-		<footer class="footer shell"><span>NO PAYMENT</span><span>NO RESOURCE CREATED</span><a href="/#machines">SEE LIVE PLANS</a></footer>
-		<script type="module" src="/assets/demo.js?v=1"></script>
+
+		<footer class="footer shell"><span>FULL DASHBOARD SIMULATION</span><span>NO RESOURCE CREATED</span><a href="/#machines">SEE LIVE PLANS</a></footer>
+		<script type="module" src="/assets/demo.js?v=2"></script>
 	</body>
 </html>

@@ -102,13 +102,38 @@ describe("public landing page", () => {
 		expect(api.body).toContain("POST /api/payments/catch");
 		expect(api.body).toContain("GET /api/payments/{orderId}");
 		expect(demo.statusCode).toBe(200);
-		expect(demo.body).toContain("TRY BEFORE YOU BUY");
-		expect(demo.body).toContain("Demo CATCH inbox");
-		expect(demo.body).toContain("Demo WHISPER reader");
-		expect(demo.body).toContain("Demo PULSE monitor");
-		expect(demo.body).toContain('src="/assets/demo.js?v=1"');
+		expect(demo.body).toContain("FULL PRODUCT EXPERIENCE");
+		expect(demo.body).toContain("LIVE MOCK DATA");
+		expect(demo.body).toContain('id="demo-catch-events"');
+		expect(demo.body).toContain('id="demo-catch-search"');
+		expect(demo.body).toContain('id="demo-whisper-reader"');
+		expect(demo.body).toContain('id="demo-whisper-scenario"');
+		expect(demo.body).toContain('id="demo-pulse-dashboard"');
+		expect(demo.body).toContain('id="demo-pulse-settings"');
+		expect(demo.body).toContain('id="demo-pulse-public-preview"');
+		expect(demo.body).toContain('role="tablist"');
+		expect(demo.body).toContain('role="tabpanel"');
+		expect(demo.body).toContain('src="/assets/demo.js?v=2"');
 		expect(favicon.statusCode).toBe(200);
 		expect(favicon.headers["content-type"]).toContain("image/svg+xml");
+	});
+
+	it("keeps the full product demos local while simulating live dashboard activity", async () => {
+		const source = await readFile(new URL("../public/assets/demo.js", import.meta.url), "utf8");
+
+		expect(source).toContain("createMockCatchEvent");
+		expect(source).toContain("renderCatchEvents");
+		expect(source).toContain("attemptWhisperRead");
+		expect(source).toContain("renderWhisperState");
+		expect(source).toContain("simulatePulseHeartbeat");
+		expect(source).toContain("renderPulseDashboard");
+		expect(source).toContain("setInterval");
+		expect(source).not.toContain("fetch(");
+		expect(source).not.toContain("XMLHttpRequest");
+		expect(source).not.toContain("WebSocket");
+		expect(source).not.toContain("sendBeacon");
+		expect(source).not.toContain("localStorage");
+		expect(source).not.toContain("sessionStorage");
 	});
 
 	it("serves a polished PULSE status surface without indexing private portals", async () => {
