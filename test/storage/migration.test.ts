@@ -54,7 +54,7 @@ beforeAll(async () => {
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 1 });
 
-	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql"]) {
+	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql", "0014_whisper_reveal_window.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -210,6 +210,18 @@ describe("CATCH migration", () => {
 		const migration = await readFile(new URL("../../migrations/0013_whisper_scheduled_reveal.sql", import.meta.url), "utf8");
 		await expect(sql.unsafe(migration).simple()).resolves.toBeDefined();
 		expect((await sql`select version from schema_migrations where version = '0013_whisper_scheduled_reveal'`)).toHaveLength(1);
+	});
+
+	it("rejects a WHISPER reveal before resource creation at the database boundary", async () => {
+		const migration = await readFile(new URL("../../migrations/0014_whisper_reveal_window.sql", import.meta.url), "utf8");
+		await expect(sql.unsafe(migration).simple()).resolves.toBeDefined();
+		const invalidPublicId = `whisper_${randomUUID().replaceAll("-", "")}`;
+		await expect(sql`
+			insert into whispers (public_id, plan_id, status, read_token_hash, ciphertext, read_limit, read_count, whisper_reveal_at, expires_at)
+			values (${invalidPublicId}, 'spark', 'active', 'hash', decode('010203', 'hex'), 1, 0, clock_timestamp() - interval '2 minutes', clock_timestamp() + interval '7 days')
+			returning id
+		`).rejects.toMatchObject({ code: "23514" });
+		await expect(sql.unsafe(migration).simple()).resolves.toBeDefined();
 	});
 
 	it("requires live and readable resources to retain both credentials", async () => {

@@ -5,31 +5,33 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="description" content="Buy a temporary webhook inbox, encrypted handoff, or heartbeat monitor using Bitcoin over Lightning. No account or subscription." />
 		<meta name="theme-color" content="#080a08" />
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 		<title>The402Machine — Disposable Internet Infrastructure</title>
-		<link rel="stylesheet" href="/assets/styles.css?v=14" />
+		<link rel="stylesheet" href="/assets/styles.css?v=15" />
 	</head>
 	<body>
 		<div class="noise" aria-hidden="true"></div>
 		<header class="topbar">
 			<a class="brand" href="#top" aria-label="The402Machine home"><span class="brand-mark">402</span><span>The402Machine</span></a>
 			<nav aria-label="Main navigation">
-				<a href="#api">API</a>
+				<a href="/api.html">API</a>
+				<a href="/demo.html">Demos</a>
 				<a href="#machines">Cartridges</a>
 				<a href="#compare">Compare</a>
 				<a href="#principles">Safety</a>
-				<a href="https://github.com/The402Machine/The402Machine" rel="noreferrer">Source ↗</a>
+				<a href="https://github.com/The402Machine/The402Machine" target="_blank" rel="noopener noreferrer">Source ↗</a>
 			</nav>
 		</header>
 
 		<main id="top">
 			<section class="hero shell">
 				<div class="hero-copy">
-					<p class="eyebrow"><span class="live-dot"></span> <span id="checkout-indicator">CHECKING LIGHTNING CHECKOUT</span></p>
+					<p class="eyebrow"><span class="live-dot"></span> <span id="checkout-indicator">THREE TEMPORARY TOOLS</span></p>
 					<h1>Rent less internet.<br /><em>Own the ending.</em></h1>
-					<p class="lede">Pay once over Lightning. Receive one narrow, temporary capability. No account, no renewal, no general-purpose hosting — just a visible fuse and a clean exit.</p>
+					<p class="lede">Pay once over Lightning. Receive one narrow, temporary capability.<br />No account. No renewal. A visible fuse and a clean exit.</p>
 					<div class="hero-actions">
 						<a class="button primary" href="#machines">Choose a cartridge</a>
-						<a class="button ghost" href="#compare">Compare every plan</a>
+						<a class="button ghost" href="/demo.html">Try the demos</a>
 					</div>
 					<ul class="signal-list" aria-label="Product properties">
 						<li>From 42 sats</li><li>HTTP 402</li><li>Lightning native</li><li>No auto-renewal</li><li>Source-available</li>
@@ -37,57 +39,20 @@
 				</div>
 
 				<div class="machine" aria-label="Vending machine preview">
-					<div class="machine-head"><span>THE 402 MACHINE</span><span class="machine-status">THREE SLOTS LIVE</span></div>
-					<div class="display"><p>SELECT CAPABILITY</p><strong>CATCH</strong><span>private webhook / inbound only</span></div>
-					<div class="slot-grid"><a href="#catch"><span>A1</span><b>CATCH</b><small>FROM 42</small></a><a href="#whisper"><span>B1</span><b>WHISPER</b><small>FROM 42</small></a><a href="#pulse"><span>C1</span><b>PULSE</b><small>FROM 42</small></a></div>
-					<div class="machine-footer"><div><small>PAYMENT</small><b>LIGHTNING</b></div><div class="bolt">ϟ</div><div><small>ACCOUNT</small><b>NOT REQUIRED</b></div></div>
+					<div class="machine-head"><span>LIVE PRODUCT PREVIEW</span><span class="machine-status">03 READY</span></div>
+					<div class="display"><p id="machine-kicker">INBOUND WEBHOOK INBOX</p><strong id="machine-product">CATCH</strong><span id="machine-detail">Requests arrive. Nothing is forwarded.</span><div class="machine-meter"><i id="machine-meter"></i></div><small id="machine-stat">402 requests · 4h 02m</small></div>
+					<div class="slot-grid"><a href="#catch" data-machine-product="catch"><span>A1</span><b>CATCH</b><small>FROM 42</small></a><a href="#whisper" data-machine-product="whisper"><span>B1</span><b>WHISPER</b><small>FROM 42</small></a><a href="#pulse" data-machine-product="pulse"><span>C1</span><b>PULSE</b><small>FROM 42</small></a></div>
+					<div class="machine-footer"><div><small>PREVIEW</small><b>ROTATES LIVE</b></div><div class="bolt">ϟ</div><div><small>DEMO</small><b>NO PAYMENT</b></div></div>
 				</div>
 			</section>
 
 			<section class="manifesto-band"><div class="shell band-inner"><span>INSERT SATS</span><i>→</i><span>RECEIVE A CAPABILITY</span><i>→</i><span>WATCH IT DISAPPEAR</span></div></section>
 
-			<section class="api-section" id="api">
-				<div class="shell section">
-					<header class="api-heading"><div><p class="eyebrow">API / COMPLETE FLOW</p><h2>Buy, pay, receive,<br />inspect, erase.</h2></div><p>Everything the checkout does is available over HTTP. Payment settlement is verified server-side; never treat a wallet callback as proof of payment.</p></header>
-					<div class="api-flow" aria-label="API payment flow"><span>1 · Catalogue</span><i>→</i><span>2 · HTTP 402 quote</span><i>→</i><span>3 · Pay BOLT11</span><i>→</i><span>4 · Poll order</span><i>→</i><span>5 · Capability</span></div>
-					<div class="api-grid">
-						<article><p class="eyebrow">DISCOVER + PAY</p><h3>Lightning checkout</h3><code>GET /api/catalog</code><code>POST /api/payments/catch</code><code>POST /api/payments/whisper</code><code>POST /api/payments/pulse</code><code>GET /api/payments/{orderId}</code><p>Send a unique <b>Idempotency-Key</b> with every purchase request. A quote returns HTTP 402 with <code>orderId</code>, amount and BOLT11. Pay it, then poll the order endpoint. Credentials are returned only after server-side settlement.</p><details><summary>CATCH purchase example</summary><pre>curl -i -X POST https://the402machine.com/api/payments/catch \
-  -H 'Idempotency-Key: your-unique-key' \
-  -H 'Content-Type: application/json' \
-  --data '{"planId":"spark"}'
-
-# Pay the returned BOLT11, then poll:
-curl https://the402machine.com/api/payments/{orderId}</pre></details><p class="api-note">WHISPER accepts client-encrypted <code>application/octet-stream</code> plus <code>X-Whisper-Plan</code>. Never upload plaintext.</p></article>
-						<article><p class="eyebrow">CATCH / INGEST</p><h3>Receive any webhook verb</h3><code>POST|PUT|PATCH|DELETE|GET|HEAD|OPTIONS /c/{publicId}</code><p>Requests are accepted with or without the ingest token. CATCH records the HTTP method, content type, allow-listed headers, raw body, trusted source IP, locally resolved approximate IP location and whether the ingest token authenticated the request.</p><details><summary>Authenticated event example</summary><pre>curl -X PUT https://the402machine.com/c/{publicId} \
-  -H 'Authorization: Bearer {ingestToken}' \
-  -H 'Content-Type: application/json' \
-  --data '{"event":"canary"}'</pre></details><p class="api-note">The endpoint URL is a write capability: anyone who learns it can consume quota. Supplying the ingest token adds authenticated provenance. Owner APIs remain protected.</p></article>
-						<article><p class="eyebrow">CATCH / OWNER</p><h3>Inspect and manage</h3><code>GET /api/catch/{publicId}</code><code>GET /api/catch/{publicId}/events</code><code>DELETE /api/catch/{publicId}/events/{eventId}</code><code>DELETE /api/catch/{publicId}</code><p>Use <code>Authorization: Bearer {ownerToken}</code>. Event listing supports <code>limit</code>, <code>cursor</code>, <code>access=public|authenticated</code>, <code>method</code>, <code>contentType</code> and <code>q</code>. Bodies use <code>bodyEncoding: "base64"</code>; each event also includes <code>sourceIp</code> and best-effort <code>ipLocation</code>.</p><details><summary>Paginated listing example</summary><pre>curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;access=authenticated&amp;method=POST' \
-  -H 'Authorization: Bearer {ownerToken}'
-
-# Continue with nextCursor:
-curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;cursor={nextCursor}' \
-  -H 'Authorization: Bearer {ownerToken}'</pre></details></article>
-						<article><p class="eyebrow">WHISPER / ENCRYPTED DELIVERY</p><h3>Encrypt before upload</h3><code>POST /api/payments/whisper</code><code>GET /w/{publicId}</code><p>Generate a 32-byte AES-256-GCM key locally. Upload <code>application/octet-stream</code> as <code>[0x01][12-byte nonce][ciphertext + tag]</code>, with <code>X-Whisper-Plan</code> and <code>Idempotency-Key</code>. Add <code>X-Whisper-Read-Limit: 1</code> to burn after the first successful read, or <code>X-Whisper-Reveal-At</code> to schedule delivery while preserving at least one hour before the purchase-time expiry. After settlement, keep the key outside the API response.</p><details><summary>Encrypted retrieval</summary><pre>curl https://the402machine.com/w/{publicId} \
-  -H 'Authorization: Bearer ***' \
-  --output encrypted.bin
-
-# Decrypt locally with the separately retained AES-256-GCM key.
-# Each successful retrieval uses one read. The final allowed read deletes the server copy.</pre></details><p class="api-note">The service never needs the plaintext or encryption key. The browser creates the shareable link for you.</p></article>
-						<article><p class="eyebrow">PULSE / HEARTBEAT STATUS</p><h3>Ping, inspect, publish</h3><code>POST /p/{publicId}</code><code>GET /api/pulse/{publicId}</code><code>PATCH /api/pulse/{publicId}</code><code>DELETE /api/pulse/{publicId}</code><p>Send an authenticated POST from a cron job, backup, agent, or service. PULSE stores no request body: only an aggregate count and the latest successful heartbeat time. The owner API changes the label, expected interval, late grace, and optional public status page.</p><details><summary>Heartbeat example</summary><pre>curl -X POST https://the402machine.com/p/{publicId} \
-  -H 'Authorization: Bearer ***'
-
-# The quota covers the entire purchased lifetime.
-# It may be used in bursts or distributed at the suggested cadence.</pre></details><p class="api-note">PULSE never calls another URL, runs code, or sends alerts. It only receives a bounded heartbeat and renders its current state.</p></article>
-					</div>
-				</div>
-			</section>
-
 			<section class="shell section" id="machines">
 				<header class="catalogue-heading">
 					<div class="catalogue-meta"><p class="eyebrow">CARTRIDGE CATALOGUE</p><div class="catalogue-count"><strong>03</strong><span>available cartridges</span></div></div>
 					<div class="catalogue-copy">
-						<div><h2>Pick a fuse.</h2><p class="section-intro">CATCH collects incoming requests. WHISPER delivers encrypted handoffs. PULSE watches heartbeats through a clear status page. Every cartridge expires automatically.</p></div>
+						<div><h2>Pick a fuse.</h2><p class="section-intro"><span>CATCH collects incoming requests.</span><span>WHISPER delivers encrypted handoffs.</span><span>PULSE watches heartbeats through a clear status page.</span><b>Every cartridge expires automatically.</b></p></div>
 						<svg class="catalogue-illustration" viewBox="0 0 460 230" aria-hidden="true" focusable="false">
 							<g class="illustration-catch"><rect x="22" y="54" width="168" height="132" rx="5"/><path d="M22 91h48l16 20h40l16-20h48"/><rect x="50" y="26" width="28" height="28" rx="3"/><rect x="92" y="26" width="28" height="28" rx="3"/><rect x="134" y="26" width="28" height="28" rx="3"/><path d="M106 121v40m-15-15 15 15 15-15"/></g>
 							<path class="illustration-divider" d="M230 24v182"/>
@@ -101,7 +66,8 @@ curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;cursor=
 						<div class="card-index">A1</div>
 						<div class="card-body">
 							<div class="card-title"><div class="product-heading"><svg class="product-icon" viewBox="0 0 72 72" role="img"><title>CATCH webhook inbox</title><rect x="9" y="30" width="54" height="33" rx="3"/><path d="M9 42h16l6 8h10l6-8h16M36 8v26m-9-9 9 9 9-9"/><rect x="13" y="9" width="10" height="10"/><rect x="49" y="9" width="10" height="10"/></svg><div><p class="product-kicker">INBOUND-ONLY WEBHOOK</p><h3>CATCH</h3></div></div><span>LIVE</span></div>
-							<p class="product-line">Catch webhooks from GitHub, forms, monitors, or devices. Inspect the method, headers, body, source IP, and location in one private inbox, then delete individual events or destroy the whole inbox.</p>
+							<p class="product-line">Catch webhooks from GitHub, forms, monitors, or devices.<br />Inspect the method, headers, body, source IP, and location in one private inbox, then delete individual events or destroy the whole inbox.</p>
+							<a class="demo-link" href="/demo.html#catch">Preview a demo inbox →</a>
 							<div class="feature-strip"><span>Inbound only</span><span>Raw bytes</span><span>Hard stop</span></div>
 							<div class="plan-grid" aria-label="CATCH plan comparison">
 								<article class="plan-card"><header><small>SPARK</small><div class="plan-price"><strong>42</strong><span>SATS</span></div><b class="plan-duration">4h 02m</b></header><dl><div><dt>Requests</dt><dd>402</dd></div><div><dt>Storage</dt><dd>2 MiB</dd></div><div><dt>Payload</dt><dd>64 KiB</dd></div></dl><button class="button plan-buy" data-buy="catch" data-plan="spark">Choose Spark</button></article>
@@ -115,7 +81,8 @@ curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;cursor=
 						<div class="card-index">B1</div>
 						<div class="card-body">
 							<div class="card-title"><div class="product-heading"><svg class="product-icon" viewBox="0 0 72 72" role="img"><title>WHISPER encrypted message</title><rect x="9" y="16" width="54" height="43" rx="4"/><path d="m9 22 27 22 27-22M9 59l20-20m34 20L43 39"/><path d="M51 9v14m-7-7h14"/></svg><div><p class="product-kicker">CLIENT-ENCRYPTED DEAD DROP</p><h3>WHISPER</h3></div></div><span>LIVE</span></div>
-							<p class="product-line">Send an encrypted note, password, recovery detail, or private handoff. The message is encrypted in your browser before upload and stays available only for the purchased time and read allowance.</p>
+							<p class="product-line">Send an encrypted note, password, recovery detail, or private handoff.<br />The message is encrypted in your browser before upload and stays available only for the purchased time and read allowance.</p>
+							<a class="demo-link" href="/demo.html#whisper">Preview a demo handoff →</a>
 							<div class="plan-grid" aria-label="WHISPER plan comparison">
 								<article class="plan-card"><header><small>SPARK</small><div class="plan-price"><strong>42</strong><span>SATS</span></div><b class="plan-duration">7 days</b></header><dl><div><dt>Read allowance</dt><dd>1 read</dd></div><div><dt>Encrypted size</dt><dd>Up to 4.02 MiB</dd></div><div><dt>Best for</dt><dd>One private handoff</dd></div></dl><button class="button plan-buy" data-buy="whisper" data-plan="spark">Choose Spark</button></article>
 								<article class="plan-card recommended"><div class="recommendation">BEST BALANCE</div><header><small>STANDARD</small><div class="plan-price"><strong>402</strong><span>SATS</span></div><b class="plan-duration">42 days</b></header><dl><div><dt>Read allowance</dt><dd>Up to 42 reads</dd></div><div><dt>Encrypted size</dt><dd>Up to 4.02 MiB</dd></div><div><dt>Best for</dt><dd>Small team handoff</dd></div></dl><button class="button plan-buy primary" data-buy="whisper" data-plan="standard">Choose Standard</button></article>
@@ -128,7 +95,8 @@ curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;cursor=
 						<div class="card-index">C1</div>
 						<div class="card-body">
 							<div class="card-title"><div class="product-heading"><svg class="product-icon" viewBox="0 0 72 72" role="img"><title>PULSE heartbeat monitor</title><path d="M7 39h13l7-18 11 34 8-25 7 9h12"/><rect x="7" y="8" width="58" height="56" rx="4"/></svg><div><p class="product-kicker">TEMPORARY HEARTBEAT MONITOR</p><h3>PULSE</h3></div></div><span>LIVE</span></div>
-							<p class="product-line">Give a cron job, backup, agent, or service one tiny heartbeat endpoint. Get a polished private dashboard and optional public status page with waiting, operational, late, exhausted, and expired states.</p>
+							<p class="product-line">Give a cron job, backup, agent, or service one tiny heartbeat endpoint.<br />Get a polished private dashboard and optional public status page with waiting, operational, late, exhausted, and expired states.</p>
+							<a class="demo-link" href="/demo.html#pulse">Preview a demo monitor →</a>
 							<div class="feature-strip"><span>API first</span><span>No request bodies</span><span>Optional public status</span><span>Fixed lifetime quota</span></div>
 							<p>The quota belongs to the full lifetime. Send heartbeats in bursts or distribute them evenly; the cadence below is a practical sizing guide, not a per-minute throttle.</p>
 							<div class="plan-grid" aria-label="PULSE plan comparison">
@@ -154,6 +122,8 @@ curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;cursor=
 
 			<section class="principles" id="principles"><div class="shell section principles-grid"><div><p class="eyebrow">THE SAFETY INTERLOCK</p><h2>Closed machines.<br />Not generic infrastructure.</h2></div><div class="rules"><div><span>01</span><p><strong>No arbitrary code.</strong> Every cartridge has one job and fixed behavior.</p></div><div><span>02</span><p><strong>No hidden forwarding.</strong> CATCH receives; it never calls a user-supplied destination.</p></div><div><span>03</span><p><strong>No forever plan.</strong> Every purchase shows its fuse before payment.</p></div><div><span>04</span><p><strong>No account recovery.</strong> Save the dispensed keys or link when it appears.</p></div></div></div></section>
 
+			<section class="shell section api-cta"><div><p class="eyebrow">BUILD WITH HTTP 402</p><h2>Prefer the API?</h2><p>The complete payment, provisioning, capability and lifecycle reference now lives on its own page.</p></div><a class="button primary" href="/api.html">Open API documentation</a></section>
+
 			<section class="shell section closing"><p class="eyebrow">STATUS / THREE CARTRIDGES LIVE</p><h2>Insert sats.<br />Receive a tiny piece of the Internet.</h2><p>Lightning checkout is live and verified end to end. Choose the smallest plan that fits the job; every cartridge is temporary by design.</p><a class="button primary" href="#machines">Choose a cartridge</a></section>
 		</main>
 
@@ -167,6 +137,7 @@ curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;cursor=
 				<label id="whisper-burn-field" class="whisper-burn" hidden><input id="whisper-burn-after-read" type="checkbox" /><span><b>Burn after first read</b><small>Delete the encrypted server copy after its first successful read, even when the plan includes more reads.</small></span></label>
 				<div id="checkout-summary" class="checkout-summary"></div>
 				<button id="checkout-submit" class="button primary" type="submit">Create Lightning invoice</button>
+				<div id="checkout-requesting" class="checkout-requesting" hidden aria-live="polite"><i aria-hidden="true"></i><span><b>Requesting invoice</b><small>Checking the live catalogue and reserving one payment attempt.</small></span></div>
 				<section id="checkout-payment" class="checkout-payment" hidden aria-live="polite">
 					<div id="checkout-progress" class="checkout-progress" data-stage="pending">
 						<span class="active">1 · Invoice</span><span>2 · Waiting</span><span>3 · Dispensed</span>
@@ -197,6 +168,7 @@ curl 'https://the402machine.com/api/catch/{publicId}/events?limit=20&amp;cursor=
 		</dialog>
 
 		<footer class="footer shell"><span>THE402MACHINE.COM</span><span>PAYMENT REQUIRED / TAKEN LITERALLY</span><span>© 2026</span></footer>
-		<script type="module" src="/assets/checkout.js?v=21"></script>
+		<script type="module" src="/assets/landing.js?v=1"></script>
+		<script type="module" src="/assets/checkout.js?v=22"></script>
 	</body>
 </html>

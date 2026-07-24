@@ -50,15 +50,20 @@ afterAll(async () => {
 	try { docker("rm", "--force", container); } catch { /* container already removed */ }
 });
 
-const createWhisper = async (overrides: { expiresAt?: Date; revealAt?: Date; readLimit?: number; planId?: "spark" | "standard" | "long" } = {}) => repository.create({
-	publicId: `whisper_${randomUUID().replaceAll("-", "")}`,
-	planId: overrides.planId ?? "spark",
-	readTokenHash: randomUUID().replaceAll("-", ""),
-	ciphertext: Buffer.from("opaque-client-ciphertext"),
-	readLimit: overrides.readLimit ?? 1,
-	revealAt: overrides.revealAt ?? new Date(Date.now() - 1_000),
-	expiresAt: overrides.expiresAt ?? new Date(Date.now() + 2 * 60 * 60 * 1_000),
-});
+const createWhisper = async (overrides: { expiresAt?: Date; revealAt?: Date; readLimit?: number; planId?: "spark" | "standard" | "long" } = {}) => {
+	const revealAt = overrides.revealAt ?? new Date();
+	const whisper = await repository.create({
+		publicId: `whisper_${randomUUID().replaceAll("-", "")}`,
+		planId: overrides.planId ?? "spark",
+		readTokenHash: randomUUID().replaceAll("-", ""),
+		ciphertext: Buffer.from("opaque-client-ciphertext"),
+		readLimit: overrides.readLimit ?? 1,
+		revealAt,
+		expiresAt: overrides.expiresAt ?? new Date(revealAt.getTime() + 2 * 60 * 60 * 1_000),
+	});
+	if (overrides.revealAt === undefined) await new Promise((resolve) => setTimeout(resolve, 10));
+	return whisper;
+};
 
 describe("WhisperRepository", () => {
 	it("atomically consumes ciphertext exactly once under concurrent reads", async () => {

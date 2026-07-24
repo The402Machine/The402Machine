@@ -19,6 +19,7 @@ const output = document.querySelector("#checkout-output");
 const closeButton = document.querySelector("#checkout-close");
 const submitButton = document.querySelector("#checkout-submit");
 const indicator = document.querySelector("#checkout-indicator");
+const requesting = document.querySelector("#checkout-requesting");
 const paymentPanel = document.querySelector("#checkout-payment");
 const progress = document.querySelector("#checkout-progress");
 const qr = document.querySelector("#checkout-qr");
@@ -32,7 +33,7 @@ const portalLink = document.querySelector("#checkout-portal");
 const copyPortalButton = document.querySelector("#checkout-copy-portal");
 const portalNote = document.querySelector("#checkout-portal-note");
 
-if (!(dialog instanceof HTMLDialogElement) || !(form instanceof HTMLFormElement) || !(title instanceof HTMLElement) || !(intro instanceof HTMLElement) || !(planChoices instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(noteField instanceof HTMLElement) || !(note instanceof HTMLTextAreaElement) || !(scheduleField instanceof HTMLElement) || !(revealAtInput instanceof HTMLInputElement) || !(burnField instanceof HTMLElement) || !(burnAfterRead instanceof HTMLInputElement) || !(status instanceof HTMLElement) || !(output instanceof HTMLTextAreaElement) || !(closeButton instanceof HTMLButtonElement) || !(submitButton instanceof HTMLButtonElement) || !(indicator instanceof HTMLElement) || !(paymentPanel instanceof HTMLElement) || !(progress instanceof HTMLElement) || !(qr instanceof HTMLElement) || !(amount instanceof HTMLElement) || !(walletLink instanceof HTMLAnchorElement) || !(webLnButton instanceof HTMLButtonElement) || !(copyButton instanceof HTMLButtonElement) || !(invoice instanceof HTMLTextAreaElement) || !(deliveryActions instanceof HTMLElement) || !(portalLink instanceof HTMLAnchorElement) || !(copyPortalButton instanceof HTMLButtonElement) || !(portalNote instanceof HTMLElement)) throw new Error("Checkout is incomplete");
+if (!(dialog instanceof HTMLDialogElement) || !(form instanceof HTMLFormElement) || !(title instanceof HTMLElement) || !(intro instanceof HTMLElement) || !(planChoices instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(noteField instanceof HTMLElement) || !(note instanceof HTMLTextAreaElement) || !(scheduleField instanceof HTMLElement) || !(revealAtInput instanceof HTMLInputElement) || !(burnField instanceof HTMLElement) || !(burnAfterRead instanceof HTMLInputElement) || !(status instanceof HTMLElement) || !(output instanceof HTMLTextAreaElement) || !(closeButton instanceof HTMLButtonElement) || !(submitButton instanceof HTMLButtonElement) || !(indicator instanceof HTMLElement) || !(requesting instanceof HTMLElement) || !(paymentPanel instanceof HTMLElement) || !(progress instanceof HTMLElement) || !(qr instanceof HTMLElement) || !(amount instanceof HTMLElement) || !(walletLink instanceof HTMLAnchorElement) || !(webLnButton instanceof HTMLButtonElement) || !(copyButton instanceof HTMLButtonElement) || !(invoice instanceof HTMLTextAreaElement) || !(deliveryActions instanceof HTMLElement) || !(portalLink instanceof HTMLAnchorElement) || !(copyPortalButton instanceof HTMLButtonElement) || !(portalNote instanceof HTMLElement)) throw new Error("Checkout is incomplete");
 
 let catalog = null;
 let product = "catch";
@@ -52,7 +53,7 @@ async function configureCheckout() {
 		const received = await response.json();
 		if (!response.ok || received.checkoutEnabled !== true || !isCatalog(received)) throw new Error("disabled");
 		catalog = received;
-		indicator.textContent = "LIGHTNING CHECKOUT ONLINE";
+		indicator.textContent = "THREE TEMPORARY TOOLS · CHECKOUT READY";
 		indicator.closest(".eyebrow")?.classList.add("online");
 	} catch {
 		disableCheckout();
@@ -61,7 +62,7 @@ async function configureCheckout() {
 
 function disableCheckout() {
 	catalog = null;
-	indicator.textContent = "LIGHTNING CHECKOUT OFFLINE";
+	indicator.textContent = "THREE TEMPORARY TOOLS · CHECKOUT OFFLINE";
 	document.querySelectorAll("[data-buy]").forEach((button) => {
 		if (button instanceof HTMLButtonElement) {
 			button.disabled = true;
@@ -84,6 +85,7 @@ document.querySelectorAll("[data-buy]").forEach((button) => button.addEventListe
 function openCheckout() {
 	checkoutSession += 1;
 	const productData = catalog.products[product];
+	resetCheckoutState();
 	title.textContent = `Dispense ${product.toUpperCase()}`;
 	intro.textContent = product === "catch" ? "Choose by lifetime, request quota, and storage. Every CATCH stays inbound-only."
 		: product === "whisper" ? "Choose how long the encrypted message should wait and how many successful reads it allows. Encryption happens in this browser."
@@ -94,6 +96,16 @@ function openCheckout() {
 	revealAtInput.value = "";
 	burnAfterRead.checked = false;
 	updateBurnChoice();
+	renderPlanChoices(productData.plans);
+	updateSummary();
+	status.textContent = "Review the plan, then create the Lightning invoice.";
+	dialog.showModal();
+}
+
+function resetCheckoutState() {
+	submitButton.disabled = false;
+	submitButton.hidden = false;
+	requesting.hidden = true;
 	output.hidden = true;
 	output.value = "";
 	deliveryActions.hidden = true;
@@ -104,12 +116,10 @@ function openCheckout() {
 	currentInvoice = "";
 	deliveryDispensed = false;
 	quoteAttempt = null;
-	setPaymentStage("review");
 	encryptionKey = "";
-	renderPlanChoices(productData.plans);
-	updateSummary();
-	status.textContent = "Review the plan, then create the Lightning invoice.";
-	dialog.showModal();
+	qr.replaceChildren();
+	invoice.value = "";
+	setPaymentStage("review");
 }
 
 function renderPlanChoices(plans) {
@@ -202,6 +212,7 @@ form.addEventListener("submit", async (event) => {
 	const session = checkoutSession;
 	let response;
 	submitButton.disabled = true;
+	setPaymentStage("requesting");
 	try {
 		const catalogResponse = await fetch("/api/catalog", { cache: "no-store" });
 		const currentCatalog = await catalogResponse.json();
@@ -238,6 +249,7 @@ form.addEventListener("submit", async (event) => {
 	} catch (error) {
 		if (session !== checkoutSession || !dialog.open) return;
 		status.textContent = error instanceof Error ? error.message : "Checkout failed.";
+		setPaymentStage("review");
 	} finally {
 		if (session === checkoutSession) submitButton.disabled = false;
 	}
@@ -310,7 +322,11 @@ function showInvoice(quote) {
 function setPaymentStage(stage) {
 	progress.dataset.stage = stage;
 	form.dataset.stage = stage;
-	if (stage === "review") submitButton.hidden = false;
+	requesting.hidden = stage !== "requesting";
+	if (stage === "review") {
+		submitButton.hidden = false;
+		submitButton.disabled = false;
+	}
 }
 
 function closeCheckout() {

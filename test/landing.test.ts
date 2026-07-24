@@ -59,25 +59,29 @@ describe("public landing page", () => {
 		expect(response.body).toContain("256 KiB");
 		expect(response.body).toContain("1 MiB");
 		expect(response.body).toContain("available cartridges");
-		expect(response.body).toContain("CHECKING LIGHTNING CHECKOUT");
-		expect(response.body).toContain("THREE SLOTS LIVE");
+		expect(response.body).toContain("THREE TEMPORARY TOOLS");
 		expect(response.body).toContain("Source-available");
 		expect(response.body).not.toContain("Open source");
 		expect(response.body).toContain('data-buy="catch"');
 		expect(response.body).toContain('data-buy="whisper"');
 		expect(response.body).toContain('data-buy="pulse"');
 		expect(response.body).toContain('data-plan="long"');
-		expect(response.body).toContain('href="/assets/styles.css?v=14"');
-		expect(response.body).toContain('src="/assets/checkout.js?v=21"');
-		expect(response.body).toContain('href="#api"');
-		expect(response.body).toContain('id="api"');
-		expect(response.body).toContain("API / COMPLETE FLOW");
-		expect(response.body).toContain("POST /api/payments/catch");
-		expect(response.body).toContain("GET /api/payments/{orderId}");
-		expect(response.body).toContain("POST|PUT|PATCH|DELETE|GET|HEAD|OPTIONS /c/{publicId}");
-		expect(response.body).toContain("GET /api/catch/{publicId}/events");
-		expect(response.body).toContain("Idempotency-Key");
-		expect(response.body).toContain("bodyEncoding");
+		expect(response.body).toContain('href="/assets/styles.css?v=15"');
+		expect(response.body).toContain('src="/assets/checkout.js?v=22"');
+		expect(response.body).toContain('src="/assets/landing.js?v=1"');
+		expect(response.body).toContain('href="/api.html"');
+		expect(response.body).not.toContain('id="api"');
+		expect(response.body).not.toContain("API / COMPLETE FLOW");
+		expect(response.body).not.toContain("POST|PUT|PATCH|DELETE|GET|HEAD|OPTIONS /c/{publicId}");
+		expect(response.body).toContain('href="https://github.com/The402Machine/The402Machine" target="_blank"');
+		expect(response.body).toContain('rel="icon" href="/favicon.svg"');
+		expect(response.body).toContain('id="machine-product"');
+		expect(response.body).toContain('data-machine-product="pulse"');
+		expect(response.body).toContain('href="/demo.html#catch"');
+		expect(response.body).toContain('href="/demo.html#whisper"');
+		expect(response.body).toContain('href="/demo.html#pulse"');
+		expect(response.body).toContain("Try the demos");
+		expect(response.body).not.toContain("general-purpose hosting — just");
 		expect(response.body).toContain('id="checkout-payment"');
 		expect(response.body).toContain('id="checkout-qr"');
 		expect(response.body).toContain('id="checkout-wallet"');
@@ -85,6 +89,27 @@ describe("public landing page", () => {
 		expect(response.body).toContain('id="checkout-progress"');
 	});
 
+	it("serves dedicated API documentation and read-only product demos", async () => {
+		const app = buildApp();
+		apps.push(app);
+		const [api, demo, favicon] = await Promise.all([
+			app.inject({ method: "GET", url: "/api.html" }),
+			app.inject({ method: "GET", url: "/demo.html" }),
+			app.inject({ method: "GET", url: "/favicon.svg" }),
+		]);
+		expect(api.statusCode).toBe(200);
+		expect(api.body).toContain("API / COMPLETE FLOW");
+		expect(api.body).toContain("POST /api/payments/catch");
+		expect(api.body).toContain("GET /api/payments/{orderId}");
+		expect(demo.statusCode).toBe(200);
+		expect(demo.body).toContain("TRY BEFORE YOU BUY");
+		expect(demo.body).toContain("Demo CATCH inbox");
+		expect(demo.body).toContain("Demo WHISPER reader");
+		expect(demo.body).toContain("Demo PULSE monitor");
+		expect(demo.body).toContain('src="/assets/demo.js?v=1"');
+		expect(favicon.statusCode).toBe(200);
+		expect(favicon.headers["content-type"]).toContain("image/svg+xml");
+	});
 
 	it("serves a polished PULSE status surface without indexing private portals", async () => {
 		const app = buildApp(); apps.push(app);
@@ -192,6 +217,9 @@ describe("public landing page", () => {
 		expect(source).toContain("qr.replaceChildren(qrImage)");
 		expect(source).toContain('setPaymentStage("pending")');
 		expect(source).toContain('setPaymentStage("paid")');
+		expect(source).toContain('setPaymentStage("requesting")');
+		expect(source).toContain("resetCheckoutState");
+		expect(html).toContain("Requesting invoice");
 		expect(source).toContain("form.dataset.stage = stage");
 		expect(source).toContain("session !== checkoutSession || !dialog.open");
 		expect(source).toContain("quoteAttempt?.intent !== intent");

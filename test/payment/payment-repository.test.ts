@@ -130,9 +130,10 @@ describe("PaymentRepository", () => {
 		const order = await repository.createOrder({ idempotencyKey: "idem-whisper-dispense", product: "whisper", planId: "spark", productPayload: ciphertext });
 		await repository.attachInvoice(order.id, { paymentHash: "e".repeat(64), bolt11: "lnbc4n1whisper" });
 		await repository.markPaid(order.id);
+		const revealAt = new Date();
 		const results = await Promise.all(Array.from({ length: 4 }, () => repository.dispensePaidOrder(order.id, () => Promise.resolve({
 			product: "whisper", publicId: "whisper_payment_once_abcdefghijklmnopqrstuv", planId: "spark", readTokenHash: "read-hash", readLimit: 1,
-			ciphertext, readToken: "read-once", revealAt: new Date(Date.now() - 1_000), expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1_000),
+			ciphertext, readToken: "read-once", revealAt, expiresAt: new Date(revealAt.getTime() + 2 * 60 * 60 * 1_000),
 		}))));
 		expect(results.every((result) => result?.product === "whisper" && result.readToken === "read-once")).toBe(true);
 		const rows = await sql<{ count: number }[]>`select count(*)::int as count from whispers where public_id = 'whisper_payment_once_abcdefghijklmnopqrstuv'`;

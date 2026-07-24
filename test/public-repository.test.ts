@@ -8,8 +8,9 @@ describe("public repository boundary", () => {
 	it("describes only the public product boundary in the README", async () => {
 		const readme = await read("README.md");
 
-		expect(readme).toContain("Product boundary");
-		expect(readme).toContain("Never commit payment credentials");
+		expect(readme).toContain("Design principles");
+		expect(readme).toContain("INSTALL.md");
+		expect(readme).toContain("Interactive demos");
 		expect(readme).toContain("source-available");
 		expect(readme).not.toContain("is an open-source");
 	});

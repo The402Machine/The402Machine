@@ -1,116 +1,92 @@
-# The402Machine
+<p align="center">
+  <img src="public/favicon.svg" width="82" alt="The402Machine 402 icon" />
+</p>
 
-> **Insert sats. Receive a tiny piece of the Internet. Use it. Watch it disappear.**
+<h1 align="center">The402Machine</h1>
 
-The402Machine is a source-available vending machine for temporary Internet appliances designed to be paid with Bitcoin over Lightning. No account, subscription, credit balance, or custodial payment processor.
+<p align="center">
+  <strong>Insert sats. Receive a tiny piece of the Internet. Watch it disappear.</strong>
+</p>
 
-## First cartridges
+<p align="center">
+  <a href="https://the402machine.com">Live machine</a> ·
+  <a href="https://the402machine.com/demo.html">Interactive demos</a> ·
+  <a href="https://the402machine.com/api.html">API reference</a> ·
+  <a href="INSTALL.md">Self-hosting guide</a>
+</p>
 
-### CATCH
+<p align="center">
+  <img alt="HTTP 402" src="https://img.shields.io/badge/HTTP-402-c7ff3d?style=flat-square&labelColor=080a08" />
+  <img alt="Lightning" src="https://img.shields.io/badge/payment-Lightning-ff6433?style=flat-square&labelColor=080a08" />
+  <img alt="Node 22" src="https://img.shields.io/badge/Node-22-eef3e7?style=flat-square&labelColor=080a08" />
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/storage-PostgreSQL-65e7dd?style=flat-square&labelColor=080a08" />
+</p>
 
-A private, inbound-only webhook inbox with hard request, storage, and lifetime limits.
+---
 
-- **Spark:** 4 hours 2 minutes, 402 requests, 2 MiB total, 64 KiB per request — **42 sats**.
-- **Standard:** 40 days 2 hours, 4,020 requests, 20 MiB total, 256 KiB per request — **402 sats**.
-- **Long:** 4 months 2 days, 40,200 requests, 200 MiB total, 1 MiB per request — **4,002 sats**.
+The402Machine is a source-available vending machine for small, temporary Internet capabilities paid once over Bitcoin Lightning.
 
-CATCH accepts bounded POST requests and never forwards, executes, or calls back into user-provided destinations.
+No account. No subscription. No credit balance. Every product has a visible lifetime or quota and a defined ending.
 
-When LNbits payments are enabled, the public flow is:
+## The cartridges
 
-```text
-POST /api/payments/catch        Idempotency-Key: <8-128 chars>  {"planId":"spark|standard|long"}
-GET  /api/payments/<order-id>   returns 402 while pending, then the CATCH credentials
-```
+| Product | What it does | What it never does |
+| --- | --- | --- |
+| **CATCH** | Receives bounded webhook requests in a private inbox with event inspection and deletion controls. | It does not forward traffic, call user URLs or execute code. |
+| **WHISPER** | Delivers a client-encrypted handoff immediately or at a scheduled reveal time, with a bounded read allowance. | The server never receives the plaintext or AES key. |
+| **PULSE** | Turns authenticated heartbeats into a private dashboard and optional public status page. | It stores no request body, performs no outbound checks and sends no alerts. |
 
-Concurrent retries reuse one invoice. After server-side settlement verification, CATCH provisioning and an encrypted delivery receipt are committed in one PostgreSQL transaction.
+### One simple price ladder
 
-### WHISPER
+| Plan | Price | Typical role |
+| --- | ---: | --- |
+| **Spark** | 42 sats | Short tests, handoffs and jobs |
+| **Standard** | 402 sats | Useful production-sized temporary work |
+| **Long** | 4,002 sats | Longer-running bounded infrastructure |
 
-An encrypted message with a fixed read allowance that disappears after its final successful read or when its selected lifetime ends. The server accepts only bounded opaque ciphertext; encryption and decryption belong to the client.
+Each product applies its own lifetime and quota. The live catalogue is the source of truth.
 
-The browser helper uses AES-256-GCM. The server receives ciphertext and a read credential, but not the AES key. Each successful retrieval atomically increments the read count; the final allowed read clears the ciphertext and credential. Standard and Long buyers can choose `X-Whisper-Read-Limit: 1` at purchase time to burn the server copy after the first successful read instead of using the full plan allowance.
+## See it before buying
 
-Every WHISPER plan can also use `X-Whisper-Reveal-At` to schedule a future reveal. The expiry fuse still starts when the order is created, and the reveal must leave at least one hour before expiry. Authenticated requests before that time return `425 Too Early` without consuming a read.
+The [demo area](https://the402machine.com/demo.html) contains local, read-only previews of:
 
-### PULSE
+- a CATCH inbox populated with sample events;
+- a WHISPER handoff decrypted entirely in the browser;
+- a PULSE heartbeat dashboard with interactive status updates.
 
-A temporary heartbeat monitor for cron jobs, backups, agents, and small services. PULSE accepts authenticated `POST` heartbeats, stores only the aggregate count and latest successful timestamp, and renders a private dashboard with an optional public status page.
+The demos create no invoice, resource, capability or payment request.
 
-- **Spark:** 4 days 2 hours, 1,202 lifetime heartbeats (about every 5 minutes if spread evenly) — **42 sats**.
-- **Standard:** 42 days, 61,402 lifetime heartbeats (about every minute) — **402 sats**.
-- **Long:** 402 days, 1,740,402 lifetime heartbeats (about every 20 seconds) — **4,002 sats**.
+## Design principles
 
-The quota covers the whole purchased lifetime and may be used in bursts. PULSE ignores request bodies and never forwards requests, calls user URLs, executes code, or sends alerts. The public status page is disabled by default and can be enabled from the private owner dashboard.
+- **Closed functions:** one product, one narrow job.
+- **Visible fuses:** duration, quota and destruction policy are shown before payment.
+- **Server-confirmed settlement:** wallet callbacks are never treated as proof of payment.
+- **Capability-based access:** no customer accounts or recovery workflow.
+- **Fail closed:** provisioning, quota consumption and final deletion are transactional.
+- **No hidden egress:** products do not become proxies, redirectors or generic compute.
 
-## Product boundary
+## API first
 
-The402Machine sells closed functions, never general computing capability. It will not offer arbitrary code, proxies, redirects, tunnels, mutable public APIs, configurable HTTP responses, or user-controlled outbound requests.
+The browser checkout and owner interfaces sit on the same HTTP API available to scripts and agents.
 
-## Current status
+Read the dedicated [API reference](https://the402machine.com/api.html) for catalogue discovery, HTTP 402 quotes, payment polling and product operations.
 
-The public landing page and Lightning checkout are online. CATCH, WHISPER, and PULSE are implemented with bounded capabilities, transactional quotas, automatic expiry cleanup, private owner access, and PostgreSQL persistence. The first external CATCH purchase has been verified end to end.
+## Run your own machine
 
-Current plan ladder:
+Installation, configuration, migrations, payment adapter details, security boundaries and release checks live in **[INSTALL.md](INSTALL.md)**.
 
-- Spark: 42 sats
-- Standard: 402 sats
-- Long: 4,002 sats
-
-CATCH uses lifetimes of 4h 02m, 40d 02h, and 4 months + 2 days while scaling request, storage, and per-request payload quotas. WHISPER uses windows of 7, 42, and 402 days with read allowances of 1, 42, and 402; every plan is client-encrypted and holds up to 4.02 MiB of ciphertext. PULSE uses windows of 4d 02h, 42 days, and 402 days with fixed lifetime quotas of 1,202, 61,402, and 1,740,402 heartbeats.
-
-## CATCH guarantees
-
-- Accepts only bounded `POST` bodies in JSON, text, or simple form format.
-- Returns a fixed `204 No Content` response after successful ingestion.
-- Uses separate ingest and owner credentials.
-- Never executes code, forwards requests, calls user destinations, or exposes stored events publicly.
-- Stops accepting data when its request, storage, lifetime, suspension, or destruction fuse is reached.
-- Erases stored events and credentials when the cartridge expires or is destroyed.
-
-## Local development
-
-Requirements:
-
-- Node.js 22
-- npm
-- Docker, for PostgreSQL integration tests and the production stack
+Quick local start:
 
 ```bash
 npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:4020` or check:
-
-```bash
-curl http://127.0.0.1:4020/health
-```
-
-Quality gates:
-
-```bash
-npm run test
-npm run lint
-npm run typecheck
-npm run build
-```
-
-## Configuration
-
-Copy `.env.example` to `.env` for local development. Production Compose uses an untracked `.env.production` file and runs PostgreSQL, migrations, the web service, and the expiry worker. Never commit payment credentials, database passwords, token peppers, wallet material, private keys, macaroons, or deployment secrets.
-
-The LNbits adapter accepts only loopback HTTP or the pinned Docker gateway bridge, plus an invoice-only key. A constrained sidecar publishes the existing host-loopback tunnel only on the pinned Docker gateway address. `PAYMENT_DELIVERY_KEY` is a separate 32-byte base64url key used to encrypt recoverable credentials for idempotent delivery; it must not be reused as the CATCH token pepper.
-
-Invoice creation uses the payment order UUID as LNbits `external_id`. Before creating an invoice, the broker looks up that stable identifier so retries can recover an invoice whose response was lost instead of blindly creating another one.
-
-`TRUSTED_PROXY` must be the reverse proxy address as seen by Fastify. Leave it unset for direct development access; never trust arbitrary forwarding headers. The production Compose file pins its edge subnet and gateway so this trust boundary cannot drift silently.
-
-CATCH stores the trusted request IP and resolves approximate city/country data locally from the packaged GeoLite database. Visitor IPs are not sent to third-party geolocation services.
+Then open `http://127.0.0.1:4020`.
 
 ## Security
 
-Please report security issues privately rather than opening a public issue. A dedicated security contact and disclosure policy will be published before payments are enabled.
+Please report security issues privately rather than opening a public issue. Never include capabilities, payment credentials, wallet material or production connection strings in a report.
 
 ## License
 

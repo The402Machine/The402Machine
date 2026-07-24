@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="description" content="Read-only previews of The402Machine CATCH, WHISPER and PULSE products." />
+		<meta name="theme-color" content="#080a08" />
+		<meta name="robots" content="noindex,nofollow" />
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+		<title>Demos — The402Machine</title>
+		<link rel="stylesheet" href="/assets/styles.css?v=15" />
+	</head>
+	<body class="demo-body">
+		<div class="noise" aria-hidden="true"></div>
+		<header class="topbar"><a class="brand" href="/" aria-label="The402Machine home"><span class="brand-mark">402</span><span>The402Machine</span></a><nav><a href="/">Home</a><a href="/api.html">API</a><a href="https://github.com/The402Machine/The402Machine" target="_blank" rel="noopener noreferrer">Source ↗</a></nav></header>
+		<main class="shell demo-shell">
+			<header class="demo-hero"><p class="eyebrow">TRY BEFORE YOU BUY</p><h1>Touch the controls.<br /><em>Spend zero sats.</em></h1><p class="lede">These previews are local and read-only. They do not create resources, invoices, capabilities or network requests.</p></header>
+			<nav class="demo-tabs" aria-label="Choose a product demo"><button class="active" data-demo-tab="catch">CATCH</button><button data-demo-tab="whisper">WHISPER</button><button data-demo-tab="pulse">PULSE</button></nav>
+
+			<section id="catch" class="demo-panel active" data-demo-panel="catch">
+				<header><div><p class="eyebrow">Demo CATCH inbox</p><h2>Webhook activity</h2></div><span class="portal-status-badge">ACTIVE</span></header>
+				<div class="demo-metrics"><article><small>REQUESTS</small><strong>17 / 402</strong></article><article><small>STORAGE</small><strong>28 KiB</strong></article><article><small>EXPIRES</small><strong>03:41:22</strong></article></div>
+				<div class="demo-events">
+					<article class="portal-event"><div class="portal-event-head"><div><strong>POST</strong><span class="portal-event-access authenticated">AUTHENTICATED</span></div><time>just now</time></div><pre>{ "event": "deployment.finished", "status": "ok" }</pre></article>
+					<article class="portal-event"><div class="portal-event-head"><div><strong>PUT</strong><span class="portal-event-access public">PUBLIC</span></div><time>2 min ago</time></div><pre>temperature=21.4&amp;sensor=garage</pre></article>
+				</div>
+				<button class="button ghost" data-demo-add type="button">Simulate incoming event</button>
+			</section>
+
+			<section id="whisper" class="demo-panel" data-demo-panel="whisper" hidden>
+				<header><div><p class="eyebrow">Demo WHISPER reader</p><h2>Encrypted handoff</h2></div><span class="portal-status-badge">1 READ</span></header>
+				<div class="whisper-warning"><strong>Preview only.</strong> A real opening spends one read. This demo never contacts the server.</div>
+				<div class="demo-cipher" data-demo-cipher>7f 4a 2c 91 · encrypted payload · 0d a8 c3 42</div>
+				<pre class="whisper-message" data-demo-message hidden>Recovery handoff
+
+1. Open the offline vault.
+2. Verify the fingerprint shown in person.
+3. Rotate this secret after use.</pre>
+				<button class="button primary" data-demo-open type="button">Decrypt demo locally</button>
+			</section>
+
+			<section id="pulse" class="demo-panel" data-demo-panel="pulse" hidden>
+				<header><div><p class="eyebrow">Demo PULSE monitor</p><h2>Nightly backup</h2></div><div class="pulse-state" data-demo-pulse-state data-state="operational"><i></i><span>OPERATIONAL</span></div></header>
+				<div class="pulse-overview"><article><small>LAST HEARTBEAT</small><strong data-demo-last>18 seconds ago</strong><span>Expected every 5 minutes</span></article><article><small>LIFETIME QUOTA</small><strong data-demo-heartbeats>318 / 1,202</strong><span>Whole purchased lifetime</span></article><article><small>EXPIRES</small><strong>3d 17h</strong><span>Automatic hard stop</span></article></div>
+				<div class="pulse-history-card"><header><div><p class="eyebrow">CURRENT SIGNAL</p><h2>Heartbeat history</h2></div><span>LIVE PREVIEW</span></header><div class="pulse-timeline"></div><p>A real monitor moves through waiting, operational, late, exhausted and expired states.</p></div>
+				<button class="button primary" data-demo-ping type="button">Simulate heartbeat</button>
+			</section>
+		</main>
+		<footer class="footer shell"><span>NO PAYMENT</span><span>NO RESOURCE CREATED</span><a href="/#machines">SEE LIVE PLANS</a></footer>
+		<script type="module" src="/assets/demo.js?v=1"></script>
+	</body>
+</html>

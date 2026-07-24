@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 describe("public API documentation", () => {
 	it("documents payment, settlement, ingestion, listing, pagination, and owner operations without secrets", async () => {
-		const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
+		const html = await readFile(new URL("../public/api.html", import.meta.url), "utf8");
 		for (const contract of [
 			"POST /api/payments/catch",
 			"POST /api/payments/whisper",
