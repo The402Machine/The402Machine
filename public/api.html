@@ -14,7 +14,7 @@
 		<header class="topbar"><a class="brand" href="/" aria-label="The402Machine home"><span class="brand-mark">402</span><span>The402Machine</span></a><nav aria-label="Documentation navigation"><a href="#quickstart">Quickstart</a><a href="#reference">Reference</a><a href="/demo">Demos</a><a href="https://github.com/The402Machine/The402Machine" target="_blank" rel="noopener noreferrer">Source ↗</a></nav></header>
 		<main>
 			<section class="shell docs-hero api-docs-hero">
-				<div><p class="eyebrow">HTTP API / COMPLETE FLOW</p><h1>Buy, pay, receive.<br /><em>Then let it expire.</em></h1><p class="lede">Everything the browser checkout does is available over HTTP. Start with the catalogue, receive an HTTP 402 Lightning quote, poll settlement, then use the narrowly scoped capability returned by the server.</p></div>
+				<div><p class="eyebrow">HTTP API / COMPLETE FLOW / AGENT READY</p><h1>Buy, pay, receive.<br /><em>Then let it expire.</em></h1><p class="lede">Use the native Lightning quote and polling flow, HTTP Payment Authentication with Lightning charge, or the L402 compatibility adapter. All three converge on the same atomic provisioning and narrowly scoped capabilities.</p></div>
 				<aside class="api-base-card"><small>Base URL</small><code>https://the402machine.com</code><span>JSON unless an endpoint explicitly uses raw bytes.</span></aside>
 			</section>
 
@@ -22,7 +22,7 @@
 				<div><p class="eyebrow">READY TO IMPORT</p><h2 id="api-download-title">Use the format your tools understand.</h2><p>Both files describe the public API only. They contain placeholders, never live invoices, tokens or capabilities.</p></div>
 				<div class="api-download-grid">
 					<a class="api-download-card" href="/openapi.json" download><span>01</span><div><strong>OpenAPI 3.1</strong><small>Swagger UI, Redoc, code generators and validators</small></div><b>Download JSON ↓</b></a>
-					<a class="api-download-card" href="/the402machine.postman_collection.json" download><span>02</span><div><strong>Postman collection</strong><small>22 prepared requests grouped by product</small></div><b>Download JSON ↓</b></a>
+					<a class="api-download-card" href="/the402machine.postman_collection.json" download><span>02</span><div><strong>Postman collection</strong><small>Native, Payment Auth and L402 requests</small></div><b>Download JSON ↓</b></a>
 				</div>
 			</section>
 
@@ -37,13 +37,14 @@
   --data '{"planId":"spark"}'</pre><p>The expected response is HTTP 402 with <code>orderId</code>, <code>amountSats</code> and <code>bolt11</code>.</p></article>
 					<article><small>STEP 3</small><h3>Poll until provisioned</h3><pre>curl https://the402machine.com/api/payments/{orderId}</pre><p>HTTP 402 means payment is still pending. HTTP 200 returns the product capability once. Save it immediately.</p></article>
 				</div>
+				<div class="api-response-codes"><h3>Agent payment negotiation</h3><dl><div><dt>Payment Auth</dt><dd>Send <code>X-Payment-Protocol: payment</code>. HTTP 402 carries <code>WWW-Authenticate: Payment</code>. Repeat the identical request with <code>Authorization: Payment &lt;credential&gt;</code>. HTTP 200 includes <code>Payment-Receipt</code>.</dd></div><div><dt>L402</dt><dd>Send <code>X-Payment-Protocol: l402</code>. HTTP 402 carries <code>WWW-Authenticate: L402</code>. Repeat the identical request with <code>Authorization: L402 &lt;macaroon&gt;:&lt;preimage&gt;</code>.</dd></div></dl><p>Never place invoices, preimages, macaroons or product capabilities in URLs, logs, analytics or shared environments. Credentials are bound to the request method, route and body.</p></div>
 			</div></section>
 
 			<section class="shell section api-foundations">
 				<div class="api-section-heading"><div><p class="eyebrow">BEFORE YOU CALL IT</p><h2>Protocol rules.</h2></div><p>The API deliberately uses capability URLs and bearer tokens instead of user accounts. Treat every dispensed token as a password.</p></div>
 				<div class="api-foundation-grid">
 					<article><span>AUTH</span><h3>Authentication model</h3><p>Owner, ingest, read and ping tokens have different roles. Send the correct value as <code>Authorization: Bearer ***</code>. Do not put bearer capabilities in query strings, logs, analytics or shared Postman environments.</p></article>
-					<article><span>PAYMENT</span><h3>HTTP 402 is expected</h3><p>Quote creation and unpaid order polling return <code>402 Payment Required</code>. A paid order returns <code>200</code> only after server-side settlement and provisioning complete.</p></article>
+					<article><span>PAYMENT</span><h3>Three additive flows</h3><p>The native flow returns a JSON quote and supports polling. Payment Authentication and L402 are optional agent adapters over the same BOLT11 invoice and provisioning path. This is not Coinbase x402 compatibility.</p></article>
 					<article><span>PRIVACY</span><h3>WHISPER stays opaque</h3><p>Encrypt WHISPER content locally with AES-256-GCM. Upload only <code>application/octet-stream</code> ciphertext. The encryption key never belongs in an API request.</p></article>
 					<article><span>LIFECYCLE</span><h3>Expiry is final</h3><p>Capabilities disappear at expiry, exhaustion or explicit destruction. Private responses use <code>Cache-Control: no-store</code>; clients should not assume recovery is possible.</p></article>
 				</div>
@@ -59,7 +60,7 @@
 						<article><div class="api-route"><b data-method="get">GET</b><code>/api/catalog</code><span>Public</span></div><p><span class="api-contract-label">GET /api/catalog</span> Returns products, plans, prices, lifetimes, quotas and current availability.</p></article>
 						<article><div class="api-route"><b data-method="post">POST</b><code>/api/payments/catch</code><span>Idempotency-Key</span></div><p><span class="api-contract-label">POST /api/payments/catch</span> JSON body: <code>{"planId":"spark|standard|long"}</code>. Returns a CATCH invoice quote with HTTP 402.</p></article>
 						<article><div class="api-route"><b data-method="post">POST</b><code>/api/payments/whisper</code><span>Raw ciphertext</span></div><p><span class="api-contract-label">POST /api/payments/whisper</span> Requires <code>X-Whisper-Plan</code>. Set <code>X-Whisper-Read-Limit</code> to any whole number from 1 through the selected plan allowance. Optional <code>X-Whisper-Reveal-At</code> schedules reveal. Body must be client-encrypted AES-256-GCM bytes.</p></article>
-						<article><div class="api-route"><b data-method="post">POST</b><code>/api/payments/pulse</code><span>Idempotency-Key</span></div><p><span class="api-contract-label">POST /api/payments/pulse</span> JSON body: <code>{"planId":"spark|standard|long"}</code>. Returns a PULSE invoice quote with HTTP 402.</p></article>
+						<article><div class="api-route"><b data-method="post">POST</b><code>/api/payments/pulse</code><span>Idempotency-Key</span></div><p><span class="api-contract-label">POST /api/payments/pulse</span> JSON body: <code>{"planId":"spark|standard|long"}</code>. Returns a native quote by default. Add <code>X-Payment-Protocol: payment</code> or <code>X-Payment-Protocol: l402</code> for agent negotiation.</p></article>
 						<article><div class="api-route"><b data-method="get">GET</b><code>/api/payments/{orderId}</code><span>Public</span></div><p><span class="api-contract-label">GET /api/payments/{orderId}</span> Poll payment state. HTTP 200 returns the provisioned CATCH, WHISPER or PULSE capability.</p></article>
 					</div>
 				</section>

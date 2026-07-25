@@ -54,7 +54,7 @@ beforeAll(async () => {
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 1 });
 
-	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql", "0014_whisper_reveal_window.sql", "0015_whisper_custom_read_limit.sql", "0016_pulse_public_status_id.sql"]) {
+	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql", "0014_whisper_reveal_window.sql", "0015_whisper_custom_read_limit.sql", "0016_pulse_public_status_id.sql", "0017_payment_challenges.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -72,6 +72,12 @@ afterAll(async () => {
 });
 
 describe("CATCH migration", () => {
+	it("creates the single-use agent payment challenge ledger", async () => {
+		const [table] = await sql<{ challenge_table: string | null }[]>`select to_regclass('public.payment_challenges')::text as challenge_table`;
+		expect(table).toEqual({ challenge_table: "payment_challenges" });
+		expect((await sql`select version from schema_migrations where version = '0017_payment_challenges'`)).toHaveLength(1);
+	});
+
 	it("creates the resource and event tables with the migration marker", async () => {
 		const [row] = await sql<{ resource: string | null; event: string | null; version: string | null }[]>`
 			select

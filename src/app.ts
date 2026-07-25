@@ -1,14 +1,16 @@
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { join } from "node:path";
 
 import helmet from "@fastify/helmet";
 import fastifyStatic from "@fastify/static";
-import Fastify, { LogController, type FastifyInstance, type FastifyRequest } from "fastify";
+import Fastify, { LogController, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 
 import { calculatePlanExpiry, CATCH_PLANS } from "./domain/catch-plans.js";
 import { PULSE_PLANS } from "./domain/pulse-plans.js";
 import { calculateWhisperSchedule, isWhisperReadLimit, MAX_WHISPER_CIPHERTEXT_BYTES, WHISPER_PLANS } from "./domain/whisper-plans.js";
 import { CATCH_PRICES_SATS, PULSE_PRICES_SATS, WHISPER_PRICES_SATS } from "./payment/payment-domain.js";
+import { createL402Challenge, parseL402Authorization, verifyL402Authorization } from "./payment/l402-protocol.js";
+import { createPaymentChallenge, createPaymentReceipt, parsePaymentAuthorization, paymentChallengeFingerprint, verifyPaymentCredential } from "./payment/payment-protocol.js";
 import type { DispensedResource } from "./payment/payment-repository.js";
 import type { PaymentQuote } from "./payment/payment-service.js";
 import { ownerPulseStatus, parsePulseSettings, publicPulseStatus } from "./pulse/pulse-contract.js";
@@ -72,7 +74,11 @@ type PulseAppOptions = { repository: PulseApiRepository; tokenPepper: string };
 type PaymentAppOptions = {
 	quote(input: { idempotencyKey: string; product: "catch" | "whisper" | "pulse"; planId: "spark" | "standard" | "long"; productPayload: Buffer | null; whisperReadLimit?: number | null; whisperRevealAt?: Date | null }): Promise<PaymentQuote>;
 	fulfill(orderId: string): Promise<{ settled: false } | { settled: true; resource: DispensedResource }>;
+	fulfillWithPreimage?(orderId: string, preimage: string): Promise<{ settled: false; reason: "invalid-preimage" | "unsettled" } | { settled: true; resource: DispensedResource }>;
+	fulfillAgentPayment?(input: { challengeId: string; orderId: string; protocol: "payment" | "l402"; challengeFingerprint: string; paymentHash: string; expiresAt: Date; preimage: string }): Promise<{ settled: true; resource: DispensedResource } | { settled: false; reason: "invalid-preimage" | "unsettled" | "replayed" | "mismatch" | "expired" }>;
 };
+
+type PaymentProtocolOptions = { realm: string; secret: Buffer };
 
 type BuildAppOptions = {
 	logger?: boolean | object;
@@ -81,6 +87,7 @@ type BuildAppOptions = {
 	whisper?: WhisperAppOptions;
 	pulse?: PulseAppOptions;
 	payment?: PaymentAppOptions;
+	paymentProtocols?: PaymentProtocolOptions;
 };
 
 export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
@@ -93,6 +100,9 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
 	});
 	if (options.whisper !== undefined || options.payment !== undefined) {
 		app.addContentTypeParser("application/octet-stream", { parseAs: "buffer" }, (_request, body, done) => done(null, body));
+	}
+	if (options.payment !== undefined) {
+		app.addContentTypeParser("application/json", { parseAs: "buffer" }, (_request, body, done) => done(null, body));
 	}
 
 	void app.register(helmet, {
@@ -109,11 +119,11 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
 	if (options.catch !== undefined) registerCatchRoutes(app, options.catch);
 	if (options.whisper !== undefined) registerWhisperRoutes(app, options.whisper);
 	if (options.pulse !== undefined) registerPulseRoutes(app, options.pulse);
-	if (options.payment !== undefined) registerPaymentRoutes(app, options.payment);
+	if (options.payment !== undefined) registerPaymentRoutes(app, options.payment, options.paymentProtocols);
 	return app;
 };
 
-function registerPaymentRoutes(app: FastifyInstance, payment: PaymentAppOptions): void {
+function registerPaymentRoutes(app: FastifyInstance, payment: PaymentAppOptions, protocols?: PaymentProtocolOptions): void {
 	const quoteRateLimits = new Map<string, RateLimitBucket>();
 	const verificationRateLimits = new Map<string, RateLimitBucket>();
 	app.post<{ Body: { planId?: unknown } }>("/api/payments/catch", async (request, reply) => {
@@ -123,7 +133,7 @@ function registerPaymentRoutes(app: FastifyInstance, payment: PaymentAppOptions)
 		if (typeof idempotencyKey !== "string" || idempotencyKey.length < 8 || idempotencyKey.length > 128) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid idempotency key" });
 		if (!isPlanId(planId) || !CATCH_PLANS[planId].available) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid plan" });
 		const quote = await payment.quote({ idempotencyKey, product: "catch", planId, productPayload: null });
-		return reply.header("Cache-Control", "no-store").code(402).send(quote);
+		return paymentProtocolResponse(request, reply, payment, protocols, quote, paymentRequestBody(request));
 	});
 
 	app.post("/api/payments/whisper", async (request, reply) => {
@@ -145,7 +155,7 @@ function registerPaymentRoutes(app: FastifyInstance, payment: PaymentAppOptions)
 		}
 		if (normalizedContentType(request.headers["content-type"]) !== "application/octet-stream" || !Buffer.isBuffer(request.body) || request.body.byteLength < 30 || request.body.byteLength > WHISPER_PLANS[planId].maxCiphertextBytes) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid ciphertext" });
 		const quote = await payment.quote({ idempotencyKey, product: "whisper", planId, productPayload: request.body, whisperReadLimit, whisperRevealAt });
-		return reply.header("Cache-Control", "no-store").code(402).send(quote);
+		return paymentProtocolResponse(request, reply, payment, protocols, quote, request.body);
 	});
 
 	app.post<{ Body: { planId?: unknown } }>("/api/payments/pulse", async (request, reply) => {
@@ -155,22 +165,72 @@ function registerPaymentRoutes(app: FastifyInstance, payment: PaymentAppOptions)
 		if (typeof idempotencyKey !== "string" || idempotencyKey.length < 8 || idempotencyKey.length > 128) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid idempotency key" });
 		if (!isPlanId(planId) || !PULSE_PLANS[planId].available) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid plan" });
 		const quote = await payment.quote({ idempotencyKey, product: "pulse", planId, productPayload: null });
-		return reply.header("Cache-Control", "no-store").code(402).send(quote);
+		return paymentProtocolResponse(request, reply, payment, protocols, quote, paymentRequestBody(request));
 	});
 
 	app.get<{ Params: { orderId: string } }>("/api/payments/:orderId", async (request, reply) => {
 		if (!consumeRateLimit(verificationRateLimits, request.ip, 30, 60_000)) return rateLimited(reply);
 		const result = await payment.fulfill(request.params.orderId);
 		if (!result.settled) return reply.header("Cache-Control", "no-store").code(402).send(result);
-		const resource = result.resource.product === "catch"
-			? { product: "catch", publicId: result.resource.publicId, ownerToken: result.resource.ownerToken, ingestToken: result.resource.ingestToken, expiresAt: result.resource.expiresAt.toISOString() }
-			: result.resource.product === "whisper"
-				? { product: "whisper", publicId: result.resource.publicId, readToken: result.resource.readToken, expiresAt: result.resource.expiresAt.toISOString() }
-				: { product: "pulse", publicId: result.resource.publicId, ownerToken: result.resource.ownerToken, pingToken: result.resource.pingToken, expiresAt: result.resource.expiresAt.toISOString() };
-		return reply.header("Cache-Control", "no-store").send({ settled: true, resource });
+		return reply.header("Cache-Control", "no-store").send({ settled: true, resource: publicDispensedResource(result.resource) });
 	});
 
 	app.get("/api/catalog", async (_request, reply) => reply.header("Cache-Control", "public, max-age=60").send(paymentCatalogue()));
+}
+
+async function paymentProtocolResponse(request: FastifyRequest, reply: FastifyReply, payment: PaymentAppOptions, protocols: PaymentProtocolOptions | undefined, quote: PaymentQuote, body: Buffer): Promise<unknown> {
+	const selectedProtocol = request.headers["x-payment-protocol"];
+	if (protocols === undefined || (selectedProtocol !== "payment" && selectedProtocol !== "l402")) return reply.header("Cache-Control", "no-store").code(402).send(quote);
+	const expiresAt = new Date(quote.expiresAt);
+	if (selectedProtocol === "l402") return l402ProtocolResponse(request, reply, payment, protocols, quote, body, expiresAt);
+	const challenge = createPaymentChallenge({ quote, realm: protocols.realm, method: request.method, path: request.routeOptions.url ?? request.url, body, expiresAt, secret: protocols.secret });
+	const authorization = typeof request.headers.authorization === "string" ? request.headers.authorization : undefined;
+	if (authorization === undefined) return paymentChallenge(reply, challenge.header, quote, expiresAt);
+	const verification = verifyPaymentCredential({ authorization, expected: challenge.parameters, body, secret: protocols.secret, now: new Date() });
+	if (!verification.valid) return paymentProblem(reply, challenge.header, verification.reason);
+	const credential = parsePaymentAuthorization(authorization);
+	if (credential === null || payment.fulfillAgentPayment === undefined) return paymentProblem(reply, challenge.header, "malformed-credential");
+	const challengeId = challenge.parameters.id;
+	const result = await payment.fulfillAgentPayment({ challengeId, orderId: quote.orderId, protocol: "payment", challengeFingerprint: paymentChallengeFingerprint(challenge.parameters), paymentHash: verification.paymentHash, expiresAt, preimage: credential.preimage });
+	if (!result.settled) return paymentProblem(reply, challenge.header, result.reason === "invalid-preimage" ? "invalid-preimage" : result.reason === "expired" ? "expired-invoice" : "unknown-challenge");
+	return reply.header("Cache-Control", "private, no-store").header("Payment-Receipt", createPaymentReceipt({ challengeId: challenge.parameters.id, paymentHash: verification.paymentHash, settledAt: new Date() })).send({ settled: true, resource: publicDispensedResource(result.resource) });
+}
+
+async function l402ProtocolResponse(request: FastifyRequest, reply: FastifyReply, payment: PaymentAppOptions, protocols: PaymentProtocolOptions, quote: PaymentQuote, body: Buffer, expiresAt: Date): Promise<unknown> {
+	const path = request.routeOptions.url ?? request.url;
+	const challenge = createL402Challenge({ paymentHash: quote.paymentHash, bolt11: quote.bolt11, rootKey: protocols.secret, tokenId: createHash("sha256").update(`l402:${quote.orderId}`, "utf8").digest(), location: protocols.realm, product: quote.product, planId: quote.planId, method: request.method, path, body, expiresAt });
+	const authorization = typeof request.headers.authorization === "string" ? request.headers.authorization : undefined;
+	if (authorization === undefined) return reply.header("Cache-Control", "no-store").header("WWW-Authenticate", challenge.header).code(402).send({ protocol: "l402", orderId: quote.orderId, amountSats: quote.amountSats, expiresAt: expiresAt.toISOString() });
+	const verification = verifyL402Authorization({ authorization, rootKey: protocols.secret, expectedPaymentHash: quote.paymentHash, product: quote.product, planId: quote.planId, method: request.method, path, body, now: new Date() });
+	if (!verification.valid) return reply.header("Cache-Control", "no-store").header("WWW-Authenticate", challenge.header).code(401).send({ error: "invalid L402 credential" });
+	const credential = parseL402Authorization(authorization);
+	if (credential === null || payment.fulfillAgentPayment === undefined) return reply.header("Cache-Control", "no-store").header("WWW-Authenticate", challenge.header).code(401).send({ error: "invalid L402 credential" });
+	const challengeId = createHash("sha256").update(challenge.macaroon, "utf8").digest("base64url");
+	const result = await payment.fulfillAgentPayment({ challengeId, orderId: quote.orderId, protocol: "l402", challengeFingerprint: createHash("sha256").update(challenge.header, "utf8").digest("hex"), paymentHash: verification.paymentHash, expiresAt, preimage: credential.preimage });
+	if (!result.settled) return reply.header("Cache-Control", "no-store").header("WWW-Authenticate", challenge.header).code(401).send({ error: "invalid L402 credential" });
+	return reply.header("Cache-Control", "private, no-store").send({ settled: true, resource: publicDispensedResource(result.resource) });
+}
+
+function paymentChallenge(reply: FastifyReply, header: string, quote: PaymentQuote, expiresAt: Date): unknown {
+	return reply.header("Cache-Control", "no-store").header("WWW-Authenticate", header).code(402).send({ protocol: "payment", method: "lightning", intent: "charge", orderId: quote.orderId, amountSats: quote.amountSats, expiresAt: expiresAt.toISOString() });
+}
+
+function paymentProblem(reply: FastifyReply, header: string, reason: "malformed-credential" | "invalid-challenge" | "invalid-preimage" | "expired-invoice" | "unknown-challenge"): unknown {
+	const titles = { "malformed-credential": "Malformed Credential", "invalid-challenge": "Invalid Challenge", "invalid-preimage": "Invalid Preimage", "expired-invoice": "Expired Invoice", "unknown-challenge": "Unknown Challenge" };
+	return reply.header("Cache-Control", "no-store").header("WWW-Authenticate", header).type("application/problem+json").code(402).send({ type: `https://paymentauth.org/problems/lightning/${reason}`, title: titles[reason], status: 402 });
+}
+
+function paymentRequestBody(request: FastifyRequest): Buffer {
+	if (Buffer.isBuffer(request.body)) return request.body;
+	return Buffer.from(JSON.stringify(request.body ?? {}), "utf8");
+}
+
+function publicDispensedResource(resource: DispensedResource): object {
+	return resource.product === "catch"
+		? { product: "catch", publicId: resource.publicId, ownerToken: resource.ownerToken, ingestToken: resource.ingestToken, expiresAt: resource.expiresAt.toISOString() }
+		: resource.product === "whisper"
+			? { product: "whisper", publicId: resource.publicId, readToken: resource.readToken, expiresAt: resource.expiresAt.toISOString() }
+			: { product: "pulse", publicId: resource.publicId, ownerToken: resource.ownerToken, pingToken: resource.pingToken, expiresAt: resource.expiresAt.toISOString() };
 }
 
 function paymentCatalogue() {
@@ -321,6 +381,7 @@ function registerCatchRoutes(app: FastifyInstance, options: CatchAppOptions): vo
 	const provisioningRateLimits = new Map<string, RateLimitBucket>();
 	const ownerRateLimits = new Map<string, RateLimitBucket>();
 	for (const contentType of ALLOWED_CONTENT_TYPES) {
+		if (app.hasContentTypeParser(contentType)) app.removeContentTypeParser(contentType);
 		app.addContentTypeParser(contentType, { parseAs: "buffer" }, (_request, body, done) => done(null, body));
 	}
 

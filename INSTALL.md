@@ -71,9 +71,40 @@ The LNbits adapter accepts only loopback HTTP or the explicitly pinned Docker ga
 
 `PAYMENT_DELIVERY_KEY` is a separate 32-byte base64url key used to encrypt recoverable delivery receipts. It must not be reused as the capability token pepper.
 
+To enable interoperable agent payments, add:
+
+```env
+PAYMENT_AGENT_PROTOCOLS=true
+PAYMENT_PROTOCOL_KEY=<32 random bytes encoded as base64url>
+PAYMENT_REALM=the402machine.com
+```
+
+Generate the protocol key independently:
+
+```sh
+openssl rand -base64 32 | tr '+/' '-_' | tr -d '='
+```
+
+`PAYMENT_PROTOCOL_KEY` binds HTTP Payment challenges and signs L402 macaroons. It cannot spend from LNbits or LND, but disclosure would permit forged payment credentials. Do not reuse `PAYMENT_DELIVERY_KEY`, `CATCH_TOKEN_PEPPER` or an LND macaroon.
+
+Purchase endpoints then accept optional `X-Payment-Protocol: payment` for HTTP Payment Authentication with Lightning `charge`, or `X-Payment-Protocol: l402` for classic L402 compatibility. Omit the header for the existing JSON quote and polling flow. Both agent protocols bind the credential to product, plan, HTTP method, route, exact request-body bytes and invoice expiry. JSON retries must preserve whitespace and key order, not only semantic values. Never log preimages or macaroons, and never place them in URLs.
+
+Migration `0017_payment_challenges.sql` adds the single-use challenge ledger. It stores only challenge identifiers, hashes, expiry and consumption timestamps. It never stores preimages, macaroons, invoices or dispensed capabilities.
+
+Inspect a synthetic challenge without paying anything:
+
+```sh
+node examples/agent-payment-client.mjs http://127.0.0.1:4020 payment pulse spark
+node examples/agent-payment-client.mjs http://127.0.0.1:4020 l402 pulse spark
+```
+
+The client exits after printing the invoice unless `PAYMENT_PREIMAGE_HEX` is set. Do not set it during deployment smoke tests and never pay a real invoice without explicit financial authorization.
+
 Invoice creation uses the local payment order UUID as the provider `external_id`. Before creating an invoice, the broker looks up that identifier so an ambiguous lost response can recover the existing provider invoice instead of creating a duplicate.
 
 Wallet or WebLN success is never the source of truth. Settlement, amount and payment hash are verified server-side before provisioning.
+
+Before exposing either agent challenge, The402Machine also decodes the BOLT11 returned by LNbits and verifies that its embedded amount and payment hash match the order. The advertised challenge expiry never exceeds the invoice's own expiry.
 
 ## Reverse proxy and source IPs
 

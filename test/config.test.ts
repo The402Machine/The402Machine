@@ -44,6 +44,17 @@ describe("CATCH configuration", () => {
 		expect(config.payment.provider).toBe("lnbits");
 	});
 
+	it("requires a separate 32-byte protocol key when agent payment protocols are enabled", () => {
+		const base = {
+			DATABASE_URL: "postgres://example", CATCH_TOKEN_PEPPER: "pepper",
+			PAYMENT_PROVIDER: "lnbits", PAYMENT_API_URL: "http://127.0.0.1:2180", PAYMENT_API_KEY: "invoice",
+			PAYMENT_DELIVERY_KEY: Buffer.alloc(32, 1).toString("base64url"),
+		};
+		expect(() => loadConfig({ ...base, PAYMENT_AGENT_PROTOCOLS: "true" })).toThrow(/PAYMENT_PROTOCOL_KEY/);
+		const config = loadConfig({ ...base, PAYMENT_AGENT_PROTOCOLS: "true", PAYMENT_PROTOCOL_KEY: Buffer.alloc(32, 2).toString("base64url"), PAYMENT_REALM: "the402machine.com" });
+		expect(config.payment.agentProtocols).toEqual({ enabled: true, key: Buffer.alloc(32, 2).toString("base64url"), realm: "the402machine.com" });
+	});
+
 	it("accepts only loopback or the pinned Docker gateway for LNbits", () => {
 		const base = {
 			DATABASE_URL: "postgres://example", CATCH_TOKEN_PEPPER: "pepper", PAYMENT_PROVIDER: "lnbits",

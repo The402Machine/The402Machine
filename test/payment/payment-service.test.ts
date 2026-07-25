@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+
+import { createFakeInvoice } from "fake-bolt11";
 import { describe, expect, it } from "vitest";
 
 import type { PaymentAdapter } from "../../src/payment/payment-adapter.js";
@@ -41,12 +44,16 @@ class FakeOrderStore implements PaymentOrderStore {
 			return { product: "pulse", resourceId: "resource-1", publicId: resource.publicId, ownerToken: resource.ownerToken, pingToken: resource.pingToken, expiresAt: resource.expiresAt };
 		});
 	}
+	public async consumePaymentChallengeAndDispense(input: { challengeId: string; orderId: string; protocol: "payment" | "l402"; challengeFingerprint: string; paymentHash: string; expiresAt: Date }, provision: (order: PaymentOrder) => Promise<AtomicProvision>): Promise<{ consumed: true; resource: DispensedResource } | { consumed: false; reason: "replayed" | "mismatch" | "expired" | "unsettled" }> {
+		const resource = await this.dispensePaidOrder(input.orderId, provision);
+		return resource === null ? { consumed: false, reason: "unsettled" } : { consumed: true, resource };
+	}
 }
 
 class FakeAdapter implements PaymentAdapter {
 	public settled = false;
 	public createCalls = 0;
-	public createInvoice(): Promise<{ paymentHash: string; bolt11: string }> { this.createCalls += 1; return Promise.resolve({ paymentHash: "a".repeat(64), bolt11: "lnbc4n1test" }); }
+	public createInvoice(): Promise<{ paymentHash: string; bolt11: string }> { this.createCalls += 1; return Promise.resolve(fakeInvoice(42, "a".repeat(64))); }
 	public findInvoice(): Promise<null> { return Promise.resolve(null); }
 	public verifyInvoice(): Promise<{ settled: boolean }> { return Promise.resolve({ settled: this.settled }); }
 }
@@ -74,4 +81,38 @@ describe("PaymentService", () => {
 		const quote = await service.quote({ idempotencyKey: "idempotency-3", product: "catch", planId: "spark", productPayload: null });
 		expect(await service.fulfill(quote.orderId)).toEqual({ settled: true, resource: { product: "catch", resourceId: "resource-1", publicId: "catch_once", ownerToken: "owner-once", ingestToken: "ingest-once", expiresAt: provisioned.expiresAt } });
 	});
+
+	it("fulfills a Lightning preimage only when it matches the order and backend settlement", async () => {
+		const store = new FakeOrderStore(); const adapter = new FakeAdapter(); adapter.settled = true;
+		const preimage = Buffer.alloc(32, 9).toString("hex");
+		adapter.createInvoice = () => Promise.resolve(fakeInvoice(42, awaitHash(preimage)));
+		const provisioned = { product: "catch" as const, publicId: "catch_preimage", planId: "spark" as const, ownerTokenHash: "owner-hash", ingestTokenHash: "ingest-hash", requestLimit: 402, storageLimitBytes: 2 * 1024 * 1024, maxBytesPerRequest: 64 * 1024, ownerToken: "owner-preimage", ingestToken: "ingest-preimage", expiresAt: new Date("2026-07-25T12:00:00.000Z") };
+		const service = new PaymentService(store, adapter, () => Promise.resolve(provisioned));
+		const quote = await service.quote({ idempotencyKey: "idempotency-preimage", product: "catch", planId: "spark", productPayload: null });
+
+		expect(await service.fulfillWithPreimage(quote.orderId, Buffer.alloc(32, 8).toString("hex"))).toEqual({ settled: false, reason: "invalid-preimage" });
+		expect(await service.fulfillWithPreimage(quote.orderId, preimage)).toMatchObject({ settled: true, resource: { publicId: "catch_preimage" } });
+	});
+
+	it("settles and atomically consumes an agent challenge", async () => {
+		const store = new FakeOrderStore(); const adapter = new FakeAdapter(); adapter.settled = true;
+		const preimage = Buffer.alloc(32, 10).toString("hex");
+		adapter.createInvoice = () => Promise.resolve(fakeInvoice(42, awaitHash(preimage)));
+		const provisioned = { product: "catch" as const, publicId: "catch_agent", planId: "spark" as const, ownerTokenHash: "owner-hash", ingestTokenHash: "ingest-hash", requestLimit: 402, storageLimitBytes: 2 * 1024 * 1024, maxBytesPerRequest: 64 * 1024, ownerToken: "owner-agent", ingestToken: "ingest-agent", expiresAt: new Date("2026-07-25T12:00:00.000Z") };
+		const service = new PaymentService(store, adapter, () => Promise.resolve(provisioned));
+		const quote = await service.quote({ idempotencyKey: "idempotency-agent-service", product: "catch", planId: "spark", productPayload: null });
+		expect(await service.fulfillAgentPayment({ challengeId: Buffer.alloc(32, 2).toString("base64url"), orderId: quote.orderId, protocol: "payment", challengeFingerprint: "a".repeat(64), paymentHash: quote.paymentHash, expiresAt: new Date(Date.now() + 60_000), preimage })).toMatchObject({ settled: true, resource: { publicId: "catch_agent" } });
+	});
 });
+
+function awaitHash(preimage: string): string {
+	return requireHash(Buffer.from(preimage, "hex"));
+}
+
+function requireHash(value: Buffer): string {
+	return createHash("sha256").update(value).digest("hex");
+}
+
+function fakeInvoice(amountSats: number, paymentHash: string): { paymentHash: string; bolt11: string } {
+	return { paymentHash, bolt11: createFakeInvoice(amountSats, { paymentHash, expiry: 600 }) };
+}

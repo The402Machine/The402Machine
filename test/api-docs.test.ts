@@ -20,6 +20,13 @@ describe("public API documentation", () => {
 			"DELETE /api/catch/{publicId}/events/{eventId}",
 			"DELETE /api/catch/{publicId}",
 			"Idempotency-Key",
+			"X-Payment-Protocol: payment",
+			"WWW-Authenticate: Payment",
+			"Authorization: Payment",
+			"Payment-Receipt",
+			"X-Payment-Protocol: l402",
+			"WWW-Authenticate: L402",
+			"Authorization: L402",
 			"Authorization: Bearer",
 			"cursor",
 			"access=public|authenticated",
@@ -76,6 +83,16 @@ describe("public API documentation", () => {
 		})) for (const method of methods) expect(openApi.paths?.[path]?.[method], `${method.toUpperCase()} ${path}`).toBeDefined();
 		expect(openApi.components?.securitySchemes).toHaveProperty("bearerCapability");
 		expect(openApi.paths?.["/api/catalog"]?.get?.responses?.["200"]?.content?.["application/json"]?.schema).toEqual({ $ref: "#/components/schemas/Catalogue" });
+		const pulsePayment = openApi.paths?.["/api/payments/pulse"]?.post as { parameters?: { $ref?: string }[]; responses?: Record<string, { headers?: Record<string, unknown>; content?: Record<string, { schema?: unknown }> }> } | undefined;
+		expect(pulsePayment?.parameters).toContainEqual({ $ref: "#/components/parameters/PaymentProtocol" });
+		expect(pulsePayment?.parameters).toContainEqual({ $ref: "#/components/parameters/PaymentAuthorization" });
+		expect(pulsePayment?.responses?.["200"]?.headers).toHaveProperty("Payment-Receipt");
+		expect(pulsePayment?.responses?.["402"]?.headers).toHaveProperty("WWW-Authenticate");
+		expect(pulsePayment?.responses?.["401"]?.headers).toHaveProperty("WWW-Authenticate");
+		const paymentQuoteSchema = openApi.components?.schemas?.PaymentQuote as { required?: string[]; properties?: { network?: { enum?: string[] } } } | undefined;
+		expect(paymentQuoteSchema?.required).toEqual(expect.arrayContaining(["network", "expiresAt"]));
+		expect(paymentQuoteSchema?.properties?.network?.enum).toEqual(["mainnet", "regtest", "signet"]);
+		expect(pulsePayment?.responses?.["402"]?.content?.["application/json"]?.schema).toEqual({ oneOf: [{ $ref: "#/components/schemas/PaymentQuote" }, { $ref: "#/components/schemas/PaymentAuthChallenge" }, { $ref: "#/components/schemas/L402Challenge" }] });
 		expect(openApi.paths?.["/api/catch/{publicId}"]?.get?.responses?.["200"]?.content?.["application/json"]?.schema).toEqual({ $ref: "#/components/schemas/CatchStatus" });
 		expect(openApi.paths?.["/api/catch/{publicId}/events"]?.get?.responses?.["200"]?.content?.["application/json"]?.schema).toEqual({ $ref: "#/components/schemas/CatchEventPage" });
 		expect(openApi.paths?.["/api/pulse/{publicId}"]?.get?.responses?.["200"]?.content?.["application/json"]?.schema).toEqual({ $ref: "#/components/schemas/OwnerPulseStatus" });
@@ -101,9 +118,11 @@ describe("public API documentation", () => {
 		expect(postman.info?._postman_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u);
 		expect(postman.variable).toContainEqual(expect.objectContaining({ key: "baseUrl", value: "https://the402machine.com" }));
 		expect(postman.variable).toContainEqual(expect.objectContaining({ key: "publicStatusId" }));
+		expect(postman.variable).toContainEqual(expect.objectContaining({ key: "paymentIdempotencyKey" }));
+		expect(postman.variable).toContainEqual(expect.objectContaining({ key: "l402IdempotencyKey" }));
 		expect(postman.item?.length).toBeGreaterThanOrEqual(5);
 		const postmanRequests = flattenPostmanRequests(postman.item ?? []);
-		expect(postmanRequests).toHaveLength(22);
+		expect(postmanRequests).toHaveLength(26);
 		expect(postmanRequests.find((request) => request.name === "Public status")?.url?.raw).toBe("{{baseUrl}}/api/pulse/public/{{publicStatusId}}");
 		const whisperQuote = postmanRequests.find((request) => request.name === "Quote WHISPER ciphertext");
 		expect(whisperQuote?.header).toContainEqual(expect.objectContaining({ key: "X-Whisper-Reveal-At", disabled: true }));
@@ -112,6 +131,12 @@ describe("public API documentation", () => {
 		expect(listEventsUrl?.query).toContainEqual({ key: "limit", value: "20" });
 		expect(listEventsUrl?.query).toContainEqual({ key: "access", value: "authenticated" });
 		expect(postmanRequests.find((request) => request.name === "Quote WHISPER ciphertext")?.body?.raw).toHaveLength(30);
+		expect(postmanRequests.find((request) => request.name === "Payment Auth PULSE challenge")?.header).toContainEqual(expect.objectContaining({ key: "X-Payment-Protocol", value: "payment" }));
+		expect(postmanRequests.find((request) => request.name === "Payment Auth PULSE challenge")?.header).toContainEqual(expect.objectContaining({ key: "Idempotency-Key", value: "{{paymentIdempotencyKey}}" }));
+		expect(postmanRequests.find((request) => request.name === "Payment Auth PULSE credential")?.header).toContainEqual(expect.objectContaining({ key: "Idempotency-Key", value: "{{paymentIdempotencyKey}}" }));
+		expect(postmanRequests.find((request) => request.name === "L402 PULSE challenge")?.header).toContainEqual(expect.objectContaining({ key: "X-Payment-Protocol", value: "l402" }));
+		expect(postmanRequests.find((request) => request.name === "L402 PULSE challenge")?.header).toContainEqual(expect.objectContaining({ key: "Idempotency-Key", value: "{{l402IdempotencyKey}}" }));
+		expect(postmanRequests.find((request) => request.name === "L402 PULSE credential")?.header).toContainEqual(expect.objectContaining({ key: "Idempotency-Key", value: "{{l402IdempotencyKey}}" }));
 		for (const source of [openApiSource, postmanSource]) {
 			expect(source).not.toMatch(/catch_(?:own|ing)_[A-Za-z0-9_-]{20,}/u);
 			expect(source).not.toMatch(/pulse_(?:own|ping)_[A-Za-z0-9_-]{20,}/u);
@@ -133,7 +158,7 @@ describe("public API documentation", () => {
 		]) expect(html).toContain(contract);
 	});
 
-	it("keeps the documented 22-operation contract explicit instead of exposing generated HEAD siblings", async () => {
+	it("keeps the documented 22-route-operation contract explicit instead of exposing generated HEAD siblings", async () => {
 		const source = await readFile(new URL("../src/app.ts", import.meta.url), "utf8");
 		expect(source).toContain("exposeHeadRoutes: false");
 	});

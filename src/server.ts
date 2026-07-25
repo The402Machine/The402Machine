@@ -100,6 +100,7 @@ const app = buildApp({
 	...(whisperOptions === undefined ? {} : { whisper: whisperOptions }),
 	...(pulseOptions === undefined ? {} : { pulse: pulseOptions }),
 	...(paymentService === undefined ? {} : { payment: paymentService }),
+	...(config.payment.agentProtocols.enabled && config.payment.agentProtocols.key !== undefined ? { paymentProtocols: { realm: config.payment.agentProtocols.realm, secret: Buffer.from(config.payment.agentProtocols.key, "base64url") } } : {}),
 });
 
 const shutdown = async (signal: NodeJS.Signals): Promise<void> => {

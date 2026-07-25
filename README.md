@@ -69,7 +69,21 @@ The demos create no invoice, resource, capability or payment request.
 
 The browser checkout and owner interfaces sit on the same HTTP API available to scripts and agents.
 
-Read the dedicated [API reference](https://the402machine.com/api) for catalogue discovery, HTTP 402 quotes, payment polling and product operations.
+Agents can choose one of three additive payment flows on the existing purchase endpoints:
+
+- Native HTTP 402 JSON quote plus settlement polling.
+- HTTP Payment Authentication with the Lightning `charge` intent, BOLT11 and preimage proof.
+- Classic L402 compatibility using a request-bound macaroon and payment preimage.
+
+No external custodian or mandatory facilitator is required. The self-hosted deployment continues to use an invoice-only LNbits wallet backed by the operator's Lightning node. All three flows reuse the same payment order, server-side settlement verification and atomic provisioning path.
+
+This does **not** claim Coinbase x402 compatibility. HTTP 402, HTTP Payment Authentication, x402 and L402 are distinct contracts.
+
+Read the dedicated [API reference](https://the402machine.com/api). Machine-readable contracts are available as [OpenAPI 3.1](https://the402machine.com/openapi.json) and a [Postman collection](https://the402machine.com/the402machine.postman_collection.json).
+
+A dependency-free reference client is included at [`examples/agent-payment-client.mjs`](examples/agent-payment-client.mjs). It obtains either challenge, prints the BOLT11 invoice, and only submits a preimage when `PAYMENT_PREIMAGE_HEX` is explicitly provided.
+
+See [`PAYMENT_PROTOCOLS.md`](PAYMENT_PROTOCOLS.md) for the compatibility matrix, wire flows, replay protection and the explicit x402 non-claim.
 
 ## Run your own machine
 

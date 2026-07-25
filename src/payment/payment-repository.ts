@@ -141,6 +141,42 @@ export class PaymentRepository {
 			return deliveryResource(resourceId, delivery);
 		});
 	}
+
+	public async consumePaymentChallengeAndDispense(input: { challengeId: string; orderId: string; protocol: "payment" | "l402"; challengeFingerprint: string; paymentHash: string; expiresAt: Date }, provision: (order: PaymentOrder) => Promise<AtomicProvision>): Promise<{ consumed: true; resource: DispensedResource } | { consumed: false; reason: "replayed" | "mismatch" | "expired" | "unsettled" }> {
+		return this.sql.begin(async (tx) => {
+			const orders = await tx<(PaymentOrderRow & { delivery_ciphertext: Buffer | null; resource_id: string | null })[]>`
+				select *, null::text as resource_public_id from payment_orders where id = ${input.orderId} for update
+			`;
+			const order = orders[0];
+			if (order === undefined || order.payment_hash !== input.paymentHash || (order.status !== "paid" && order.status !== "dispensed")) return { consumed: false, reason: "unsettled" };
+			if (order.status === "dispensed") return { consumed: false, reason: "replayed" };
+			await tx`
+				insert into payment_challenges (challenge_id, order_id, protocol, challenge_fingerprint, payment_hash, expires_at)
+				values (${input.challengeId}, ${input.orderId}, ${input.protocol}, ${input.challengeFingerprint}, ${input.paymentHash}, ${input.expiresAt})
+				on conflict (challenge_id) do nothing
+			`;
+			const rows = await tx<{ order_id: string; protocol: "payment" | "l402"; challenge_fingerprint: string; payment_hash: string; expires_at: Date; consumed_at: Date | null }[]>`
+				select order_id, protocol, challenge_fingerprint, payment_hash, expires_at, consumed_at
+				from payment_challenges where challenge_id = ${input.challengeId} for update
+			`;
+			const row = rows[0];
+			if (row === undefined || row.order_id !== input.orderId || row.protocol !== input.protocol || row.challenge_fingerprint !== input.challengeFingerprint || row.payment_hash !== input.paymentHash || row.expires_at.getTime() !== input.expiresAt.getTime()) return { consumed: false, reason: "mismatch" };
+			if (row.consumed_at !== null) return { consumed: false, reason: "replayed" };
+			if (row.expires_at.getTime() <= Date.now()) return { consumed: false, reason: "expired" };
+			const provisionInput = await provision(mapOrder(order));
+			if (provisionInput.product !== order.product) throw new Error("Provisioned product does not match order");
+			const resourceId = provisionInput.product === "catch" ? await insertCatch(tx, provisionInput) : provisionInput.product === "whisper" ? await insertWhisper(tx, provisionInput) : await insertPulse(tx, provisionInput);
+			const delivery: PaymentDelivery = provisionInput.product === "catch"
+				? { product: "catch", publicId: provisionInput.publicId, ownerToken: provisionInput.ownerToken, ingestToken: provisionInput.ingestToken, expiresAt: provisionInput.expiresAt.toISOString() }
+				: provisionInput.product === "whisper"
+					? { product: "whisper", publicId: provisionInput.publicId, readToken: provisionInput.readToken, expiresAt: provisionInput.expiresAt.toISOString() }
+					: { product: "pulse", publicId: provisionInput.publicId, ownerToken: provisionInput.ownerToken, pingToken: provisionInput.pingToken, expiresAt: provisionInput.expiresAt.toISOString() };
+			const encryptedDelivery = encryptDelivery(delivery, this.deliveryKey);
+			await tx`update payment_orders set status = 'dispensed', resource_id = ${resourceId}, delivery_ciphertext = ${encryptedDelivery}, product_payload = null, dispensed_at = clock_timestamp(), updated_at = clock_timestamp() where id = ${input.orderId} and status = 'paid'`;
+			await tx`update payment_challenges set consumed_at = clock_timestamp() where challenge_id = ${input.challengeId} and consumed_at is null`;
+			return { consumed: true, resource: deliveryResource(resourceId, delivery) };
+		});
+	}
 }
 
 async function insertCatch(tx: TransactionSql, input: AtomicCatchProvision): Promise<string> {

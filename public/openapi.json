@@ -3,7 +3,7 @@
   "info": {
     "title": "The402Machine HTTP API",
     "version": "0.1.0",
-    "description": "Buy temporary CATCH, WHISPER and PULSE capabilities over Lightning. Capabilities are bearer secrets: keep them out of logs, analytics and shared URLs.",
+    "description": "Buy temporary CATCH, WHISPER and PULSE capabilities over Lightning. Supports the native quote and polling flow, HTTP Payment Authentication with Lightning charge, and L402 compatibility. Capabilities and payment credentials are bearer secrets: keep them out of URLs, logs, analytics and shared environments.",
     "license": {
       "name": "Source-available; see repository license",
       "url": "https://github.com/The402Machine/The402Machine"
@@ -22,7 +22,7 @@
     },
     {
       "name": "Payments",
-      "description": "Catalogue, Lightning quotes and settlement polling."
+      "description": "Catalogue, native Lightning quotes, settlement polling, HTTP Payment Authentication and L402 compatibility."
     },
     {
       "name": "CATCH",
@@ -103,6 +103,12 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/PaymentProtocol"
+          },
+          {
+            "$ref": "#/components/parameters/PaymentAuthorization"
           }
         ],
         "requestBody": {
@@ -117,11 +123,29 @@
         },
         "responses": {
           "402": {
-            "description": "Lightning invoice quote. Poll the returned orderId after paying.",
+            "description": "Native Lightning quote, fresh HTTP Payment challenge, or fresh L402 challenge according to X-Payment-Protocol.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaymentQuote"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/PaymentQuote"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PaymentAuthChallenge"
+                    },
+                    {
+                      "$ref": "#/components/schemas/L402Challenge"
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "HTTP Payment or L402 challenge selected by X-Payment-Protocol.",
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -131,10 +155,47 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "200": {
+            "description": "Agent payment accepted and capability provisioned.",
+            "headers": {
+              "Payment-Receipt": {
+                "description": "Base64url JCS receipt returned after HTTP Payment Authentication settlement. Never contains the preimage.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettledPayment"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid L402 credential.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "HTTP Payment or L402 challenge selected by X-Payment-Protocol.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "security": [],
-        "operationId": "postApiPaymentsCatch"
+        "operationId": "postApiPaymentsCatch",
+        "description": "Omit X-Payment-Protocol for the native flow. Use `payment` for HTTP Payment Authentication or `l402` for L402 compatibility."
       }
     },
     "/api/payments/pulse": {
@@ -146,6 +207,12 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/PaymentProtocol"
+          },
+          {
+            "$ref": "#/components/parameters/PaymentAuthorization"
           }
         ],
         "requestBody": {
@@ -160,11 +227,29 @@
         },
         "responses": {
           "402": {
-            "description": "Lightning invoice quote. Poll the returned orderId after paying.",
+            "description": "Native Lightning quote, fresh HTTP Payment challenge, or fresh L402 challenge according to X-Payment-Protocol.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaymentQuote"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/PaymentQuote"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PaymentAuthChallenge"
+                    },
+                    {
+                      "$ref": "#/components/schemas/L402Challenge"
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "HTTP Payment or L402 challenge selected by X-Payment-Protocol.",
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -174,10 +259,47 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "200": {
+            "description": "Agent payment accepted and capability provisioned.",
+            "headers": {
+              "Payment-Receipt": {
+                "description": "Base64url JCS receipt returned after HTTP Payment Authentication settlement. Never contains the preimage.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettledPayment"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid L402 credential.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "HTTP Payment or L402 challenge selected by X-Payment-Protocol.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "security": [],
-        "operationId": "postApiPaymentsPulse"
+        "operationId": "postApiPaymentsPulse",
+        "description": "Omit X-Payment-Protocol for the native flow. Use `payment` for HTTP Payment Authentication or `l402` for L402 compatibility."
       }
     },
     "/api/payments/whisper": {
@@ -186,7 +308,7 @@
         "tags": [
           "Payments"
         ],
-        "description": "Encrypt in the client before upload. The server never receives the AES key.",
+        "description": "Encrypt in the client before upload. The server never receives the AES key. Omit X-Payment-Protocol for the native flow. Use `payment` for HTTP Payment Authentication or `l402` for L402 compatibility.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
@@ -199,6 +321,12 @@
           },
           {
             "$ref": "#/components/parameters/WhisperRevealAt"
+          },
+          {
+            "$ref": "#/components/parameters/PaymentProtocol"
+          },
+          {
+            "$ref": "#/components/parameters/PaymentAuthorization"
           }
         ],
         "requestBody": {
@@ -214,11 +342,29 @@
         },
         "responses": {
           "402": {
-            "description": "Lightning invoice quote. Poll the returned orderId after paying.",
+            "description": "Native Lightning quote, fresh HTTP Payment challenge, or fresh L402 challenge according to X-Payment-Protocol.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaymentQuote"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/PaymentQuote"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PaymentAuthChallenge"
+                    },
+                    {
+                      "$ref": "#/components/schemas/L402Challenge"
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "HTTP Payment or L402 challenge selected by X-Payment-Protocol.",
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -228,6 +374,42 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "200": {
+            "description": "Agent payment accepted and capability provisioned.",
+            "headers": {
+              "Payment-Receipt": {
+                "description": "Base64url JCS receipt returned after HTTP Payment Authentication settlement. Never contains the preimage.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettledPayment"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid L402 credential.",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "HTTP Payment or L402 challenge selected by X-Payment-Protocol.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "security": [],
@@ -1174,6 +1356,28 @@
           "type": "string",
           "format": "date-time"
         }
+      },
+      "PaymentProtocol": {
+        "name": "X-Payment-Protocol",
+        "in": "header",
+        "required": false,
+        "description": "Select `payment` for HTTP Payment Authentication with Lightning charge, or `l402` for classic L402 compatibility. Omit for the native quote and polling flow.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "payment",
+            "l402"
+          ]
+        }
+      },
+      "PaymentAuthorization": {
+        "name": "Authorization",
+        "in": "header",
+        "required": false,
+        "description": "On the retry only: `Payment <base64url credential>` or `L402 <macaroon>:<preimage>`. Omit while requesting the initial challenge. Treat this value as a bearer secret and never log it.",
+        "schema": {
+          "type": "string"
+        }
       }
     },
     "responses": {
@@ -1265,7 +1469,9 @@
           "planId",
           "amountSats",
           "bolt11",
-          "paymentHash"
+          "paymentHash",
+          "network",
+          "expiresAt"
         ],
         "properties": {
           "orderId": {
@@ -1290,6 +1496,19 @@
           },
           "paymentHash": {
             "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Invoice and protocol challenge acceptance deadline."
+          },
+          "network": {
+            "type": "string",
+            "enum": [
+              "mainnet",
+              "regtest",
+              "signet"
+            ]
           }
         }
       },
@@ -1976,6 +2195,64 @@
             "type": "integer",
             "minimum": 0,
             "description": "Private owner-only remaining lifetime heartbeat quota."
+          }
+        }
+      },
+      "PaymentAuthChallenge": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "protocol",
+          "method",
+          "intent",
+          "orderId",
+          "amountSats",
+          "expiresAt"
+        ],
+        "properties": {
+          "protocol": {
+            "const": "payment"
+          },
+          "method": {
+            "const": "lightning"
+          },
+          "intent": {
+            "const": "charge"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "amountSats": {
+            "type": "integer"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "L402Challenge": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "protocol",
+          "orderId",
+          "amountSats",
+          "expiresAt"
+        ],
+        "properties": {
+          "protocol": {
+            "const": "l402"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "amountSats": {
+            "type": "integer"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }

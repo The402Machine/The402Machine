@@ -23,6 +23,8 @@
   "dependencies": {
     "@fastify/helmet": "^13.1.0",
     "@fastify/static": "^10.1.2",
+    "@unional/macaroon": "^3.2.1",
+    "bolt11-ts": "^0.2.1",
     "fast-geoip": "1.1.88",
     "fastify": "5.10.0",
     "postgres": "^3.4.9",
@@ -34,7 +36,8 @@
     "@types/node": "26.1.1",
     "@types/qrcode": "^1.5.6",
     "esbuild": "^0.28.1",
-    "eslint": "9.39.5",
+    "eslint": "^10.8.0",
+    "fake-bolt11": "^0.1.0",
     "tsx": "4.23.1",
     "typescript": "5.9.3",
     "typescript-eslint": "8.65.0",

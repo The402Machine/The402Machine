@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "9cc4d586-937d-4020-9402-402402402402",
     "name": "The402Machine API",
-    "description": "Prepared examples for every public endpoint. Replace placeholder variables only. Do not store real capabilities in shared environments or exported collections. WHISPER ciphertext must be produced client-side; the collection never contains plaintext secrets.",
+    "description": "Prepared examples for the native quote and polling API plus HTTP Payment Authentication and L402 challenges. Never store live invoices, preimages, macaroons or product capabilities in shared environments.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -53,6 +53,22 @@
     {
       "key": "publicStatusId",
       "value": "pulse_status_[REDACTED]"
+    },
+    {
+      "key": "paymentAuthorization",
+      "value": "replace-with-Payment-credential"
+    },
+    {
+      "key": "paymentIdempotencyKey",
+      "value": "replace-with-one-stable-key-per-payment-purchase"
+    },
+    {
+      "key": "l402Authorization",
+      "value": "replace-with-L402-macaroon-and-preimage"
+    },
+    {
+      "key": "l402IdempotencyKey",
+      "value": "replace-with-one-stable-key-per-l402-purchase"
     }
   ],
   "item": [
@@ -254,6 +270,196 @@
               ]
             },
             "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Payment Auth PULSE challenge",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{paymentIdempotencyKey}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Payment-Protocol",
+                "value": "payment",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/pulse",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "pulse"
+              ]
+            },
+            "description": "Template only. Pay live invoices only with explicit authorization. Never log or share preimages or credentials.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"{{planId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Payment Auth PULSE credential",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{paymentIdempotencyKey}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Payment-Protocol",
+                "value": "payment",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Payment {{paymentAuthorization}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/pulse",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "pulse"
+              ]
+            },
+            "description": "Template only. Pay live invoices only with explicit authorization. Never log or share preimages or credentials.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"{{planId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "L402 PULSE challenge",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{l402IdempotencyKey}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Payment-Protocol",
+                "value": "l402",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/pulse",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "pulse"
+              ]
+            },
+            "description": "Template only. Pay live invoices only with explicit authorization. Never log or share preimages or credentials.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"{{planId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "L402 PULSE credential",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{l402IdempotencyKey}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Payment-Protocol",
+                "value": "l402",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "L402 {{l402Authorization}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/pulse",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "pulse"
+              ]
+            },
+            "description": "Template only. Pay live invoices only with explicit authorization. Never log or share preimages or credentials.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"{{planId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
           },
           "response": []
         }

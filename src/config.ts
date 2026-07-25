@@ -11,6 +11,7 @@ export type PaymentConfig = {
 	apiUrl: string | undefined;
 	apiKey: string | undefined;
 	deliveryKey: string | undefined;
+	agentProtocols: { enabled: boolean; key: string | undefined; realm: string };
 };
 
 export type AppConfig = {
@@ -61,6 +62,11 @@ export const loadConfig = (environment: NodeJS.ProcessEnv = process.env): AppCon
 		apiUrl: environment.PAYMENT_API_URL,
 		apiKey: environment.PAYMENT_API_KEY,
 		deliveryKey: environment.PAYMENT_DELIVERY_KEY,
+		agentProtocols: {
+			enabled: parseBoolean("PAYMENT_AGENT_PROTOCOLS", environment.PAYMENT_AGENT_PROTOCOLS, false),
+			key: environment.PAYMENT_PROTOCOL_KEY,
+			realm: environment.PAYMENT_REALM ?? "the402machine.com",
+		},
 	};
 	if (payment.provider === "lnbits") {
 		if (!nonEmpty(payment.apiUrl)) throw new Error("PAYMENT_API_URL is required when LNbits payments are enabled");
@@ -68,6 +74,11 @@ export const loadConfig = (environment: NodeJS.ProcessEnv = process.env): AppCon
 		if (!nonEmpty(payment.apiKey)) throw new Error("PAYMENT_API_KEY is required when LNbits payments are enabled");
 		if (!nonEmpty(payment.deliveryKey) || Buffer.from(payment.deliveryKey, "base64url").byteLength !== 32) throw new Error("PAYMENT_DELIVERY_KEY must contain 32 base64url-encoded bytes");
 		if (!hasDatabaseUrl || !hasTokenPepper) throw new Error("DATABASE_URL and CATCH_TOKEN_PEPPER are required when LNbits payments are enabled");
+	}
+	if (payment.agentProtocols.enabled) {
+		if (payment.provider !== "lnbits") throw new Error("LNbits payments are required when agent payment protocols are enabled");
+		if (!nonEmpty(payment.agentProtocols.key) || Buffer.from(payment.agentProtocols.key, "base64url").byteLength !== 32) throw new Error("PAYMENT_PROTOCOL_KEY must contain 32 base64url-encoded bytes");
+		if (!nonEmpty(payment.agentProtocols.realm)) throw new Error("PAYMENT_REALM is required when agent payment protocols are enabled");
 	}
 
 	return {

@@ -1,11 +1,14 @@
+import { createHash } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 
 import { buildApp } from "../../src/app.js";
+import { createPaymentChallenge } from "../../src/payment/payment-protocol.js";
 import type { PaymentQuote } from "../../src/payment/payment-service.js";
 
 describe("public payment API", () => {
 	it("returns a Lightning invoice with HTTP 402 and reuses the idempotency key", async () => {
-		const quote: PaymentQuote = { orderId: "order-1", product: "catch", planId: "spark", amountSats: 42, bolt11: "lnbc42n1test", paymentHash: "a".repeat(64) };
+		const quote: PaymentQuote = { orderId: "order-1", product: "catch", planId: "spark", amountSats: 42, bolt11: "lnbc42n1test", paymentHash: "a".repeat(64), expiresAt: new Date(Date.now() + 300_000).toISOString() };
 		const calls: unknown[] = [];
 		const app = buildApp({ payment: {
 			quote: (input) => { calls.push(input); return Promise.resolve(quote); },
@@ -19,8 +22,128 @@ describe("public payment API", () => {
 		await app.close();
 	});
 
+	it("offers HTTP Payment Lightning charge and fulfills it with the preimage", async () => {
+		const preimage = Buffer.alloc(32, 7).toString("hex");
+		const quote: PaymentQuote = {
+			orderId: "11111111-1111-4111-8111-111111111111", product: "pulse", planId: "spark", amountSats: 42,
+			bolt11: "lnbc42n1agent", paymentHash: createHash("sha256").update(Buffer.alloc(32, 7)).digest("hex"),
+			expiresAt: new Date(Date.now() + 300_000).toISOString(),
+		};
+		const resource = { product: "pulse" as const, resourceId: "resource-agent", publicId: "pulse_agent", ownerToken: "owner-agent", pingToken: "ping-agent", expiresAt: new Date("2026-07-29T12:00:00.000Z") };
+		const calls: unknown[] = [];
+		const app = buildApp({
+			paymentProtocols: { realm: "the402machine.com", secret: Buffer.alloc(32, 3) },
+			payment: {
+				quote: (input) => { calls.push(input); return Promise.resolve(quote); },
+				fulfill: () => Promise.resolve({ settled: false }),
+				fulfillAgentPayment: (input) => { calls.push(input); return Promise.resolve(input.orderId === quote.orderId && input.preimage === preimage ? { settled: true, resource } : { settled: false, reason: "invalid-preimage" }); },
+			},
+		});
+		const body = Buffer.from('{"planId":"spark"}');
+		const challengeResponse = await app.inject({ method: "POST", url: "/api/payments/pulse", headers: { "content-type": "application/json", "idempotency-key": "idempotency-agent-pulse", "x-payment-protocol": "payment" }, payload: body });
+		expect(challengeResponse.statusCode).toBe(402);
+		expect(challengeResponse.headers["www-authenticate"]).toMatch(/^Payment /u);
+		const challengeBody: { expiresAt: string } = challengeResponse.json();
+		const expected = createPaymentChallenge({ quote, realm: "the402machine.com", method: "POST", path: "/api/payments/pulse", body, expiresAt: new Date(challengeBody.expiresAt), secret: Buffer.alloc(32, 3) });
+		const authorization = `Payment ${Buffer.from(JSON.stringify({ challenge: expected.parameters, payload: { preimage } })).toString("base64url")}`;
+		const fulfilled = await app.inject({ method: "POST", url: "/api/payments/pulse", headers: { "content-type": "application/json", "idempotency-key": "idempotency-agent-pulse", authorization, "x-payment-protocol": "payment" }, payload: body });
+		expect(fulfilled.statusCode).toBe(200);
+		expect(fulfilled.headers["payment-receipt"]).toMatch(/^[A-Za-z0-9_-]+$/u);
+		expect(fulfilled.json()).toMatchObject({ settled: true, resource: { product: "pulse", publicId: "pulse_agent" } });
+		expect(calls).toHaveLength(3);
+		expect(calls[2]).toMatchObject({ protocol: "payment", orderId: quote.orderId, paymentHash: quote.paymentHash, preimage });
+		await app.close();
+	});
+
+	it("offers L402 compatibility and rejects a broken credential with HTTP 401", async () => {
+		const preimage = Buffer.alloc(32, 11).toString("hex");
+		const quote: PaymentQuote = { orderId: "22222222-2222-4222-8222-222222222222", product: "pulse", planId: "spark", amountSats: 42, bolt11: "lnbc42n1l402agent", paymentHash: createHash("sha256").update(Buffer.alloc(32, 11)).digest("hex"), expiresAt: new Date(Date.now() + 300_000).toISOString() };
+		const resource = { product: "pulse" as const, resourceId: "resource-l402", publicId: "pulse_l402", ownerToken: "owner-l402", pingToken: "ping-l402", expiresAt: new Date("2026-07-29T12:00:00.000Z") };
+		const app = buildApp({ paymentProtocols: { realm: "the402machine.com", secret: Buffer.alloc(32, 3) }, payment: {
+			quote: () => Promise.resolve(quote), fulfill: () => Promise.resolve({ settled: false }),
+			fulfillAgentPayment: ({ preimage: received }) => Promise.resolve(received === preimage ? { settled: true, resource } : { settled: false, reason: "invalid-preimage" }),
+		} });
+		const body = Buffer.from('{"planId":"spark"}');
+		const challenge = await app.inject({ method: "POST", url: "/api/payments/pulse", headers: { "content-type": "application/json", "idempotency-key": "idempotency-agent-l402", "x-payment-protocol": "l402" }, payload: body });
+		expect(challenge.statusCode).toBe(402);
+		const header = challenge.headers["www-authenticate"];
+		if (typeof header !== "string") throw new Error("Missing L402 challenge");
+		expect(header).toMatch(/^L402 macaroon="[A-Za-z0-9_-]+", invoice="lnbc42n1l402agent"$/u);
+		const macaroon = /^L402 macaroon="([A-Za-z0-9_-]+)"/u.exec(header)?.[1];
+		if (macaroon === undefined) throw new Error("Missing L402 macaroon");
+		const fulfilled = await app.inject({ method: "POST", url: "/api/payments/pulse", headers: { "content-type": "application/json", "idempotency-key": "idempotency-agent-l402", "x-payment-protocol": "l402", authorization: `L402 ${macaroon}:${preimage}` }, payload: body });
+		expect(fulfilled.statusCode).toBe(200);
+		expect(fulfilled.json()).toMatchObject({ settled: true, resource: { publicId: "pulse_l402" } });
+		const rejected = await app.inject({ method: "POST", url: "/api/payments/pulse", headers: { "content-type": "application/json", "idempotency-key": "idempotency-agent-l402", "x-payment-protocol": "l402", authorization: `L402 ${macaroon}:${Buffer.alloc(32, 12).toString("hex")}` }, payload: body });
+		expect(rejected.statusCode).toBe(401);
+		await app.close();
+	});
+
+	it("binds agent credentials to the exact JSON bytes sent on the wire", async () => {
+		const preimage = Buffer.alloc(32, 13).toString("hex");
+		const quote: PaymentQuote = { orderId: "23232323-2323-4232-8232-232323232323", product: "pulse", planId: "spark", amountSats: 42, bolt11: "lnbc42n1exactbody", paymentHash: createHash("sha256").update(Buffer.alloc(32, 13)).digest("hex"), expiresAt: new Date(Date.now() + 300_000).toISOString() };
+		const app = buildApp({ paymentProtocols: { realm: "the402machine.com", secret: Buffer.alloc(32, 3) }, payment: {
+			quote: () => Promise.resolve(quote), fulfill: () => Promise.resolve({ settled: false }),
+			fulfillAgentPayment: () => Promise.reject(new Error("body binding must reject before settlement")),
+		} });
+		const challengeBody = Buffer.from('{ "planId": "spark" }');
+		const retryBody = Buffer.from('{"planId":"spark"}');
+
+		const paymentChallengeResponse = await app.inject({ method: "POST", url: "/api/payments/pulse", headers: { "content-type": "application/json", "idempotency-key": "exact-json-payment", "x-payment-protocol": "payment" }, payload: challengeBody });
+		const paymentChallenge = createPaymentChallenge({ quote, realm: "the402machine.com", method: "POST", path: "/api/payments/pulse", body: challengeBody, expiresAt: new Date(paymentChallengeResponse.json<{ expiresAt: string }>().expiresAt), secret: Buffer.alloc(32, 3) });
+		const paymentAuthorization = `Payment ${Buffer.from(JSON.stringify({ challenge: paymentChallenge.parameters, payload: { preimage } })).toString("base64url")}`;
+		const paymentRetry = await app.inject({ method: "POST", url: "/api/payments/pulse", headers: { "content-type": "application/json", "idempotency-key": "exact-json-payment", "x-payment-protocol": "payment", authorization: paymentAuthorization }, payload: retryBody });
+		expect(paymentRetry.statusCode).toBe(402);
+
+		const l402Challenge = await app.inject({ method: "POST", url: "/api/payments/pulse", headers: { "content-type": "application/json", "idempotency-key": "exact-json-l402", "x-payment-protocol": "l402" }, payload: challengeBody });
+		const l402Header = l402Challenge.headers["www-authenticate"];
+		if (typeof l402Header !== "string") throw new Error("Missing L402 challenge");
+		const macaroon = /^L402 macaroon="([A-Za-z0-9_-]+)"/u.exec(l402Header)?.[1];
+		if (macaroon === undefined) throw new Error("Missing L402 macaroon");
+		const l402Retry = await app.inject({ method: "POST", url: "/api/payments/pulse", headers: { "content-type": "application/json", "idempotency-key": "exact-json-l402", "x-payment-protocol": "l402", authorization: `L402 ${macaroon}:${preimage}` }, payload: retryBody });
+		expect(l402Retry.statusCode).toBe(401);
+		await app.close();
+	});
+
+	it("binds Payment credentials to the purchase route", async () => {
+		const preimage = Buffer.alloc(32, 14).toString("hex");
+		const paymentHash = createHash("sha256").update(Buffer.alloc(32, 14)).digest("hex");
+		const pulseQuote: PaymentQuote = { orderId: "24242424-2424-4242-8242-242424242424", product: "pulse", planId: "spark", amountSats: 42, bolt11: "lnbc42n1route", paymentHash, expiresAt: new Date(Date.now() + 300_000).toISOString() };
+		const catchQuote: PaymentQuote = { ...pulseQuote, product: "catch" };
+		const app = buildApp({ paymentProtocols: { realm: "the402machine.com", secret: Buffer.alloc(32, 3) }, payment: {
+			quote: ({ product }) => Promise.resolve(product === "pulse" ? pulseQuote : catchQuote), fulfill: () => Promise.resolve({ settled: false }),
+			fulfillAgentPayment: () => Promise.reject(new Error("route binding must reject before settlement")),
+		} });
+		const body = Buffer.from('{"planId":"spark"}');
+		const challengeResponse = await app.inject({ method: "POST", url: "/api/payments/pulse", headers: { "content-type": "application/json", "idempotency-key": "route-bound-payment", "x-payment-protocol": "payment" }, payload: body });
+		const challenge = createPaymentChallenge({ quote: pulseQuote, realm: "the402machine.com", method: "POST", path: "/api/payments/pulse", body, expiresAt: new Date(challengeResponse.json<{ expiresAt: string }>().expiresAt), secret: Buffer.alloc(32, 3) });
+		const authorization = `Payment ${Buffer.from(JSON.stringify({ challenge: challenge.parameters, payload: { preimage } })).toString("base64url")}`;
+		const wrongRoute = await app.inject({ method: "POST", url: "/api/payments/catch", headers: { "content-type": "application/json", "idempotency-key": "route-bound-payment", "x-payment-protocol": "payment", authorization }, payload: body });
+		expect(wrongRoute.statusCode).toBe(402);
+		await app.close();
+	});
+
+	it("consumes an HTTP Payment credential only once", async () => {
+		const preimage = Buffer.alloc(32, 17).toString("hex");
+		const quote: PaymentQuote = { orderId: "33333333-3333-4333-8333-333333333333", product: "pulse", planId: "spark", amountSats: 42, bolt11: "lnbc42n1replay", paymentHash: createHash("sha256").update(Buffer.alloc(32, 17)).digest("hex"), expiresAt: new Date(Date.now() + 300_000).toISOString() };
+		const resource = { product: "pulse" as const, resourceId: "resource-replay", publicId: "pulse_replay", ownerToken: "owner-replay", pingToken: "ping-replay", expiresAt: new Date("2026-07-29T12:00:00.000Z") };
+		let consumed = false;
+		const app = buildApp({ paymentProtocols: { realm: "the402machine.com", secret: Buffer.alloc(32, 3) }, payment: {
+			quote: () => Promise.resolve(quote), fulfill: () => Promise.resolve({ settled: false }),
+			fulfillAgentPayment: () => { if (consumed) return Promise.resolve({ settled: false, reason: "replayed" }); consumed = true; return Promise.resolve({ settled: true, resource }); },
+		} });
+		const body = Buffer.from('{"planId":"spark"}');
+		const initial = await app.inject({ method: "POST", url: "/api/payments/pulse", headers: { "content-type": "application/json", "idempotency-key": "idempotency-agent-replay", "x-payment-protocol": "payment" }, payload: body });
+		const challenge = createPaymentChallenge({ quote, realm: "the402machine.com", method: "POST", path: "/api/payments/pulse", body, expiresAt: new Date(initial.json<{ expiresAt: string }>().expiresAt), secret: Buffer.alloc(32, 3) });
+		const authorization = `Payment ${Buffer.from(JSON.stringify({ challenge: challenge.parameters, payload: { preimage } })).toString("base64url")}`;
+		const request = { method: "POST" as const, url: "/api/payments/pulse", headers: { "content-type": "application/json", "idempotency-key": "idempotency-agent-replay", "x-payment-protocol": "payment", authorization }, payload: body };
+		expect((await app.inject(request)).statusCode).toBe(200);
+		expect((await app.inject(request)).statusCode).toBe(402);
+		await app.close();
+	});
+
 	it("parses checkout JSON when CATCH ingestion is installed in the same app", async () => {
-		const quote: PaymentQuote = { orderId: "order-combined", product: "catch", planId: "spark", amountSats: 42, bolt11: "lnbc42n1combined", paymentHash: "e".repeat(64) };
+		const quote: PaymentQuote = { orderId: "order-combined", product: "catch", planId: "spark", amountSats: 42, bolt11: "lnbc42n1combined", paymentHash: "e".repeat(64), expiresAt: new Date(Date.now() + 300_000).toISOString() };
 		const calls: unknown[] = [];
 		const repository = {
 			provision: () => Promise.reject(new Error("not used")), getCredentialHashes: () => Promise.resolve(null),
@@ -38,7 +161,7 @@ describe("public payment API", () => {
 	});
 
 	it("quotes a client-encrypted WHISPER without accepting plaintext media types", async () => {
-		const quote: PaymentQuote = { orderId: "order-whisper", product: "whisper", planId: "spark", amountSats: 42, bolt11: "lnbc42n1whisper", paymentHash: "d".repeat(64) };
+		const quote: PaymentQuote = { orderId: "order-whisper", product: "whisper", planId: "spark", amountSats: 42, bolt11: "lnbc42n1whisper", paymentHash: "d".repeat(64), expiresAt: new Date(Date.now() + 300_000).toISOString() };
 		const calls: unknown[] = [];
 		const app = buildApp({ payment: {
 			quote: (input) => { calls.push(input); return Promise.resolve(quote); },
@@ -57,7 +180,7 @@ describe("public payment API", () => {
 	it("accepts a scheduled WHISPER reveal for every plan and persists it in quote identity", async () => {
 		const ciphertext = Buffer.from([1, ...Array.from({ length: 29 }, (_, index) => index)]);
 		const calls: unknown[] = [];
-		const quote: PaymentQuote = { orderId: "order-whisper-scheduled", product: "whisper", planId: "spark", amountSats: 42, bolt11: "lnbc42n1scheduled", paymentHash: "7".repeat(64) };
+		const quote: PaymentQuote = { orderId: "order-whisper-scheduled", product: "whisper", planId: "spark", amountSats: 42, bolt11: "lnbc42n1scheduled", paymentHash: "7".repeat(64), expiresAt: new Date(Date.now() + 300_000).toISOString() };
 		const app = buildApp({ payment: { quote: (input) => { calls.push(input); return Promise.resolve(quote); }, fulfill: () => Promise.resolve({ settled: false }) } });
 		for (const [planId, revealAt] of [
 			["spark", "2026-07-26T12:00:00.000Z"],
@@ -89,7 +212,7 @@ describe("public payment API", () => {
 
 	it("accepts a WHISPER note near 4.02 MiB and rejects a larger ciphertext", async () => {
 		const burnCalls: unknown[] = [];
-		const burnQuote: PaymentQuote = { orderId: "order-whisper-burn", product: "whisper", planId: "standard", amountSats: 402, bolt11: "lnbc402n1burn", paymentHash: "8".repeat(64) };
+		const burnQuote: PaymentQuote = { orderId: "order-whisper-burn", product: "whisper", planId: "standard", amountSats: 402, bolt11: "lnbc402n1burn", paymentHash: "8".repeat(64), expiresAt: new Date(Date.now() + 300_000).toISOString() };
 		const burnApp = buildApp({ payment: { quote: (input) => { burnCalls.push(input); return Promise.resolve(burnQuote); }, fulfill: () => Promise.resolve({ settled: false }) } });
 		const burnCiphertext = Buffer.from([1, ...Array.from({ length: 29 }, (_, index) => index)]);
 		const burn = await burnApp.inject({ method: "POST", url: "/api/payments/whisper", headers: { "idempotency-key": "idempotency-whisper-burn", "x-whisper-plan": "standard", "x-whisper-read-limit": "1", "content-type": "application/octet-stream" }, payload: burnCiphertext });
@@ -109,7 +232,7 @@ describe("public payment API", () => {
 		await burnApp.close();
 
 		const calls: unknown[] = [];
-		const quote: PaymentQuote = { orderId: "order-whisper-large", product: "whisper", planId: "spark", amountSats: 42, bolt11: "lnbc42n1large", paymentHash: "c".repeat(64) };
+		const quote: PaymentQuote = { orderId: "order-whisper-large", product: "whisper", planId: "spark", amountSats: 42, bolt11: "lnbc42n1large", paymentHash: "c".repeat(64), expiresAt: new Date(Date.now() + 300_000).toISOString() };
 		const app = buildApp({ payment: { quote: (input) => { calls.push(input); return Promise.resolve(quote); }, fulfill: () => Promise.resolve({ settled: false }) } });
 		const accepted = Buffer.alloc(4_215_276, 7);
 		accepted[0] = 1;
@@ -122,7 +245,7 @@ describe("public payment API", () => {
 	});
 
 	it("quotes PULSE as a fixed lifetime quota with no purchase payload", async () => {
-		const quote: PaymentQuote = { orderId: "order-pulse", product: "pulse", planId: "standard", amountSats: 402, bolt11: "lnbc402n1pulse", paymentHash: "9".repeat(64) };
+		const quote: PaymentQuote = { orderId: "order-pulse", product: "pulse", planId: "standard", amountSats: 402, bolt11: "lnbc402n1pulse", paymentHash: "9".repeat(64), expiresAt: new Date(Date.now() + 300_000).toISOString() };
 		const calls: unknown[] = [];
 		const app = buildApp({ payment: { quote: (input) => { calls.push(input); return Promise.resolve(quote); }, fulfill: () => Promise.resolve({ settled: false }) } });
 		const response = await app.inject({ method: "POST", url: "/api/payments/pulse", headers: { "idempotency-key": "idempotency-pulse-1", "content-type": "application/json" }, payload: { planId: "standard" } });
@@ -151,7 +274,7 @@ describe("public payment API", () => {
 
 	it("accepts Long for both products", async () => {
 		const calls: unknown[] = [];
-		const quote: PaymentQuote = { orderId: "order-long", product: "catch", planId: "long", amountSats: 4_002, bolt11: "lnbc4002n1long", paymentHash: "b".repeat(64) };
+		const quote: PaymentQuote = { orderId: "order-long", product: "catch", planId: "long", amountSats: 4_002, bolt11: "lnbc4002n1long", paymentHash: "b".repeat(64), expiresAt: new Date(Date.now() + 300_000).toISOString() };
 		const app = buildApp({ payment: { quote: (input) => { calls.push(input); return Promise.resolve(quote); }, fulfill: () => Promise.resolve({ settled: false }) } });
 		const response = await app.inject({ method: "POST", url: "/api/payments/catch", headers: { "idempotency-key": "idempotency-public-2" }, payload: { planId: "long" } });
 		expect(response.statusCode).toBe(402);
@@ -187,7 +310,7 @@ describe("public payment API", () => {
 		let quotes = 0;
 		let fulfillments = 0;
 		const app = buildApp({ payment: {
-			quote: () => { quotes += 1; return Promise.resolve({ orderId: "order-rate", product: "catch", planId: "spark", amountSats: 42, bolt11: "lnbc42n1rate", paymentHash: "f".repeat(64) }); },
+			quote: () => { quotes += 1; return Promise.resolve({ orderId: "order-rate", product: "catch", planId: "spark", amountSats: 42, bolt11: "lnbc42n1rate", paymentHash: "f".repeat(64), expiresAt: new Date(Date.now() + 300_000).toISOString() }); },
 			fulfill: () => { fulfillments += 1; return Promise.resolve({ settled: false }); },
 		} });
 		let quoteStatus = 0;
