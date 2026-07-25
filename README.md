@@ -1,15 +1,15 @@
 <p align="center">
-  <img src="public/favicon.svg" width="82" alt="The402Machine 402 icon" />
+  <img src="public/favicon.svg" width="82" alt="The402Machine HTTP 402 icon" />
 </p>
 
 <h1 align="center">The402Machine</h1>
 
 <p align="center">
-  <strong>Insert sats. Receive a tiny piece of the Internet. Watch it disappear.</strong>
+  <strong>Pay once over Bitcoin Lightning. Receive a small Internet capability. Let it expire.</strong>
 </p>
 
 <p align="center">
-  <a href="https://the402machine.com">Live machine</a> ·
+  <a href="https://the402machine.com">Live service</a> ·
   <a href="https://the402machine.com/demo">Interactive demos</a> ·
   <a href="https://the402machine.com/api">API reference</a> ·
   <a href="INSTALL.md">Self-hosting guide</a>
@@ -17,91 +17,142 @@
 
 <p align="center">
   <img alt="HTTP 402" src="https://img.shields.io/badge/HTTP-402-c7ff3d?style=flat-square&labelColor=080a08" />
-  <img alt="Lightning" src="https://img.shields.io/badge/payment-Lightning-ff6433?style=flat-square&labelColor=080a08" />
+  <img alt="L402" src="https://img.shields.io/badge/protocol-L402-c7ff3d?style=flat-square&labelColor=080a08" />
+  <img alt="Bitcoin Lightning" src="https://img.shields.io/badge/payment-Bitcoin%20Lightning-ff6433?style=flat-square&labelColor=080a08" />
+  <img alt="Self-hosted" src="https://img.shields.io/badge/deployment-self--hosted-65e7dd?style=flat-square&labelColor=080a08" />
   <img alt="Node 22" src="https://img.shields.io/badge/Node-22-eef3e7?style=flat-square&labelColor=080a08" />
-  <img alt="PostgreSQL" src="https://img.shields.io/badge/storage-PostgreSQL-65e7dd?style=flat-square&labelColor=080a08" />
 </p>
 
 ---
 
-The402Machine is a source-available vending machine for small, temporary Internet capabilities paid once over Bitcoin Lightning.
+The402Machine sells temporary webhook inboxes, encrypted handoffs and heartbeat monitors over Bitcoin Lightning. A user or agent pays a BOLT11 invoice once, receives a capability, and uses it until its published quota or lifetime ends.
 
-No account. No subscription. No credit balance. Every product has a visible lifetime or quota and a defined ending.
+There are no customer accounts, subscriptions or prepaid balances. The server verifies settlement itself and provisions the resource in the same PostgreSQL transaction that consumes the payment challenge.
 
-## The cartridges
+## What can you buy?
 
-| Product | What it does | What it never does |
+| Product | What you receive | Limits and privacy boundary |
 | --- | --- | --- |
-| **CATCH** | Receives bounded webhook requests in a private inbox with event inspection and deletion controls. | It does not forward traffic, call user URLs or execute code. |
-| **WHISPER** | Delivers a client-encrypted handoff immediately or at a scheduled reveal time, with a bounded read allowance. | The server never receives the plaintext or AES key. |
-| **PULSE** | Turns authenticated heartbeats into a private dashboard and optional public status page. | It stores no request body, performs no outbound checks and sends no alerts. |
+| **CATCH** | A private, inbound-only webhook inbox with separate ingest and owner capabilities. | Fixed request, storage, payload and lifetime limits. It never forwards traffic, calls user URLs or executes code. |
+| **WHISPER** | An immediate or scheduled encrypted handoff with a bounded read allowance. | AES-256-GCM encryption happens in the browser. The server receives ciphertext, never the plaintext or AES key. |
+| **PULSE** | A heartbeat endpoint, private owner dashboard and optional public status page. | Fixed lifetime and heartbeat quota. It stores no request body and performs no outbound checks or alerts. |
 
-### One simple price ladder
+Every product uses the same price ladder:
 
-| Plan | Price | Typical role |
+| Plan | Price | Example lifetime |
 | --- | ---: | --- |
-| **Spark** | 42 sats | Short tests, handoffs and jobs |
-| **Standard** | 402 sats | Useful production-sized temporary work |
-| **Long** | 4,002 sats | Longer-running bounded infrastructure |
+| **Spark** | 42 sats | CATCH 4h 02m · WHISPER 7 days · PULSE 4d 02h |
+| **Standard** | 402 sats | CATCH 40d 02h · WHISPER 42 days · PULSE 42 days |
+| **Long** | 4,002 sats | CATCH 4 months + 2 days · WHISPER 402 days · PULSE 402 days |
 
-Each product applies its own lifetime and quota. The live catalogue is the source of truth.
+Each product has its own quotas. Check the [live catalogue](https://the402machine.com/api/catalog) for the current limits before paying.
 
-## See it before buying
+## Try it without paying
 
-The [demo area](https://the402machine.com/demo) contains local, read-only previews of:
+The [interactive demos](https://the402machine.com/demo) run entirely in the browser with synthetic data:
 
-- a CATCH inbox populated with sample events;
-- a WHISPER handoff decrypted entirely in the browser;
-- a PULSE heartbeat dashboard with interactive status updates.
+- inspect and delete sample CATCH events;
+- decrypt a sample WHISPER message locally;
+- send synthetic heartbeats to a PULSE dashboard and preview its public status page.
 
-The demos create no invoice, resource, capability or payment request.
+The demos do not create invoices, resources or payment credentials.
 
-## Design principles
+## Payment protocols
 
-- **Closed functions:** one product, one narrow job.
-- **Visible fuses:** duration, quota and destruction policy are shown before payment.
-- **Server-confirmed settlement:** wallet callbacks are never treated as proof of payment.
-- **Capability-based access:** no customer accounts or recovery workflow.
-- **Fail closed:** provisioning, quota consumption and final deletion are transactional.
-- **No hidden egress:** products do not become proxies, redirectors or generic compute.
+The current source tree supports three additive flows on the same purchase endpoints:
 
-## API first
+| Flow | Client | Settlement proof | Status |
+| --- | --- | --- | --- |
+| Native HTTP 402 | Browser checkout and simple clients | Server-side LNbits settlement polling | Stable project flow |
+| HTTP Payment Authentication + Lightning `charge` | Agents following the current Payment Authentication draft | BOLT11 preimage plus server-side settlement verification | Experimental draft support |
+| L402 | Existing Lightning/L402 clients | Binary v2 macaroon plus BOLT11 preimage | Compatibility adapter |
 
-The browser checkout and owner interfaces sit on the same HTTP API available to scripts and agents.
+The native flow returns a JSON quote and lets the client poll for settlement. Agent clients request a challenge with `X-Payment-Protocol: payment` or `X-Payment-Protocol: l402`, pay the BOLT11 invoice, then repeat the same request with the corresponding `Authorization` credential.
 
-Agents can choose one of three additive payment flows on the existing purchase endpoints:
+Payment credentials are bound to the order, product, plan, HTTP method, route, exact request-body bytes and expiry. Successful redemption and resource provisioning happen atomically, so a challenge cannot provision twice.
 
-- Native HTTP 402 JSON quote plus settlement polling.
-- HTTP Payment Authentication with the Lightning `charge` intent, BOLT11 and preimage proof.
-- Classic L402 compatibility using a request-bound macaroon and payment preimage.
+The402Machine does not claim x402 compatibility. HTTP 402, Payment Authentication, L402 and x402 are separate contracts.
 
-No external custodian or mandatory facilitator is required. The self-hosted deployment continues to use an invoice-only LNbits wallet backed by the operator's Lightning node. All three flows reuse the same payment order, server-side settlement verification and atomic provisioning path.
+Protocol details and curl-level wire flows are documented in [`PAYMENT_PROTOCOLS.md`](PAYMENT_PROTOCOLS.md).
 
-This does **not** claim Coinbase x402 compatibility. HTTP 402, HTTP Payment Authentication, x402 and L402 are distinct contracts.
+## Use the API
 
-Read the dedicated [API reference](https://the402machine.com/api). Machine-readable contracts are available as [OpenAPI 3.1](https://the402machine.com/openapi.json) and a [Postman collection](https://the402machine.com/the402machine.postman_collection.json).
+Public contracts and examples:
 
-A dependency-free reference client is included at [`examples/agent-payment-client.mjs`](examples/agent-payment-client.mjs). It obtains either challenge, prints the BOLT11 invoice, and only submits a preimage when `PAYMENT_PREIMAGE_HEX` is explicitly provided.
+- [Human-readable API reference](https://the402machine.com/api)
+- [OpenAPI 3.1](https://the402machine.com/openapi.json)
+- [Postman collection](https://the402machine.com/the402machine.postman_collection.json)
+- [`examples/agent-payment-client.mjs`](examples/agent-payment-client.mjs), a dependency-free Payment/L402 reference client
 
-See [`PAYMENT_PROTOCOLS.md`](PAYMENT_PROTOCOLS.md) for the compatibility matrix, wire flows, replay protection and the explicit x402 non-claim.
-
-## Run your own machine
-
-Installation, configuration, migrations, payment adapter details, security boundaries and release checks live in **[INSTALL.md](INSTALL.md)**.
-
-Quick local start:
+A minimal native quote request looks like this:
 
 ```bash
+curl -i https://the402machine.com/api/payments/pulse \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: pulse-example-001' \
+  --data-binary '{"planId":"spark"}'
+```
+
+The server responds with `402 Payment Required`, a BOLT11 invoice and an order ID. Poll `GET /api/payments/{orderId}` after payment to receive the capability.
+
+Request an L402 challenge by adding the protocol header:
+
+```bash
+curl -i https://the402machine.com/api/payments/pulse \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: l402-example-001' \
+  -H 'X-Payment-Protocol: l402' \
+  --data-binary '{"planId":"spark"}'
+```
+
+This returns `WWW-Authenticate: L402 macaroon="...", invoice="..."`. The retry must preserve the same method, route, idempotency key and body bytes. See [`PAYMENT_PROTOCOLS.md`](PAYMENT_PROTOCOLS.md) before implementing a client.
+
+## Self-host it
+
+The production stack is Node.js 22, Fastify, PostgreSQL 17 and Docker Compose. Lightning invoices come from a dedicated invoice-only LNbits wallet, which can be backed by the operator's own node. No external custodian or payment facilitator is required.
+
+For a quick local look at the interface:
+
+```bash
+git clone https://github.com/The402Machine/The402Machine.git
+cd The402Machine
 npm ci
 npm run dev
 ```
 
-Then open `http://127.0.0.1:4020`.
+Open `http://127.0.0.1:4020`. Payments are disabled by default, so the public pages and demos work without wallet credentials. Enabling checkout, LNbits, migrations and production deployment requires the steps in [`INSTALL.md`](INSTALL.md).
+
+## How it is built
+
+- Server-confirmed payment hash, amount and settlement before provisioning
+- BOLT11 amount, network, payment hash and expiry validation
+- Idempotent invoice creation using the order UUID as the LNbits `external_id`
+- Atomic PostgreSQL provisioning and single-use challenge consumption
+- Encrypted recoverable delivery receipts at rest
+- Capability-based owner, ingest, read and heartbeat access
+- Internal PostgreSQL network with no published database port in Compose
+- Read-only containers with dropped Linux capabilities
+
+The release gate includes unit and PostgreSQL integration tests, lint, type checking, production builds, dependency audit, OpenAPI validation and Docker builds.
+
+## Design principles
+
+- A product performs one narrow job.
+- Price, lifetime, quota and deletion behavior are visible before payment.
+- Wallet callbacks and browser success states are never treated as proof of payment.
+- Products cannot become proxies, redirectors or general-purpose compute.
+- Expiry, quota exhaustion and destruction remove credentials and data at the database boundary.
+
+## Project status
+
+The live service is an experimental deployment. The native checkout is the established project flow; HTTP Payment Authentication follows an evolving Internet-Draft; L402 is provided as a compatibility adapter. Interfaces may change before a stable release.
+
+The project is open source under the ISC license.
 
 ## Security
 
-Please report security issues privately rather than opening a public issue. Never include capabilities, payment credentials, wallet material or production connection strings in a report.
+Please report vulnerabilities privately through [GitHub Security Advisories](https://github.com/The402Machine/The402Machine/security/advisories/new). Do not include live capabilities, payment credentials, wallet material, invoices, preimages or production connection strings in a public issue.
 
 ## License
 
-All rights reserved while the product and abuse model are being validated.
+[ISC](LICENSE) © 2026 The402Machine contributors.

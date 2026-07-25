@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Self-hosted Lightning-powered vending machine for tiny disposable Internet appliances.",
+  "license": "ISC",
   "engines": {
     "node": ">=22 <23"
   },

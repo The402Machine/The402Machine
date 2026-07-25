@@ -5,8 +5,9 @@
     "version": "0.1.0",
     "description": "Buy temporary CATCH, WHISPER and PULSE capabilities over Lightning. Supports the native quote and polling flow, HTTP Payment Authentication with Lightning charge, and L402 compatibility. Capabilities and payment credentials are bearer secrets: keep them out of URLs, logs, analytics and shared environments.",
     "license": {
-      "name": "Source-available; see repository license",
-      "url": "https://github.com/The402Machine/The402Machine"
+      "name": "ISC",
+      "identifier": "ISC",
+      "url": "https://github.com/The402Machine/The402Machine/blob/master/LICENSE"
     }
   },
   "servers": [
