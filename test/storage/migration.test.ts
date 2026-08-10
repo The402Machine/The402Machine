@@ -54,7 +54,7 @@ beforeAll(async () => {
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 1 });
 
-	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql", "0014_whisper_reveal_window.sql", "0015_whisper_custom_read_limit.sql", "0016_pulse_public_status_id.sql", "0017_payment_challenges.sql", "0018_platform_events.sql"]) {
+	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql", "0014_whisper_reveal_window.sql", "0015_whisper_custom_read_limit.sql", "0016_pulse_public_status_id.sql", "0017_payment_challenges.sql", "0018_platform_events.sql", "0019_page_views.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -72,6 +72,16 @@ afterAll(async () => {
 });
 
 describe("CATCH migration", () => {
+	it("creates privacy-safe daily page counters", async () => {
+		const [table] = await sql<{ views_table: string | null }[]>`select to_regclass('public.page_view_daily')::text as views_table`;
+		expect(table).toEqual({ views_table: "page_view_daily" });
+		expect((await sql`select version from schema_migrations where version = '0019_page_views'`)).toHaveLength(1);
+		const columns = await sql<{ column_name: string }[]>`select column_name from information_schema.columns where table_name = 'page_view_daily' order by ordinal_position`;
+		expect(columns.map(({ column_name }) => column_name)).toEqual(["day", "path", "views"]);
+		await expect(sql`insert into page_view_daily (path, views) values ('/stats', 1)`).resolves.toBeDefined();
+		await expect(sql`insert into page_view_daily (path, views) values ('/private-capability', 1)`).rejects.toMatchObject({ code: "23514" });
+	});
+
 	it("creates the privacy-safe platform event ledger", async () => {
 		const [table] = await sql<{ event_table: string | null }[]>`select to_regclass('public.platform_events')::text as event_table`;
 		expect(table).toEqual({ event_table: "platform_events" });

@@ -1,8 +1,9 @@
 const PRODUCTS = ["catch", "whisper", "pulse"];
 const COUNTERS = ["paidPayments", "dispensedResources", "receivedSats"];
+const TRAFFIC_COUNTERS = ["pageViews", "viewsToday", "viewsLast7Days"];
 
 export function parsePublicStats(value) {
-	if (!isRecord(value) || !isRecord(value.byProduct) || !COUNTERS.every((counter) => isCounter(value[counter]))) return null;
+	if (!isRecord(value) || !isRecord(value.byProduct) || ![...TRAFFIC_COUNTERS, ...COUNTERS].every((counter) => isCounter(value[counter]))) return null;
 	for (const product of PRODUCTS) {
 		const productStats = value.byProduct[product];
 		if (!isRecord(productStats) || !COUNTERS.every((counter) => isCounter(productStats[counter]))) return null;

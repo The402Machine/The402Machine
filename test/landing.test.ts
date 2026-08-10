@@ -144,6 +144,7 @@ describe("public landing page", () => {
 			const html = await readFile(new URL(`../public/${page}`, import.meta.url), "utf8");
 			expect(html, page).toContain('<link rel="icon" href="/favicon.svg" type="image/svg+xml" />');
 			expect(html, page).toContain('href="/assets/styles.css?v=21"');
+			expect(html, page).toContain('href="/stats"');
 		}
 	});
 

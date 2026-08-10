@@ -11,17 +11,23 @@ describe("public stats browser", () => {
 		const elements = installDom();
 		vi.stubGlobal("fetch", () => Promise.resolve({ ok: true, json: () => Promise.resolve(validStats()) }));
 		await loadStatsModule();
+		expect(elements.get("#stats-views")?.textContent).toBe("1,402");
+		expect(elements.get("#stats-views-today")?.textContent).toBe("42");
+		expect(elements.get("#stats-views-week")?.textContent).toBe("402");
 		expect(elements.get("#stats-paid")?.textContent).toBe("5");
 		expect(elements.get("#stats-dispensed")?.textContent).toBe("4");
 		expect(elements.get("#stats-sats")?.textContent).toBe("570");
 		expect(elements.get("#stats-products")?.children).toHaveLength(3);
-		expect(elements.get("#stats-status")?.textContent).toContain("Aggregate ledger loaded");
+		expect(elements.get("#stats-status")?.textContent).toContain("Aggregate counters loaded");
 	});
 
 	it("keeps placeholders and reports unavailability for an invalid contract", async () => {
 		const elements = installDom();
 		vi.stubGlobal("fetch", () => Promise.resolve({ ok: true, json: () => Promise.resolve({ paidPayments: 5, byProduct: {} }) }));
 		await loadStatsModule();
+		expect(elements.get("#stats-views")?.textContent).toBe("—");
+		expect(elements.get("#stats-views-today")?.textContent).toBe("—");
+		expect(elements.get("#stats-views-week")?.textContent).toBe("—");
 		expect(elements.get("#stats-paid")?.textContent).toBe("—");
 		expect(elements.get("#stats-dispensed")?.textContent).toBe("—");
 		expect(elements.get("#stats-sats")?.textContent).toBe("—");
@@ -31,7 +37,7 @@ describe("public stats browser", () => {
 });
 
 function installDom(): Map<string, FakeElement> {
-	const selectors = ["#stats-paid", "#stats-dispensed", "#stats-sats", "#stats-products", "#stats-status"];
+	const selectors = ["#stats-views", "#stats-views-today", "#stats-views-week", "#stats-paid", "#stats-dispensed", "#stats-sats", "#stats-products", "#stats-status"];
 	const elements = new Map(selectors.map((selector) => [selector, fakeElement()]));
 	vi.stubGlobal("document", {
 		querySelector: (selector: string) => elements.get(selector) ?? null,
@@ -52,6 +58,9 @@ async function loadStatsModule(): Promise<void> {
 
 function validStats() {
 	return {
+		pageViews: 1_402,
+		viewsToday: 42,
+		viewsLast7Days: 402,
 		paidPayments: 5,
 		dispensedResources: 4,
 		receivedSats: 570,

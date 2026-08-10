@@ -80,7 +80,9 @@ type PaymentAppOptions = {
 };
 
 type PaymentProtocolOptions = { realm: string; secret: Buffer };
-type StatsAppOptions = { getPublicStats(): Promise<PlatformStats> };
+type StatsAppOptions = { getPublicStats(): Promise<PlatformStats>; recordPageView?(path: string): Promise<void> };
+
+const PUBLIC_PAGE_PATHS = new Set(["/", "/api", "/demo", "/catch", "/whisper", "/pulse", "/pulse-public", "/stats"]);
 
 type BuildAppOptions = {
 	logger?: boolean | object;
@@ -119,6 +121,13 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
 	void app.register(fastifyStatic, { root: join(import.meta.dirname, "..", "public"), index: "index.html", extensions: ["html"], cacheControl: true, maxAge: "1h" });
 	app.get("/health", () => ({ service: "the402machine", status: "ok" }));
 	const stats = options.stats;
+	const recordPageView = stats?.recordPageView?.bind(stats);
+	if (recordPageView !== undefined) app.addHook("onResponse", (request) => {
+		const path = request.url.split("?", 1)[0] ?? "";
+		if (request.method === "GET" && PUBLIC_PAGE_PATHS.has(path)) {
+			void recordPageView(path).catch((error: unknown) => request.log.error({ err: error }, "page view counter unavailable"));
+		}
+	});
 	if (stats !== undefined) app.get("/api/stats", async (request, reply) => {
 		try {
 			return reply.header("Cache-Control", "public, max-age=30").send(await stats.getPublicStats());

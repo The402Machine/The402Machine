@@ -5,6 +5,9 @@ import { buildApp } from "../../src/app.js";
 describe("public stats", () => {
 	it("serves privacy-safe aggregates with a short public cache", async () => {
 		const stats = {
+			pageViews: 1_402,
+			viewsToday: 42,
+			viewsLast7Days: 402,
 			paidPayments: 5,
 			dispensedResources: 4,
 			receivedSats: 570,
@@ -20,6 +23,19 @@ describe("public stats", () => {
 		expect(response.headers["cache-control"]).toBe("public, max-age=30");
 		expect(response.json()).toEqual(stats);
 		expect(response.body).not.toMatch(/order|invoice|token|publicId|ip/iu);
+		await app.close();
+	});
+
+	it("records public HTML visits without retaining request identity", async () => {
+		const viewedPaths: string[] = [];
+		const app = buildApp({ stats: {
+			getPublicStats: () => Promise.resolve({ pageViews: 0, viewsToday: 0, viewsLast7Days: 0, paidPayments: 0, dispensedResources: 0, receivedSats: 0, byProduct: { catch: { paidPayments: 0, dispensedResources: 0, receivedSats: 0 }, whisper: { paidPayments: 0, dispensedResources: 0, receivedSats: 0 }, pulse: { paidPayments: 0, dispensedResources: 0, receivedSats: 0 } } }),
+			recordPageView: (path) => { viewedPaths.push(path); return Promise.resolve(); },
+		} });
+		for (const url of ["/", "/api", "/demo", "/stats", "/favicon.svg", "/api/stats", "/health"]) {
+			await app.inject({ method: "GET", url, headers: { "user-agent": "not retained", "x-forwarded-for": "203.0.113.10" } });
+		}
+		expect(viewedPaths).toEqual(["/", "/api", "/demo", "/stats"]);
 		await app.close();
 	});
 

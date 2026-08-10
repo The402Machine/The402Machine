@@ -1,5 +1,8 @@
 import { parsePublicStats } from "./stats-contract.js";
 
+const views = document.querySelector("#stats-views");
+const viewsToday = document.querySelector("#stats-views-today");
+const viewsWeek = document.querySelector("#stats-views-week");
 const paid = document.querySelector("#stats-paid");
 const dispensed = document.querySelector("#stats-dispensed");
 const sats = document.querySelector("#stats-sats");
@@ -19,12 +22,18 @@ try {
 		item.textContent = `${product.toUpperCase()} · ${format.format(productStats.dispensedResources)} dispensed · ${format.format(productStats.receivedSats)} sats`;
 		return item;
 	});
+	views.textContent = format.format(data.pageViews);
+	viewsToday.textContent = format.format(data.viewsToday);
+	viewsWeek.textContent = format.format(data.viewsLast7Days);
 	paid.textContent = format.format(data.paidPayments);
 	dispensed.textContent = format.format(data.dispensedResources);
 	sats.textContent = format.format(data.receivedSats);
 	products.replaceChildren(...productItems);
-	status.textContent = "Aggregate ledger loaded. Counts update after a payment settles or a capability is dispensed.";
+	status.textContent = "Aggregate counters loaded. Visits use daily totals only; payment figures update after settlement or dispensing.";
 } catch {
+	views.textContent = "—";
+	viewsToday.textContent = "—";
+	viewsWeek.textContent = "—";
 	paid.textContent = "—";
 	dispensed.textContent = "—";
 	sats.textContent = "—";
