@@ -36,7 +36,7 @@ export class PaymentService {
 			const existing = await this.adapter.findInvoice({ orderId: order.id, amountSats: order.amountSats });
 			return existing ?? this.adapter.createInvoice({
 				amountSats: order.amountSats,
-				memo: `The402Machine ${order.product.toUpperCase()} ${titleCase(order.planId)}`,
+				memo: invoiceMemo(order.product, order.planId),
 				orderId: order.id,
 			});
 		});
@@ -85,6 +85,15 @@ export class PaymentService {
 function quoteResponse(order: PaymentOrder, bolt11: string, network: "mainnet" | "regtest" | "signet", invoiceExpiresAt: Date): PaymentQuote {
 	if (order.paymentHash === null) throw new Error("Invoiced order has no payment hash");
 	return { orderId: order.id, product: order.product, planId: order.planId, amountSats: order.amountSats, bolt11, paymentHash: order.paymentHash, network, expiresAt: new Date(Math.min(invoiceExpiresAt.getTime(), Date.now() + 10 * 60 * 1_000)).toISOString() };
+}
+
+function invoiceMemo(product: PaymentProduct, planId: PurchasableCatchPlanId): string {
+	const productDescription: Record<PaymentProduct, string> = {
+		catch: "CATCH webhook inbox",
+		whisper: "WHISPER encrypted handoff",
+		pulse: "PULSE heartbeat monitor",
+	};
+	return `The402Machine · ${productDescription[product]} · ${titleCase(planId)} plan`;
 }
 
 function titleCase(value: string): string { return value.charAt(0).toUpperCase() + value.slice(1); }

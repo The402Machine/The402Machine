@@ -53,7 +53,8 @@ class FakeOrderStore implements PaymentOrderStore {
 class FakeAdapter implements PaymentAdapter {
 	public settled = false;
 	public createCalls = 0;
-	public createInvoice(): Promise<{ paymentHash: string; bolt11: string }> { this.createCalls += 1; return Promise.resolve(fakeInvoice(42, "a".repeat(64))); }
+	public invoiceInputs: Array<{ amountSats: number; memo: string; orderId: string }> = [];
+	public createInvoice(input: { amountSats: number; memo: string; orderId: string }): Promise<{ paymentHash: string; bolt11: string }> { this.createCalls += 1; this.invoiceInputs.push(input); return Promise.resolve(fakeInvoice(input.amountSats, "a".repeat(64))); }
 	public findInvoice(): Promise<null> { return Promise.resolve(null); }
 	public verifyInvoice(): Promise<{ settled: boolean }> { return Promise.resolve({ settled: this.settled }); }
 }
@@ -66,6 +67,16 @@ describe("PaymentService", () => {
 		const first = await service.quote({ idempotencyKey: "idempotency-1", product: "catch", planId: "spark", productPayload: null });
 		const second = await service.quote({ idempotencyKey: "idempotency-1", product: "catch", planId: "spark", productPayload: null });
 		expect(second).toEqual(first); expect(adapter.createCalls).toBe(1);
+	});
+
+	it.each([
+		["catch", "spark", "The402Machine · CATCH webhook inbox · Spark plan"],
+		["whisper", "standard", "The402Machine · WHISPER encrypted handoff · Standard plan"],
+		["pulse", "long", "The402Machine · PULSE heartbeat monitor · Long plan"],
+	] as const)("creates a descriptive invoice concept for %s", async (product, planId, memo) => {
+		const store = new FakeOrderStore(); const adapter = new FakeAdapter(); const service = new PaymentService(store, adapter, unusedProvisioner);
+		await service.quote({ idempotencyKey: `idempotency-memo-${product}`, product, planId, productPayload: product === "whisper" ? Buffer.alloc(30) : null });
+		expect(adapter.invoiceInputs).toEqual([expect.objectContaining({ memo })]);
 	});
 
 	it("returns payment required until LNbits confirms settlement", async () => {
