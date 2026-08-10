@@ -68,7 +68,7 @@ describe("public landing page", () => {
 		expect(response.body).toContain('data-buy="pulse"');
 		expect(response.body).toContain('data-plan="long"');
 		expect(response.body).toContain('href="/assets/styles.css?v=21"');
-		expect(response.body).toContain('src="/assets/checkout.js?v=26"');
+		expect(response.body).toContain('src="/assets/checkout.js?v=27"');
 		expect(response.body).toContain('src="/assets/landing.js?v=1"');
 		expect(response.body).toContain('href="/api"');
 		expect(response.body).not.toContain('id="api"');
@@ -398,6 +398,19 @@ describe("public landing page", () => {
 		expect(source).toContain("deliveryDispensed = true");
 		expect(source).toContain("window.confirm");
 		expect(source).toContain("cannot be recovered");
+	});
+
+	it("resumes a pending Lightning purchase from session storage without storing final capabilities", async () => {
+		const source = await readFile(new URL("../public/assets/checkout.js", import.meta.url), "utf8");
+		expect(source).toContain('from "/assets/checkout-session.js"');
+		expect(source).toContain("loadPendingCheckout(sessionStorage)");
+		expect(source).toContain("savePendingCheckout(sessionStorage");
+		expect(source).toContain("clearPendingCheckout(sessionStorage)");
+		expect(source).toContain("Found a pending purchase. Checking payment status");
+		expect(source).not.toContain('sessionStorage.setItem("ownerToken"');
+		expect(source).not.toContain('sessionStorage.setItem("readToken"');
+		expect(source).not.toContain('sessionStorage.setItem("ingestToken"');
+		expect(source).not.toContain('sessionStorage.setItem("pingToken"');
 	});
 
 	it("asks for explicit confirmation before consuming and decrypting a WHISPER", async () => {

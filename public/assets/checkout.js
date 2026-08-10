@@ -1,6 +1,7 @@
 import { sealWhisper, whisperLink } from "/assets/whisper.js";
 import { renderQr } from "/assets/qr-browser-v3.js";
 import { requestProvider } from "/assets/webln-browser.js";
+import { clearPendingCheckout, loadPendingCheckout, savePendingCheckout } from "/assets/checkout-session.js";
 
 const dialog = document.querySelector("#checkout");
 const form = document.querySelector("#checkout-form");
@@ -59,8 +60,49 @@ async function configureCheckout() {
 		catalog = received;
 		indicator.textContent = "THREE TEMPORARY TOOLS · CHECKOUT READY";
 		indicator.closest(".eyebrow")?.classList.add("online");
+		await resumePendingCheckout();
 	} catch {
 		disableCheckout();
+	}
+}
+
+async function resumePendingCheckout() {
+	const pending = loadPendingCheckout(sessionStorage);
+	if (pending === null || catalog === null) return;
+	const plan = catalog.products[pending.product]?.plans.find((candidate) => candidate.planId === pending.planId && candidate.available === true);
+	if (plan === undefined || plan.priceSats !== pending.amountSats) {
+		clearPendingCheckout(sessionStorage);
+		return;
+	}
+	product = pending.product;
+	selectedPlanId = pending.planId;
+	checkoutSession += 1;
+	const session = checkoutSession;
+	resetCheckoutState();
+	title.textContent = `Resume ${product.toUpperCase()}`;
+	intro.textContent = "A Lightning invoice from this tab is still pending. The machine will continue checking it.";
+	noteField.hidden = true;
+	note.required = false;
+	scheduleField.hidden = true;
+	renderPlanChoices(catalog.products[product].plans);
+	updateReadLimitChoice();
+	updateSummary();
+	quoteAttempt = { idempotencyKey: pending.idempotencyKey };
+	if (pending.product === "whisper") {
+		encryptionKey = pending.encryptionKey;
+		quoteAttempt = { idempotencyKey: pending.idempotencyKey, encryptionKey: pending.encryptionKey, ciphertext: fromBase64url(pending.ciphertext) };
+	}
+	dialog.showModal();
+	showInvoice(pending);
+	status.textContent = "Found a pending purchase. Checking payment status…";
+	try {
+		await pollDelivery(pending.orderId, session);
+	} catch (error) {
+		if (session === checkoutSession && dialog.open) {
+			clearPendingCheckout(sessionStorage);
+			status.textContent = error instanceof Error ? error.message : "Could not resume the pending purchase.";
+			setPaymentStage("review");
+		}
 	}
 }
 
@@ -297,6 +339,7 @@ form.addEventListener("submit", async (event) => {
 		const quote = await response.json();
 		if (response.status !== 402 || typeof quote.orderId !== "string" || typeof quote.bolt11 !== "string" || quote.amountSats !== plan.priceSats) throw new Error("The payment slot is unavailable.");
 		if (session !== checkoutSession || !dialog.open) return;
+		savePendingCheckout(sessionStorage, pendingCheckoutState(quote));
 		showInvoice(quote);
 		await pollDelivery(quote.orderId, session);
 	} catch (error) {
@@ -323,6 +366,7 @@ async function pollDelivery(orderId, session) {
 		const result = await response.json();
 		if (!result.settled || !result.resource) continue;
 		const resource = result.resource;
+		clearPendingCheckout(sessionStorage);
 		setPaymentStage("paid");
 		paymentPanel.hidden = true;
 		if (resource.product === "whisper") {
@@ -360,6 +404,13 @@ async function pollDelivery(orderId, session) {
 		return;
 	}
 	if (session === checkoutSession && dialog.open) throw new Error("Invoice still unpaid or expired.");
+}
+
+function pendingCheckoutState(quote) {
+	const common = { version: 1, product, planId: selectedPlanId, idempotencyKey: quoteAttempt.idempotencyKey, orderId: quote.orderId, bolt11: quote.bolt11, amountSats: quote.amountSats, expiresAt: quote.expiresAt };
+	if (product !== "whisper") return common;
+	const revealAt = scheduledRevealIntent();
+	return { ...common, encryptionKey, ciphertext: base64url(quoteAttempt.ciphertext), readLimit: effectiveWhisperReadLimit(), revealAt: revealAt === "immediate" ? null : revealAt };
 }
 
 function setPurchaseBackup(resource, details) {
@@ -422,3 +473,5 @@ function formatNumber(value) { return new Intl.NumberFormat("en-US").format(valu
 function formatBytes(value) { return value >= 1024 * 1024 ? `${Number((value / (1024 * 1024)).toFixed(2))} MiB` : `${value / 1024} KiB`; }
 function formatCadence(seconds) { return seconds === 60 ? "about every minute" : seconds < 60 ? `about every ${seconds} seconds` : `about every ${seconds / 60} minutes`; }
 function formatLocalDate(value) { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(value); }
+function base64url(bytes) { let binary = ""; for (const byte of bytes) binary += String.fromCharCode(byte); return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, ""); }
+function fromBase64url(value) { const padded = value.replaceAll("-", "+").replaceAll("_", "/").padEnd(Math.ceil(value.length / 4) * 4, "="); return Uint8Array.from(atob(padded), (character) => character.charCodeAt(0)); }

@@ -1,0 +1,9 @@
+services:
+  db:
+    env_file: !reset []
+  migrate:
+    env_file: !reset []
+  web:
+    env_file: !reset []
+  expiry-worker:
+    env_file: !reset []

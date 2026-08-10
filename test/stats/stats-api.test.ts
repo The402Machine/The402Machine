@@ -8,13 +8,16 @@ describe("public stats", () => {
 			pageViews: 1_402,
 			viewsToday: 42,
 			viewsLast7Days: 402,
+			quotesIssued: 8,
 			paidPayments: 5,
 			dispensedResources: 4,
 			receivedSats: 570,
+			funnel: { trackingStartedOn: "2026-08-10", pageViews: 1_402, quotesIssued: 8, paidPayments: 5, dispensedResources: 4, visitToQuotePercent: 0.6, quoteToPaidPercent: 62.5, paidToDispensedPercent: 80 },
+			activityLast30Days: [{ day: "2026-08-10", pageViews: 42, quotesIssued: 3, paidPayments: 2, dispensedResources: 2 }],
 			byProduct: {
-				catch: { paidPayments: 2, dispensedResources: 2, receivedSats: 84 },
-				whisper: { paidPayments: 2, dispensedResources: 1, receivedSats: 444 },
-				pulse: { paidPayments: 1, dispensedResources: 1, receivedSats: 42 },
+				catch: { quotesIssued: 3, paidPayments: 2, dispensedResources: 2, receivedSats: 84, byPlan: emptyPlans({ spark: { quotesIssued: 3, paidPayments: 2, dispensedResources: 2, receivedSats: 84 } }) },
+				whisper: { quotesIssued: 3, paidPayments: 2, dispensedResources: 1, receivedSats: 444, byPlan: emptyPlans({ standard: { quotesIssued: 3, paidPayments: 2, dispensedResources: 1, receivedSats: 444 } }) },
+				pulse: { quotesIssued: 2, paidPayments: 1, dispensedResources: 1, receivedSats: 42, byPlan: emptyPlans({ long: { quotesIssued: 2, paidPayments: 1, dispensedResources: 1, receivedSats: 42 } }) },
 			},
 		};
 		const app = buildApp({ stats: { getPublicStats: () => Promise.resolve(stats) } });
@@ -29,7 +32,7 @@ describe("public stats", () => {
 	it("records public HTML visits without retaining request identity", async () => {
 		const viewedPaths: string[] = [];
 		const app = buildApp({ stats: {
-			getPublicStats: () => Promise.resolve({ pageViews: 0, viewsToday: 0, viewsLast7Days: 0, paidPayments: 0, dispensedResources: 0, receivedSats: 0, byProduct: { catch: { paidPayments: 0, dispensedResources: 0, receivedSats: 0 }, whisper: { paidPayments: 0, dispensedResources: 0, receivedSats: 0 }, pulse: { paidPayments: 0, dispensedResources: 0, receivedSats: 0 } } }),
+			getPublicStats: () => Promise.resolve(emptyStats()),
 			recordPageView: (path) => { viewedPaths.push(path); return Promise.resolve(); },
 		} });
 		for (const url of ["/", "/api", "/demo", "/stats", "/favicon.svg", "/api/stats", "/health"]) {
@@ -49,3 +52,8 @@ describe("public stats", () => {
 		await app.close();
 	});
 });
+
+function emptyPlan() { return { quotesIssued: 0, paidPayments: 0, dispensedResources: 0, receivedSats: 0 }; }
+function emptyPlans(overrides: Partial<Record<"spark" | "standard" | "long", ReturnType<typeof emptyPlan>>> = {}) { return { spark: emptyPlan(), standard: emptyPlan(), long: emptyPlan(), ...overrides }; }
+function emptyProduct() { return { ...emptyPlan(), byPlan: emptyPlans() }; }
+function emptyStats() { return { pageViews: 0, viewsToday: 0, viewsLast7Days: 0, quotesIssued: 0, paidPayments: 0, dispensedResources: 0, receivedSats: 0, funnel: { trackingStartedOn: null, pageViews: 0, quotesIssued: 0, paidPayments: 0, dispensedResources: 0, visitToQuotePercent: 0, quoteToPaidPercent: 0, paidToDispensedPercent: 0 }, activityLast30Days: [], byProduct: { catch: emptyProduct(), whisper: emptyProduct(), pulse: emptyProduct() } }; }

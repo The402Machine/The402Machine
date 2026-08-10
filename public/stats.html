@@ -17,20 +17,28 @@
 			<nav aria-label="Main navigation"><a href="/">Home</a><a href="/api">API</a><a href="/demo">Demos</a><a href="https://github.com/The402Machine/The402Machine" target="_blank" rel="noopener noreferrer">Source ↗</a></nav>
 		</header>
 		<main id="stats" class="shell section">
-			<header class="compact-heading"><p class="eyebrow">PLATFORM ACTIVITY / AGGREGATED</p><h1>Small numbers.<br /><em>Real machines.</em></h1><p class="section-intro">Public counters derived from daily page totals plus durable payment and dispensing events. No cookies, IP addresses, user agents, referrers, order identifiers, invoices, tokens, capabilities, payloads, or per-user history are stored for visits.</p></header>
+			<header class="compact-heading"><p class="eyebrow">PLATFORM ACTIVITY / AGGREGATED</p><h1>Small numbers.<br /><em>Real machines.</em></h1><p class="section-intro">Public counters derived from daily page totals and aggregate order stages. No cookies, IP addresses, user agents, referrers, visitor identifiers, invoices, tokens, capabilities, payloads, or per-user history are exposed.</p></header>
 			<section class="plan-grid" aria-live="polite">
 				<article class="plan-card recommended"><header><small>PAGE VIEWS</small><div class="plan-price"><strong id="stats-views">—</strong></div></header><p>All public HTML page loads since this privacy-safe counter was enabled.</p></article>
 				<article class="plan-card"><header><small>TODAY / UTC</small><div class="plan-price"><strong id="stats-views-today">—</strong></div></header><p>Page loads counted during the current UTC day.</p></article>
 				<article class="plan-card"><header><small>LAST 7 DAYS</small><div class="plan-price"><strong id="stats-views-week">—</strong></div></header><p>Rolling seven-day page load total, including today.</p></article>
 			</section>
 			<section class="plan-grid" aria-live="polite">
+				<article class="plan-card"><header><small>QUOTES ISSUED</small><div class="plan-price"><strong id="stats-quotes">—</strong></div></header><p>Orders that reached the Lightning invoice stage.</p></article>
 				<article class="plan-card"><header><small>PAID PAYMENTS</small><div class="plan-price"><strong id="stats-paid">—</strong></div></header><p>Lightning payments observed as settled.</p></article>
 				<article class="plan-card recommended"><header><small>DISPENSED</small><div class="plan-price"><strong id="stats-dispensed">—</strong></div></header><p>Temporary capabilities successfully created.</p></article>
 				<article class="plan-card"><header><small>RECEIVED</small><div class="plan-price"><strong id="stats-sats">—</strong><span>SATS</span></div></header><p>Total settled value recorded by the platform.</p></article>
 			</section>
+			<section class="plan-grid" aria-live="polite">
+				<article class="plan-card"><header><small>VIEW → QUOTE</small><div class="plan-price"><strong id="stats-visit-quote">—</strong></div></header><p>Quotes divided by page views recorded during the same aggregate counter era.</p></article>
+				<article class="plan-card"><header><small>QUOTE → PAID</small><div class="plan-price"><strong id="stats-quote-paid">—</strong></div></header><p>Settled payments divided by invoices issued.</p></article>
+				<article class="plan-card"><header><small>PAID → DISPENSED</small><div class="plan-price"><strong id="stats-paid-dispensed">—</strong></div></header><p>Capabilities delivered after a settled payment.</p></article>
+			</section>
 			<section class="product-card"><div class="card-index">Σ</div><div class="card-body"><div class="card-title"><div><p class="product-kicker">BY CARTRIDGE</p><h2>What the machine dispensed</h2></div><span>PUBLIC</span></div><div id="stats-products" class="feature-strip"><span>Loading aggregate activity…</span></div><p id="stats-status" class="checkout-status" role="status">Reading the durable event ledger.</p></div></section>
+			<section class="product-card"><div class="card-index">9</div><div class="card-body"><div class="card-title"><div><p class="product-kicker">BY PLAN</p><h2>Where orders convert</h2></div><span>AGGREGATED</span></div><div id="stats-plans" class="feature-strip"><span>Loading product and plan totals…</span></div></div></section>
+			<section class="product-card"><div class="card-index">30</div><div class="card-body"><div class="card-title"><div><p class="product-kicker">DAILY ACTIVITY</p><h2>Last 30 UTC days</h2></div><span>NO IDENTITIES</span></div><div id="stats-activity" class="feature-strip"><span>Loading daily aggregate activity…</span></div></div></section>
 		</main>
 		<footer class="footer shell"><span>THE402MACHINE.COM</span><span>AGGREGATES ONLY / NO USER TRACKING</span><a href="/stats">STATS</a></footer>
-		<script type="module" src="/assets/stats.js?v=2"></script>
+		<script type="module" src="/assets/stats.js?v=3"></script>
 	</body>
 </html>
