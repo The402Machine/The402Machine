@@ -60,13 +60,14 @@ describe("public landing page", () => {
 		expect(response.body).toContain("1 MiB");
 		expect(response.body).toContain("available cartridges");
 		expect(response.body).toContain("THREE TEMPORARY TOOLS");
-		expect(response.body).toContain("Source-available");
-		expect(response.body).not.toContain("Open source");
+		expect(response.body).toContain("Open source · ISC");
+		expect(response.body).not.toContain("Source-available");
+		expect(response.body).toContain('class="skip-link" href="#top"');
 		expect(response.body).toContain('data-buy="catch"');
 		expect(response.body).toContain('data-buy="whisper"');
 		expect(response.body).toContain('data-buy="pulse"');
 		expect(response.body).toContain('data-plan="long"');
-		expect(response.body).toContain('href="/assets/styles.css?v=19"');
+		expect(response.body).toContain('href="/assets/styles.css?v=21"');
 		expect(response.body).toContain('src="/assets/checkout.js?v=26"');
 		expect(response.body).toContain('src="/assets/landing.js?v=1"');
 		expect(response.body).toContain('href="/api"');
@@ -142,6 +143,7 @@ describe("public landing page", () => {
 		for (const page of pages) {
 			const html = await readFile(new URL(`../public/${page}`, import.meta.url), "utf8");
 			expect(html, page).toContain('<link rel="icon" href="/favicon.svg" type="image/svg+xml" />');
+			expect(html, page).toContain('href="/assets/styles.css?v=21"');
 		}
 	});
 
@@ -251,6 +253,9 @@ describe("public landing page", () => {
 		expect(response.statusCode).toBe(200);
 		expect(response.headers["content-type"]).toContain("text/css");
 		expect(response.body).toContain("--acid");
+		expect(response.body).toContain("grid-template-columns: repeat(3, minmax(0, 1fr))");
+		expect(response.body).toContain(".skip-link");
+		expect(response.body).toContain("scroll-margin-top: 92px");
 	});
 
 	it("serves WHISPER with external client code allowed by the CSP", async () => {
