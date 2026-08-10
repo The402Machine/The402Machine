@@ -82,7 +82,7 @@ type PaymentAppOptions = {
 type PaymentProtocolOptions = { realm: string; secret: Buffer };
 type StatsAppOptions = { getPublicStats(): Promise<PlatformStats>; recordPageView?(path: string): Promise<void> };
 
-const PUBLIC_PAGE_PATHS = new Set(["/", "/api", "/demo", "/catch", "/whisper", "/pulse", "/pulse-public", "/stats"]);
+const PUBLIC_PAGE_PATHS = new Set(["/", "/api", "/demo", "/catch", "/whisper", "/pulse", "/pulse-public", "/stats", "/agents", "/install", "/changelog"]);
 
 type BuildAppOptions = {
 	logger?: boolean | object;

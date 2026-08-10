@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="description" content="Install and self-host The402Machine with Node.js 22, PostgreSQL, Docker Compose, and an optional invoice-only Lightning wallet." />
+		<meta name="theme-color" content="#080a08" />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="The402Machine" />
+		<meta property="og:title" content="Install The402Machine" />
+		<meta property="og:description" content="A concise self-hosting path with safe defaults and links to the complete operations guide." />
+		<meta property="og:url" content="https://the402machine.com/install" />
+		<meta property="og:image" content="https://the402machine.com/og-image.png" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content="Install The402Machine" />
+		<meta name="twitter:description" content="Self-host temporary Internet capabilities paid over Lightning." />
+		<meta name="twitter:image" content="https://the402machine.com/og-image.png" />
+		<link rel="canonical" href="https://the402machine.com/install" />
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+		<title>Install — The402Machine</title>
+		<link rel="stylesheet" href="/assets/styles.css?v=22" />
+	</head>
+	<body>
+		<a class="skip-link" href="#install">Skip to installation</a>
+		<div class="noise" aria-hidden="true"></div>
+		<header class="topbar"><a class="brand" href="/" aria-label="The402Machine home"><span class="brand-mark">402</span><span>The402Machine</span></a><nav aria-label="Installation navigation"><a href="#local">Local</a><a href="#production">Production</a><a href="/agents">Agents</a><a href="/api">API</a><a href="/stats">Stats</a><a href="https://github.com/The402Machine/The402Machine" target="_blank" rel="noopener noreferrer">Source ↗</a></nav></header>
+		<main id="install">
+			<section class="shell docs-hero api-docs-hero"><div><p class="eyebrow">INSTALL / SELF-HOST</p><h1>Run your own<br /><em>small machine.</em></h1><p class="lede">The public interface and demos work with payments disabled. Add PostgreSQL and an invoice-only Lightning wallet when you are ready to operate the full service.</p></div><aside class="api-base-card"><small>Stack</small><code>Node.js 22 · Fastify · PostgreSQL 17 · Docker Compose</code><span>Open source under ISC. No hosted payment facilitator required.</span></aside></section>
+			<section id="local" class="api-section"><div class="shell section docs-longform"><div class="api-section-heading"><div><p class="eyebrow">LOCAL PREVIEW</p><h2>Interface first.</h2></div><p>Use the development server to inspect the storefront, documentation, stats surface, and local-only demos without wallet credentials.</p></div><pre>git clone https://github.com/The402Machine/The402Machine.git
+cd The402Machine
+npm ci
+npm run dev</pre><p>Open <code>http://127.0.0.1:4020</code>. With <code>PAYMENT_PROVIDER=disabled</code>, the checkout catalogue and purchase endpoints remain unavailable by design.</p></div></section>
+			<section class="shell section docs-longform"><div class="api-section-heading"><div><p class="eyebrow">QUALITY GATE</p><h2>Verify before serving.</h2></div><p>The same gate runs in GitHub Actions. PostgreSQL integration tests use disposable containers and must never point at production data.</p></div><pre>npm run test -- --maxWorkers=1
+npm run lint
+npm run typecheck
+npm run build
+npm audit --omit=dev --audit-level=high
+docker compose --env-file .env.example config --quiet
+docker build .
+git diff --check</pre></section>
+			<section id="production" class="api-section"><div class="shell section docs-longform"><div class="api-section-heading"><div><p class="eyebrow">PRODUCTION</p><h2>Safe defaults stay closed.</h2></div><p>Production uses an untracked <code>.env.production</code>. PostgreSQL stays on an internal network. The payment adapter uses a dedicated invoice-only key, and the agent protocol key is separate from delivery encryption and capability hashing.</p></div><div class="api-foundation-grid"><article><span>SECRETS</span><h3>Never commit configuration</h3><p>Keep database URLs, wallet keys, token peppers, delivery keys, invoices, preimages, macaroons, and capabilities outside Git and logs.</p></article><article><span>MIGRATIONS</span><h3>Run before application recreation</h3><p>The Compose migration job applies ordered migrations and records them in <code>schema_migrations</code>.</p></article><article><span>LIGHTNING</span><h3>Invoice-only custody</h3><p>The operator may use self-hosted LNbits and LND. Wallet or WebLN success is never accepted as settlement proof.</p></article><article><span>LIFECYCLE</span><h3>Expiry is enforced</h3><p>The worker and request paths remove or hide expired resources without extending public visibility.</p></article></div><pre>docker compose --env-file .env.production config --quiet
+docker compose --env-file .env.production build
+docker compose --env-file .env.production up -d
+docker compose --env-file .env.production ps</pre></div></section>
+			<section class="shell section api-final-cta"><div><p class="eyebrow">FULL OPERATIONS GUIDE</p><h2>Need every variable and invariant?</h2><p>The repository guide covers payment bridges, reverse proxies, product persistence, migrations, deployment, and verification without publishing private production topology.</p></div><div><a class="button primary" href="https://github.com/The402Machine/The402Machine/blob/master/INSTALL.md" target="_blank" rel="noopener noreferrer">Open INSTALL.md ↗</a><a class="button ghost" href="/changelog">Public changelog</a></div></section>
+		</main>
+		<footer class="footer shell"><span>THE402MACHINE.COM</span><a href="/">HOME</a><a href="/agents">AGENTS</a><a href="/api">API</a><a href="/stats">STATS</a></footer>
+	</body>
+</html>

@@ -17,6 +17,10 @@ describe("public repository boundary", () => {
 		expect(readme).toContain("L402");
 		expect(readme).toContain("does not claim x402 compatibility");
 		expect(readme).toContain("OpenAPI 3.1");
+		expect(readme).toContain("https://the402machine.com/agents");
+		expect(readme).toContain("https://the402machine.com/install");
+		expect(readme).toContain("https://the402machine.com/changelog");
+		expect(readme).toContain("/.well-known/the402machine.json");
 		expect(readme).toContain("GitHub Security Advisories");
 		expect(readme).toContain("[ISC](LICENSE)");
 		expect(readme).not.toContain("All rights reserved");

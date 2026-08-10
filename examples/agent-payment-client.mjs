@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
+import { chmod, writeFile } from "node:fs/promises";
 
 const [baseUrl = "http://127.0.0.1:4020", protocol = "payment", product = "pulse", planId = "spark"] = process.argv.slice(2);
 if (!new Set(["payment", "l402"]).has(protocol)) throw new Error("protocol must be payment or l402");
 if (!new Set(["catch", "pulse"]).has(product)) throw new Error("this minimal example supports catch or pulse");
 
+process.umask(0o077); // Equivalent to shell: umask 077
 const idempotencyKey = `agent-example-${crypto.randomUUID()}`;
 const body = JSON.stringify({ planId });
 const endpoint = `${baseUrl.replace(/\/$/u, "")}/api/payments/${product}`;
@@ -19,7 +21,8 @@ const challengeHeader = challengeResponse.headers.get("www-authenticate");
 if (challengeHeader === null) throw new Error("The server did not return WWW-Authenticate");
 
 const invoice = protocol === "payment" ? paymentInvoice(challengeHeader) : l402Invoice(challengeHeader);
-console.log(JSON.stringify({ protocol, invoice, warning: "Pay only with explicit authorization, then set PAYMENT_PREIMAGE_HEX locally." }, null, 2));
+await writePrivateJson("invoice.json", { protocol, product, planId, invoice });
+console.error("Invoice saved to invoice.json with mode 0600. Pay only with explicit authorization, then set PAYMENT_PREIMAGE_HEX locally.");
 
 const preimage = process.env.PAYMENT_PREIMAGE_HEX;
 if (preimage === undefined) process.exit(0);
@@ -34,8 +37,19 @@ const fulfilled = await fetch(endpoint, {
 	body,
 });
 const responseBody = await fulfilled.json();
-if (!fulfilled.ok) throw new Error(`Fulfillment failed with HTTP ${fulfilled.status}: ${JSON.stringify(responseBody)}`);
-console.log(JSON.stringify({ status: fulfilled.status, receipt: fulfilled.headers.get("payment-receipt"), responseBody }, null, 2));
+if (!fulfilled.ok) throw new Error(`Fulfillment failed with HTTP ${fulfilled.status}`);
+if (!isDelivery(responseBody)) throw new Error("Fulfillment response has no delivered resource");
+await writePrivateJson("capability.json", responseBody);
+console.error(`Capability saved to capability.json with mode 0600. Delivered product: ${responseBody.resource.product}.`);
+
+async function writePrivateJson(path, value) {
+	await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+	await chmod(path, 0o600); // Equivalent to shell: chmod 600
+}
+
+function isDelivery(value) {
+	return typeof value === "object" && value !== null && value.settled === true && typeof value.resource === "object" && value.resource !== null && new Set(["catch", "whisper", "pulse"]).has(value.resource.product);
+}
 
 function paymentInvoice(header) {
 	const request = authParameter(header, "request");

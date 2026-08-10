@@ -67,15 +67,25 @@ describe("public landing page", () => {
 		expect(response.body).toContain('data-buy="whisper"');
 		expect(response.body).toContain('data-buy="pulse"');
 		expect(response.body).toContain('data-plan="long"');
-		expect(response.body).toContain('href="/assets/styles.css?v=21"');
+		expect(response.body).toContain('href="/assets/styles.css?v=22"');
 		expect(response.body).toContain('src="/assets/checkout.js?v=27"');
-		expect(response.body).toContain('src="/assets/landing.js?v=1"');
+		expect(response.body).toContain('src="/assets/landing.js?v=2"');
 		expect(response.body).toContain('href="/api"');
 		expect(response.body).not.toContain('id="api"');
 		expect(response.body).not.toContain("API / COMPLETE FLOW");
 		expect(response.body).not.toContain("POST|PUT|PATCH|DELETE|GET|HEAD|OPTIONS /c/{publicId}");
 		expect(response.body).toContain('href="https://github.com/The402Machine/The402Machine" target="_blank"');
+		expect(response.body).toContain('href="/agents"');
+		expect(response.body).toContain('href="/install"');
+		expect(response.body).toContain('href="/changelog"');
 		expect(response.body).toContain('rel="icon" href="/favicon.svg"');
+		expect(response.body).toContain('id="live-platform-line"');
+		expect(response.body).toContain('id="live-dispensed"');
+		expect(response.body).toContain('id="live-sats"');
+		expect(response.body).toContain('href="/stats"');
+		expect(response.body).toContain("GitHub webhook delivery arrives in a temporary inbox");
+		expect(response.body).toContain("Share a recovery code as a client-encrypted handoff");
+		expect(response.body).toContain("A nightly backup job pings one temporary heartbeat URL");
 		expect(response.body).toContain('id="machine-product"');
 		expect(response.body).toContain('data-machine-product="pulse"');
 		expect(response.body).toContain('href="/demo#catch"');
@@ -130,6 +140,9 @@ describe("public landing page", () => {
 			["/pulse", "PULSE / PRIVATE CAPABILITY"],
 			["/pulse-public", "SHAREABLE STATUS / READ ONLY"],
 			["/stats", "PLATFORM ACTIVITY / AGGREGATED"],
+			["/agents", "AGENT PURCHASE GUIDE"],
+			["/install", "INSTALL / SELF-HOST"],
+			["/changelog", "PUBLIC CHANGELOG"],
 		] as const) {
 			const response = await app.inject({ method: "GET", url });
 			expect(response.statusCode, url).toBe(200);
@@ -139,12 +152,12 @@ describe("public landing page", () => {
 	});
 
 	it("declares the site favicon on every public HTML page", async () => {
-		const pages = ["index.html", "api.html", "demo.html", "catch.html", "whisper.html", "pulse.html", "pulse-public.html", "stats.html"];
+		const pages = ["index.html", "api.html", "demo.html", "catch.html", "whisper.html", "pulse.html", "pulse-public.html", "stats.html", "agents.html", "install.html", "changelog.html"];
 		for (const page of pages) {
 			const html = await readFile(new URL(`../public/${page}`, import.meta.url), "utf8");
 			expect(html, page).toContain('<link rel="icon" href="/favicon.svg" type="image/svg+xml" />');
-			expect(html, page).toContain('href="/assets/styles.css?v=21"');
-			expect(html, page).toContain('href="/stats"');
+			expect(html, page).toContain('href="/assets/styles.css?v=22"');
+			if (!["catch.html", "whisper.html", "pulse.html", "pulse-public.html"].includes(page)) expect(html, page).toContain('href="/stats"');
 		}
 	});
 

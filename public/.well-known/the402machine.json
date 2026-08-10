@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "name": "The402Machine",
+  "home": "https://the402machine.com/",
+  "catalog": "https://the402machine.com/api/catalog",
+  "openapi": "https://the402machine.com/openapi.json",
+  "agentGuide": "https://the402machine.com/agents",
+  "paymentProtocols": [
+    "native-lightning",
+    "payment-auth",
+    "l402"
+  ],
+  "products": [
+    "catch",
+    "whisper",
+    "pulse"
+  ]
+}

@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+Disallow: /catch
+Disallow: /whisper
+Disallow: /pulse
+Disallow: /pulse-public
+Disallow: /demo
+Disallow: /api/catch
+Disallow: /api/pulse
+Disallow: /api/payments
+Disallow: /w/
+Disallow: /p/
+Disallow: /c/
+
+Sitemap: https://the402machine.com/sitemap.xml

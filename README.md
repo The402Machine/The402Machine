@@ -12,7 +12,9 @@
   <a href="https://the402machine.com">Live service</a> ·
   <a href="https://the402machine.com/demo">Interactive demos</a> ·
   <a href="https://the402machine.com/api">API reference</a> ·
-  <a href="INSTALL.md">Self-hosting guide</a>
+  <a href="https://the402machine.com/agents">Agent guide</a> ·
+  <a href="https://the402machine.com/install">Self-hosting guide</a> ·
+  <a href="https://the402machine.com/changelog">Changelog</a>
 </p>
 
 <p align="center">
@@ -79,6 +81,8 @@ Protocol details and curl-level wire flows are documented in [`PAYMENT_PROTOCOLS
 
 Public contracts and examples:
 
+- [Agent discovery manifest](https://the402machine.com/.well-known/the402machine.json)
+- [Complete agent purchase guide](https://the402machine.com/agents)
 - [Human-readable API reference](https://the402machine.com/api)
 - [OpenAPI 3.1](https://the402machine.com/openapi.json)
 - [Postman collection](https://the402machine.com/the402machine.postman_collection.json)
@@ -120,7 +124,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:4020`. Payments are disabled by default, so the public pages and demos work without wallet credentials. Enabling checkout, LNbits, migrations and production deployment requires the steps in [`INSTALL.md`](INSTALL.md).
+Open `http://127.0.0.1:4020`. Payments are disabled by default, so the public pages and demos work without wallet credentials. The public [installation page](https://the402machine.com/install) provides the short path. Enabling checkout, LNbits, migrations and production deployment requires the complete steps in [`INSTALL.md`](INSTALL.md).
 
 ## How it is built
 

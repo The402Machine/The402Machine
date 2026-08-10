@@ -35,10 +35,10 @@ describe("public stats", () => {
 			getPublicStats: () => Promise.resolve(emptyStats()),
 			recordPageView: (path) => { viewedPaths.push(path); return Promise.resolve(); },
 		} });
-		for (const url of ["/", "/api", "/demo", "/stats", "/favicon.svg", "/api/stats", "/health"]) {
+		for (const url of ["/", "/api", "/demo", "/stats", "/agents", "/install", "/changelog", "/favicon.svg", "/api/stats", "/health"]) {
 			await app.inject({ method: "GET", url, headers: { "user-agent": "not retained", "x-forwarded-for": "203.0.113.10" } });
 		}
-		expect(viewedPaths).toEqual(["/", "/api", "/demo", "/stats"]);
+		expect(viewedPaths).toEqual(["/", "/api", "/demo", "/stats", "/agents", "/install", "/changelog"]);
 		await app.close();
 	});
 

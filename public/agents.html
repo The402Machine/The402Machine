@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="description" content="A complete, safe agent purchase guide for The402Machine using native Lightning, Payment Authentication, or L402." />
+		<meta name="theme-color" content="#080a08" />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="The402Machine" />
+		<meta property="og:title" content="Agent purchase guide — The402Machine" />
+		<meta property="og:description" content="Discover the catalogue, negotiate HTTP 402, pay over Lightning, and save the delivered capability without leaking it." />
+		<meta property="og:url" content="https://the402machine.com/agents" />
+		<meta property="og:image" content="https://the402machine.com/og-image.png" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content="Agent purchase guide — The402Machine" />
+		<meta name="twitter:description" content="Native Lightning, Payment Authentication, and L402 purchase flows for agents." />
+		<meta name="twitter:image" content="https://the402machine.com/og-image.png" />
+		<link rel="canonical" href="https://the402machine.com/agents" />
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+		<title>Agent purchase guide — The402Machine</title>
+		<link rel="stylesheet" href="/assets/styles.css?v=22" />
+	</head>
+	<body>
+		<a class="skip-link" href="#guide">Skip to guide</a>
+		<div class="noise" aria-hidden="true"></div>
+		<header class="topbar"><a class="brand" href="/" aria-label="The402Machine home"><span class="brand-mark">402</span><span>The402Machine</span></a><nav aria-label="Agent documentation"><a href="#native">Native</a><a href="#payment-auth">Payment Auth</a><a href="#l402">L402</a><a href="/api">API</a><a href="/stats">Stats</a><a href="https://github.com/The402Machine/The402Machine" target="_blank" rel="noopener noreferrer">Source ↗</a></nav></header>
+		<main id="guide">
+			<section class="shell docs-hero api-docs-hero">
+				<div><p class="eyebrow">AGENT PURCHASE GUIDE / COMPLETE FLOW</p><h1>Discover.<br /><em>Negotiate. Save.</em></h1><p class="lede">The402Machine is designed for both humans and software agents. Inspect the catalogue, create one intended purchase, pay its Lightning invoice, and write the delivered capability to a private file without printing it.</p></div>
+				<aside class="api-base-card"><small>Discovery document</small><code>https://the402machine.com/.well-known/the402machine.json</code><span>Links to the live catalogue, OpenAPI contract, protocols, products, and this guide.</span></aside>
+			</section>
+
+			<section class="shell api-downloads" aria-labelledby="agent-contracts-title">
+				<div><p class="eyebrow">START WITH CONTRACTS</p><h2 id="agent-contracts-title">Do not scrape the landing page.</h2><p>Use the discovery manifest for entry points, the catalogue for current prices and limits, and OpenAPI for request and response shapes.</p></div>
+				<div class="api-download-grid">
+					<a class="api-download-card" href="/.well-known/the402machine.json"><span>01</span><div><strong>Agent discovery</strong><small>Stable machine-readable service entry points</small></div><b>Open JSON →</b></a>
+					<a class="api-download-card" href="/openapi.json"><span>02</span><div><strong>OpenAPI 3.1</strong><small>Exact schemas, headers, security roles, and status codes</small></div><b>Open JSON →</b></a>
+					<a class="api-download-card" href="/api/catalog"><span>03</span><div><strong>Live catalogue</strong><small>Availability, plan IDs, prices, quotas, and lifetimes</small></div><b>Open JSON →</b></a>
+				</div>
+			</section>
+
+			<section class="api-section"><div class="shell section">
+				<div class="api-section-heading"><div><p class="eyebrow">INVARIANTS</p><h2>One intent.<br />One key.</h2></div><p>Create a new <code>Idempotency-Key</code> for each purchase intent. Retries for that intent must preserve product, plan, endpoint, headers, and body. For agent credentials, preserve the exact request body bytes, including JSON whitespace and key order.</p></div>
+				<div class="api-foundation-grid">
+					<article><span>IDEMPOTENCY</span><h3>Reuse after uncertainty</h3><p>If a response is lost, repeat the same request with the same key. Do not generate a second key merely because the client timed out.</p></article>
+					<article><span>FINANCIAL SIDE EFFECT</span><h3>Invoice creation is deliberate</h3><p>A POST to a purchase endpoint creates or recovers an invoice. Agents should require explicit spending policy before paying it.</p></article>
+					<article><span>DELIVERY</span><h3>Trust the server response</h3><p>A wallet success screen is not delivery. Native clients poll the order. Payment Auth and L402 clients accept only the server's credential-bearing HTTP 200 response.</p></article>
+					<article><span>SECRETS</span><h3>Never print capabilities</h3><p>Invoices, preimages, macaroons, and delivered capabilities do not belong in command traces, CI logs, analytics, shell history, or shared environments.</p></article>
+				</div>
+			</div></section>
+
+			<section id="native" class="shell section docs-longform">
+				<div class="api-section-heading"><div><p class="eyebrow">NATIVE LIGHTNING</p><h2>Quote, pay, poll.</h2></div><p>This is the simplest agent flow. It returns an ordinary JSON quote with HTTP 402. After payment, poll the order until the one-time delivery appears.</p></div>
+				<h3>1. Read the catalogue</h3>
+				<pre>curl --fail-with-body --silent --show-error \
+  https://the402machine.com/api/catalog \
+  -o catalogue.json</pre>
+				<h3>2. Create one PULSE quote</h3>
+				<pre>BODY='{"planId":"spark"}'
+IDEMPOTENCY_KEY="pulse-$(cat /proc/sys/kernel/random/uuid)"
+
+umask 077
+curl --silent --show-error --dump-header quote.headers \
+  --output quote.json \
+  --request POST https://the402machine.com/api/payments/pulse \
+  --header 'Content-Type: application/json' \
+  --header "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  --data-binary "$BODY"</pre>
+				<p><strong>Expected HTTP 402:</strong> the JSON contains <code>orderId</code>, <code>product</code>, <code>planId</code>, <code>amountSats</code>, <code>bolt11</code>, <code>network</code>, and <code>expiresAt</code>. Treat <code>bolt11</code> as invoice material and do not log the full response.</p>
+				<h3>3. After authorized payment, poll and save without printing</h3>
+				<pre>set +x
+ORDER_ID="$(node -e 'const q=require("./quote.json"); process.stdout.write(q.orderId)')"
+
+while :; do
+  STATUS="$(curl --silent --output delivery.tmp \
+    --write-out '%{http_code}' \
+    "https://the402machine.com/api/payments/$ORDER_ID")"
+  [ "$STATUS" = 200 ] && break
+  [ "$STATUS" = 402 ] || { rm -f delivery.tmp; exit 1; }
+  sleep 3
+done
+
+mv delivery.tmp capability.json
+chmod 600 capability.json</pre>
+				<p>Do not pipe <code>capability.json</code> through <code>jq</code> in a logged session. Parse it inside the consuming process or inspect only non-secret fields.</p>
+			</section>
+
+			<section id="payment-auth" class="api-section"><div class="shell section docs-longform">
+				<div class="api-section-heading"><div><p class="eyebrow">PAYMENT AUTHENTICATION</p><h2>Challenge, credential, receipt.</h2></div><p>Request the draft HTTP Payment Authentication adapter with <code>X-Payment-Protocol: payment</code>. The first response is a Lightning charge challenge.</p></div>
+				<pre>BODY='{"planId":"spark"}'
+IDEMPOTENCY_KEY="payment-$(cat /proc/sys/kernel/random/uuid)"
+
+umask 077
+curl --silent --show-error --dump-header payment.headers \
+  --output payment-challenge.json \
+  --request POST https://the402machine.com/api/payments/pulse \
+  --header 'Content-Type: application/json' \
+  --header "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  --header 'X-Payment-Protocol: payment' \
+  --data-binary "$BODY"</pre>
+				<p><strong>Expected HTTP 402:</strong> <code>WWW-Authenticate: Payment</code> plus a small JSON body describing the order, amount, and expiry. Pay the invoice only under an explicit agent spending policy.</p>
+				<p>Build <code>Authorization: Payment &lt;credential&gt;</code> from the returned challenge and payment preimage. Repeat the same method, URL, <code>Idempotency-Key</code>, protocol header, and byte-identical body. A successful HTTP 200 includes <code>Payment-Receipt</code> and the delivered resource.</p>
+				<pre>umask 077
+cat &gt; payment-auth.conf &lt;&lt;'EOF'
+header = "Authorization: Payment replace-with-derived-credential"
+EOF
+chmod 600 payment-auth.conf
+set +x
+
+curl --silent --show-error --dump-header payment-result.headers \
+  --output capability.json \
+  --request POST https://the402machine.com/api/payments/pulse \
+  --header 'Content-Type: application/json' \
+  --header "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  --header 'X-Payment-Protocol: payment' \
+  --config payment-auth.conf \
+  --data-binary "$BODY"
+chmod 600 capability.json</pre>
+				<p>The placeholder credential is inert. The dependency-free repository client writes the invoice to <code>invoice.json</code> and the final delivery to <code>capability.json</code> with mode 0600; it prints only filenames and the non-secret product discriminator. Never pass a live credential as a command-line argument where the process list can expose it.</p>
+			</div></section>
+
+			<section id="l402" class="shell section docs-longform">
+				<div class="api-section-heading"><div><p class="eyebrow">L402</p><h2>Macaroon plus preimage.</h2></div><p>The L402 adapter uses a request-bound binary macaroon and the Lightning preimage. It is a compatibility path, not Coinbase x402.</p></div>
+				<pre>BODY='{"planId":"spark"}'
+IDEMPOTENCY_KEY="l402-$(cat /proc/sys/kernel/random/uuid)"
+
+umask 077
+curl --silent --show-error --dump-header l402.headers \
+  --output l402-challenge.json \
+  --request POST https://the402machine.com/api/payments/pulse \
+  --header 'Content-Type: application/json' \
+  --header "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  --header 'X-Payment-Protocol: l402' \
+  --data-binary "$BODY"</pre>
+				<p><strong>Expected HTTP 402:</strong> <code>WWW-Authenticate: L402</code> with <code>macaroon</code> and <code>invoice</code> parameters. After payment, repeat the exact request with <code>Authorization: L402 &lt;macaroon&gt;:&lt;preimage&gt;</code>.</p>
+				<pre>umask 077
+cat &gt; l402-auth.conf &lt;&lt;'EOF'
+header = "Authorization: L402 replace-with-macaroon-and-preimage"
+EOF
+chmod 600 l402-auth.conf
+set +x
+
+curl --silent --show-error --output capability.json \
+  --request POST https://the402machine.com/api/payments/pulse \
+  --header 'Content-Type: application/json' \
+  --header "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  --header 'X-Payment-Protocol: l402' \
+  --config l402-auth.conf \
+  --data-binary "$BODY"
+chmod 600 capability.json</pre>
+			</section>
+
+			<section class="api-section"><div class="shell section docs-longform">
+				<div class="api-section-heading"><div><p class="eyebrow">DELIVERY DISPATCH</p><h2>Detect the product.</h2></div><p>All successful purchase flows return <code>{"settled":true,"resource":{...}}</code>. Dispatch on <code>resource.product</code>, then keep the complete resource object private.</p></div>
+				<pre>node &lt;&lt;'NODE'
+const fs = require('node:fs');
+const result = JSON.parse(fs.readFileSync('capability.json', 'utf8'));
+if (!result.settled || !result.resource) process.exit(1);
+switch (result.resource.product) {
+  case 'catch':
+    // ownerToken + ingestToken + publicId
+    break;
+  case 'whisper':
+    // readToken + publicId; the AES key remains client-side
+    break;
+  case 'pulse':
+    // ownerToken + pingToken + publicId
+    break;
+  default:
+    throw new Error('unknown delivered product');
+}
+NODE</pre>
+				<p>For WHISPER, upload only AES-256-GCM ciphertext. The encryption key never goes to the server and must be combined with the returned read capability locally.</p>
+			</div></section>
+
+			<section class="shell section api-final-cta"><div><p class="eyebrow">NEXT STEPS</p><h2>Use the exact contract.</h2><p>OpenAPI defines the full response variants and product-specific capability fields. The source client demonstrates challenge parsing without external dependencies.</p></div><div><a class="button primary" href="/openapi.json">Open OpenAPI</a><a class="button ghost" href="https://github.com/The402Machine/The402Machine/blob/master/examples/agent-payment-client.mjs" target="_blank" rel="noopener noreferrer">Reference client ↗</a></div></section>
+		</main>
+		<footer class="footer shell"><span>THE402MACHINE.COM</span><a href="/api">API</a><a href="/install">INSTALL</a><a href="/changelog">CHANGELOG</a><a href="/stats">STATS</a></footer>
+	</body>
+</html>
