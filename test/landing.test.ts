@@ -407,6 +407,10 @@ describe("public landing page", () => {
 		expect(source).toContain("savePendingCheckout(sessionStorage");
 		expect(source).toContain("clearPendingCheckout(sessionStorage)");
 		expect(source).toContain("Found a pending purchase. Checking payment status");
+		expect(source).toContain("return { ...common, encryptionKey }");
+		expect(source).not.toContain("pending.ciphertext");
+		expect(source).not.toContain("pending.idempotencyKey");
+		expect(source).not.toContain("ciphertext: base64url");
 		expect(source).not.toContain('sessionStorage.setItem("ownerToken"');
 		expect(source).not.toContain('sessionStorage.setItem("readToken"');
 		expect(source).not.toContain('sessionStorage.setItem("ingestToken"');

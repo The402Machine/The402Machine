@@ -5,7 +5,6 @@ export type CommonPendingCheckout = {
 	version: 1;
 	product: PendingProduct;
 	planId: PendingPlan;
-	idempotencyKey: string;
 	orderId: string;
 	bolt11: string;
 	amountSats: number;
@@ -14,9 +13,6 @@ export type CommonPendingCheckout = {
 export type PendingCheckout = CommonPendingCheckout | (CommonPendingCheckout & {
 	product: "whisper";
 	encryptionKey: string;
-	ciphertext: string;
-	readLimit: number;
-	revealAt: string | null;
 });
 export function savePendingCheckout(storage: StorageLike, pending: PendingCheckout): void;
 export function loadPendingCheckout(storage: StorageLike, now?: Date): PendingCheckout | null;

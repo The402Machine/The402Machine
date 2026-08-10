@@ -30,15 +30,13 @@ export function clearPendingCheckout(storage) {
 
 function isPendingCheckout(value) {
 	if (!isRecord(value) || value.version !== 1 || !PRODUCTS.has(value.product) || !PLANS.has(value.planId)) return false;
-	if (![value.idempotencyKey, value.orderId, value.bolt11].every((entry) => typeof entry === "string" && entry.length >= 8)) return false;
-	if (!Number.isSafeInteger(value.amountSats) || value.amountSats <= 0 || !isFutureDateShape(value.expiresAt)) return false;
-	const keys = Object.keys(value);
-	const common = ["version", "product", "planId", "idempotencyKey", "orderId", "bolt11", "amountSats", "expiresAt"];
-	if (value.product !== "whisper") return keys.every((key) => common.includes(key));
-	if (![value.encryptionKey, value.ciphertext].every((entry) => typeof entry === "string" && entry.length >= 6)) return false;
-	if (!Number.isSafeInteger(value.readLimit) || value.readLimit < 1 || !(value.revealAt === null || isFutureDateShape(value.revealAt))) return false;
-	return keys.every((key) => [...common, "encryptionKey", "ciphertext", "readLimit", "revealAt"].includes(key));
+	if (![value.orderId, value.bolt11].every((entry) => typeof entry === "string" && entry.length >= 8)) return false;
+	if (!Number.isSafeInteger(value.amountSats) || value.amountSats <= 0 || !isDateShape(value.expiresAt)) return false;
+	const common = ["version", "product", "planId", "orderId", "bolt11", "amountSats", "expiresAt"];
+	if (value.product !== "whisper") return Object.keys(value).every((key) => common.includes(key));
+	if (typeof value.encryptionKey !== "string" || value.encryptionKey.length < 6) return false;
+	return Object.keys(value).every((key) => [...common, "encryptionKey"].includes(key));
 }
 
 function isRecord(value) { return typeof value === "object" && value !== null && !Array.isArray(value); }
-function isFutureDateShape(value) { return typeof value === "string" && Number.isFinite(new Date(value).getTime()); }
+function isDateShape(value) { return typeof value === "string" && Number.isFinite(new Date(value).getTime()); }

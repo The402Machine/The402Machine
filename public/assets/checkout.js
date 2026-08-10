@@ -87,10 +87,8 @@ async function resumePendingCheckout() {
 	renderPlanChoices(catalog.products[product].plans);
 	updateReadLimitChoice();
 	updateSummary();
-	quoteAttempt = { idempotencyKey: pending.idempotencyKey };
 	if (pending.product === "whisper") {
 		encryptionKey = pending.encryptionKey;
-		quoteAttempt = { idempotencyKey: pending.idempotencyKey, encryptionKey: pending.encryptionKey, ciphertext: fromBase64url(pending.ciphertext) };
 	}
 	dialog.showModal();
 	showInvoice(pending);
@@ -407,10 +405,9 @@ async function pollDelivery(orderId, session) {
 }
 
 function pendingCheckoutState(quote) {
-	const common = { version: 1, product, planId: selectedPlanId, idempotencyKey: quoteAttempt.idempotencyKey, orderId: quote.orderId, bolt11: quote.bolt11, amountSats: quote.amountSats, expiresAt: quote.expiresAt };
+	const common = { version: 1, product, planId: selectedPlanId, orderId: quote.orderId, bolt11: quote.bolt11, amountSats: quote.amountSats, expiresAt: quote.expiresAt };
 	if (product !== "whisper") return common;
-	const revealAt = scheduledRevealIntent();
-	return { ...common, encryptionKey, ciphertext: base64url(quoteAttempt.ciphertext), readLimit: effectiveWhisperReadLimit(), revealAt: revealAt === "immediate" ? null : revealAt };
+	return { ...common, encryptionKey };
 }
 
 function setPurchaseBackup(resource, details) {
@@ -473,5 +470,3 @@ function formatNumber(value) { return new Intl.NumberFormat("en-US").format(valu
 function formatBytes(value) { return value >= 1024 * 1024 ? `${Number((value / (1024 * 1024)).toFixed(2))} MiB` : `${value / 1024} KiB`; }
 function formatCadence(seconds) { return seconds === 60 ? "about every minute" : seconds < 60 ? `about every ${seconds} seconds` : `about every ${seconds / 60} minutes`; }
 function formatLocalDate(value) { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(value); }
-function base64url(bytes) { let binary = ""; for (const byte of bytes) binary += String.fromCharCode(byte); return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, ""); }
-function fromBase64url(value) { const padded = value.replaceAll("-", "+").replaceAll("_", "/").padEnd(Math.ceil(value.length / 4) * 4, "="); return Uint8Array.from(atob(padded), (character) => character.charCodeAt(0)); }
