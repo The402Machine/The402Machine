@@ -23,25 +23,25 @@
   },
   "dependencies": {
     "@fastify/helmet": "^13.1.0",
-    "@fastify/static": "^10.1.2",
+    "@fastify/static": "^10.1.3",
     "@unional/macaroon": "^3.2.1",
     "bolt11-ts": "^0.2.1",
     "fast-geoip": "1.1.88",
-    "fastify": "5.10.0",
+    "fastify": "5.11.3",
     "postgres": "^3.4.9",
     "qrcode": "^1.5.4",
     "webln": "^0.3.2"
   },
   "devDependencies": {
-    "@eslint/js": "9.39.5",
-    "@types/node": "26.1.1",
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.2.0",
     "@types/qrcode": "^1.5.6",
-    "esbuild": "^0.28.1",
-    "eslint": "^10.8.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.8.1",
     "fake-bolt11": "^0.1.0",
-    "tsx": "4.23.1",
-    "typescript": "5.9.3",
-    "typescript-eslint": "8.65.0",
+    "tsx": "4.23.11",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.66.0",
     "vitest": "4.1.10"
   }
 }

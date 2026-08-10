@@ -182,18 +182,20 @@ describe("public payment API", () => {
 		const calls: unknown[] = [];
 		const quote: PaymentQuote = { orderId: "order-whisper-scheduled", product: "whisper", planId: "spark", amountSats: 42, bolt11: "lnbc42n1scheduled", paymentHash: "7".repeat(64), expiresAt: new Date(Date.now() + 300_000).toISOString() };
 		const app = buildApp({ payment: { quote: (input) => { calls.push(input); return Promise.resolve(quote); }, fulfill: () => Promise.resolve({ settled: false }) } });
-		for (const [planId, revealAt] of [
-			["spark", "2026-07-26T12:00:00.000Z"],
-			["standard", "2026-08-01T12:00:00.000Z"],
-			["long", "2027-01-01T12:00:00.000Z"],
-		] as const) {
+		const now = Date.now();
+		const scheduledReveals = [
+			["spark", new Date(now + 24 * 60 * 60 * 1_000).toISOString()],
+			["standard", new Date(now + 7 * 24 * 60 * 60 * 1_000).toISOString()],
+			["long", new Date(now + 30 * 24 * 60 * 60 * 1_000).toISOString()],
+		] as const;
+		for (const [planId, revealAt] of scheduledReveals) {
 			const response = await app.inject({ method: "POST", url: "/api/payments/whisper", headers: { "idempotency-key": `idempotency-scheduled-${planId}`, "x-whisper-plan": planId, "x-whisper-reveal-at": revealAt, "content-type": "application/octet-stream" }, payload: ciphertext });
 			expect(response.statusCode).toBe(402);
 		}
 		expect(calls).toEqual([
-			{ idempotencyKey: "idempotency-scheduled-spark", product: "whisper", planId: "spark", productPayload: ciphertext, whisperReadLimit: 1, whisperRevealAt: new Date("2026-07-26T12:00:00.000Z") },
-			{ idempotencyKey: "idempotency-scheduled-standard", product: "whisper", planId: "standard", productPayload: ciphertext, whisperReadLimit: 42, whisperRevealAt: new Date("2026-08-01T12:00:00.000Z") },
-			{ idempotencyKey: "idempotency-scheduled-long", product: "whisper", planId: "long", productPayload: ciphertext, whisperReadLimit: 402, whisperRevealAt: new Date("2027-01-01T12:00:00.000Z") },
+			{ idempotencyKey: "idempotency-scheduled-spark", product: "whisper", planId: "spark", productPayload: ciphertext, whisperReadLimit: 1, whisperRevealAt: new Date(scheduledReveals[0][1]) },
+			{ idempotencyKey: "idempotency-scheduled-standard", product: "whisper", planId: "standard", productPayload: ciphertext, whisperReadLimit: 42, whisperRevealAt: new Date(scheduledReveals[1][1]) },
+			{ idempotencyKey: "idempotency-scheduled-long", product: "whisper", planId: "long", productPayload: ciphertext, whisperReadLimit: 402, whisperRevealAt: new Date(scheduledReveals[2][1]) },
 		]);
 		await app.close();
 	});

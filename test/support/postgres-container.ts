@@ -54,7 +54,7 @@ export async function startPostgresTestContainer(options: StartOptions): Promise
 		const diagnostics = containerDiagnostics(options.name);
 		removeContainer(options.name);
 		const message = redactPostgresTestError(error instanceof Error ? error.message : String(error), options.password);
-		throw new Error(`${message}\n${diagnostics}`);
+		throw new Error(`${message}\n${diagnostics}`, { cause: error });
 	}
 }
 

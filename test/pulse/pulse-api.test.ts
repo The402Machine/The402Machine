@@ -8,20 +8,21 @@ const apps: ReturnType<typeof buildApp>[] = [];
 afterEach(async () => { await Promise.all(apps.splice(0).map(async (app) => app.close())); });
 
 function repositoryFixture() {
+	const now = Date.now();
 	const resource = {
 		id: "resource-pulse-1", publicId: "pulse_abcdefghijklmnopqrstuv", publicStatusId: "pulse_status_zyxwvutsrqponmlkjihgfe", planId: "spark" as const, status: "active" as "active" | "exhausted" | "expired" | "manually_destroyed",
 		ownerTokenHash: hashPulseToken("owner", "pulse_own_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ", "pepper"),
 		pingTokenHash: hashPulseToken("ping", "pulse_ping_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ", "pepper"),
 		heartbeatLimit: 1_202, heartbeatCount: 0, expectedIntervalSeconds: 300, graceSeconds: 600,
 		name: "Backup heartbeat", description: "Nightly backup worker", publicStatusEnabled: true,
-		lastPingAt: null, createdAt: new Date("2026-07-24T10:00:00.000Z"), expiresAt: new Date("2026-07-28T12:00:00.000Z"),
+		lastPingAt: null, createdAt: new Date(now - 60_000), expiresAt: new Date(now + 4 * 24 * 60 * 60 * 1_000),
 	};
 	return {
 		resource,
 		getResource: () => Promise.resolve(resource),
 		getPublicResource: (publicStatusId: string) => Promise.resolve(publicStatusId === resource.publicStatusId || publicStatusId === resource.publicId ? resource : null),
 		getCredentialHashes: () => Promise.resolve({ ownerTokenHash: resource.ownerTokenHash, pingTokenHash: resource.pingTokenHash }),
-		acceptHeartbeat: () => Promise.resolve({ accepted: true as const, heartbeatCount: 1, lastPingAt: new Date("2026-07-24T10:05:00.000Z"), exhausted: false }),
+		acceptHeartbeat: () => Promise.resolve({ accepted: true as const, heartbeatCount: 1, lastPingAt: new Date(now), exhausted: false }),
 		updateSettings: function (this: void, ...args: [string, PulseSettings]) { void args; return Promise.resolve(resource); },
 		destroy: () => Promise.resolve(true),
 	};
