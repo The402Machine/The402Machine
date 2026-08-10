@@ -128,6 +128,7 @@ describe("public landing page", () => {
 			["/whisper", "WHISPER / CLIENT-SIDE DECRYPTION"],
 			["/pulse", "PULSE / PRIVATE CAPABILITY"],
 			["/pulse-public", "SHAREABLE STATUS / READ ONLY"],
+			["/stats", "PLATFORM ACTIVITY / AGGREGATED"],
 		] as const) {
 			const response = await app.inject({ method: "GET", url });
 			expect(response.statusCode, url).toBe(200);
@@ -137,7 +138,7 @@ describe("public landing page", () => {
 	});
 
 	it("declares the site favicon on every public HTML page", async () => {
-		const pages = ["index.html", "api.html", "demo.html", "catch.html", "whisper.html", "pulse.html", "pulse-public.html"];
+		const pages = ["index.html", "api.html", "demo.html", "catch.html", "whisper.html", "pulse.html", "pulse-public.html", "stats.html"];
 		for (const page of pages) {
 			const html = await readFile(new URL(`../public/${page}`, import.meta.url), "utf8");
 			expect(html, page).toContain('<link rel="icon" href="/favicon.svg" type="image/svg+xml" />');

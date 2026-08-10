@@ -54,7 +54,7 @@ beforeAll(async () => {
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 1 });
 
-	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql", "0014_whisper_reveal_window.sql", "0015_whisper_custom_read_limit.sql", "0016_pulse_public_status_id.sql", "0017_payment_challenges.sql"]) {
+	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql", "0014_whisper_reveal_window.sql", "0015_whisper_custom_read_limit.sql", "0016_pulse_public_status_id.sql", "0017_payment_challenges.sql", "0018_platform_events.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -72,6 +72,44 @@ afterAll(async () => {
 });
 
 describe("CATCH migration", () => {
+	it("creates the privacy-safe platform event ledger", async () => {
+		const [table] = await sql<{ event_table: string | null }[]>`select to_regclass('public.platform_events')::text as event_table`;
+		expect(table).toEqual({ event_table: "platform_events" });
+		expect((await sql`select version from schema_migrations where version = '0018_platform_events'`)).toHaveLength(1);
+		const columns = await sql<{ column_name: string }[]>`select column_name from information_schema.columns where table_name = 'platform_events' order by ordinal_position`;
+		expect(columns.map(({ column_name }) => column_name)).toEqual(["id", "order_id", "event_type", "product", "plan_id", "amount_sats", "occurred_at"]);
+	});
+
+	it("backfills historical paid and dispensed orders idempotently", async () => {
+		const [paid] = await sql<{ id: string }[]>`
+			insert into payment_orders (idempotency_key, product, plan_id, amount_sats, status, payment_hash, bolt11, paid_at)
+			values ('stats-backfill-paid', 'catch', 'spark', 42, 'paid', ${"a".repeat(64)}, 'lnbc42backfillpaid', clock_timestamp() - interval '2 minutes') returning id
+		`;
+		const [dispensed] = await sql<{ id: string }[]>`
+			insert into payment_orders (idempotency_key, product, plan_id, amount_sats, status, payment_hash, bolt11, resource_id, delivery_ciphertext, paid_at, dispensed_at)
+			values ('stats-backfill-dispensed', 'pulse', 'spark', 42, 'dispensed', ${"b".repeat(64)}, 'lnbc42backfilldispensed', ${randomUUID()}, ${Buffer.alloc(29, 1)}, clock_timestamp() - interval '2 minutes', clock_timestamp() - interval '1 minute') returning id
+		`;
+		const migration = await readFile(new URL("../../migrations/0018_platform_events.sql", import.meta.url), "utf8");
+		await sql.unsafe(migration).simple();
+		await sql.unsafe(migration).simple();
+		const events = await sql<{ order_id: string; event_type: string }[]>`
+			select order_id, event_type from platform_events where order_id in (${paid!.id}, ${dispensed!.id}) order by order_id, event_type
+		`;
+		expect(events.filter(({ order_id }) => order_id === paid!.id).map(({ event_type }) => event_type)).toEqual(["payment_paid"]);
+		expect(events.filter(({ order_id }) => order_id === dispensed!.id).map(({ event_type }) => event_type)).toEqual(["payment_paid", "resource_dispensed"]);
+	});
+
+	it("records paid and dispensed transitions performed after the migration", async () => {
+		const [order] = await sql<{ id: string }[]>`
+			insert into payment_orders (idempotency_key, product, plan_id, amount_sats, status, payment_hash, bolt11)
+			values ('stats-trigger-transition', 'catch', 'spark', 42, 'invoice_issued', ${"c".repeat(64)}, 'lnbc42triggertransition') returning id
+		`;
+		await sql`update payment_orders set status = 'paid', paid_at = clock_timestamp() where id = ${order!.id}`;
+		await sql`update payment_orders set status = 'dispensed', resource_id = ${randomUUID()}, delivery_ciphertext = ${Buffer.alloc(29, 2)}, dispensed_at = clock_timestamp() where id = ${order!.id}`;
+		const events = await sql<{ event_type: string }[]>`select event_type from platform_events where order_id = ${order!.id} order by event_type`;
+		expect(events.map(({ event_type }) => event_type)).toEqual(["payment_paid", "resource_dispensed"]);
+	});
+
 	it("creates the single-use agent payment challenge ledger", async () => {
 		const [table] = await sql<{ challenge_table: string | null }[]>`select to_regclass('public.payment_challenges')::text as challenge_table`;
 		expect(table).toEqual({ challenge_table: "payment_challenges" });

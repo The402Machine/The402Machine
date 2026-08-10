@@ -15,6 +15,7 @@ import { PulseRepository } from "./pulse/pulse-repository.js";
 import { generatePulseToken, hashPulseToken } from "./security/pulse-tokens.js";
 import { generateIngestToken, generateOwnerToken, hashToken } from "./security/tokens.js";
 import { CatchRepository } from "./storage/catch-repository.js";
+import { StatsRepository } from "./stats/stats-repository.js";
 import { WhisperRepository } from "./whisper/whisper-repository.js";
 
 const config = loadConfig();
@@ -22,6 +23,7 @@ const database = config.catch.databaseUrl === undefined ? undefined : postgres(c
 const catchRepository = database === undefined ? undefined : new CatchRepository(database);
 const whisperRepository = database === undefined ? undefined : new WhisperRepository(database);
 const pulseRepository = database === undefined ? undefined : new PulseRepository(database);
+const statsRepository = database === undefined ? undefined : new StatsRepository(database);
 const catchOptions = catchRepository === undefined || config.catch.tokenPepper === undefined
 	? undefined
 	: {
@@ -100,6 +102,7 @@ const app = buildApp({
 	...(whisperOptions === undefined ? {} : { whisper: whisperOptions }),
 	...(pulseOptions === undefined ? {} : { pulse: pulseOptions }),
 	...(paymentService === undefined ? {} : { payment: paymentService }),
+	...(statsRepository === undefined ? {} : { stats: statsRepository }),
 	...(config.payment.agentProtocols.enabled && config.payment.agentProtocols.key !== undefined ? { paymentProtocols: { realm: config.payment.agentProtocols.realm, secret: Buffer.from(config.payment.agentProtocols.key, "base64url") } } : {}),
 });
 

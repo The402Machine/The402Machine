@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="description" content="Public, privacy-safe aggregate activity for The402Machine." />
+		<meta name="theme-color" content="#080a08" />
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+		<title>Stats — The402Machine</title>
+		<link rel="stylesheet" href="/assets/styles.css?v=21" />
+	</head>
+	<body>
+		<a class="skip-link" href="#stats">Skip to stats</a>
+		<div class="noise" aria-hidden="true"></div>
+		<header class="topbar">
+			<a class="brand" href="/" aria-label="The402Machine home"><span class="brand-mark">402</span><span>The402Machine</span></a>
+			<nav aria-label="Main navigation"><a href="/">Home</a><a href="/api">API</a><a href="/demo">Demos</a><a href="https://github.com/The402Machine/The402Machine" target="_blank" rel="noopener noreferrer">Source ↗</a></nav>
+		</header>
+		<main id="stats" class="shell section">
+			<header class="compact-heading"><p class="eyebrow">PLATFORM ACTIVITY / AGGREGATED</p><h1>Small numbers.<br /><em>Real machines.</em></h1><p class="section-intro">Public counters derived from durable payment and dispensing events. No IP addresses, order identifiers, invoices, tokens, capabilities, payloads, or per-user history are exposed.</p></header>
+			<section class="plan-grid" aria-live="polite">
+				<article class="plan-card"><header><small>PAID PAYMENTS</small><div class="plan-price"><strong id="stats-paid">—</strong></div></header><p>Lightning payments observed as settled.</p></article>
+				<article class="plan-card recommended"><header><small>DISPENSED</small><div class="plan-price"><strong id="stats-dispensed">—</strong></div></header><p>Temporary capabilities successfully created.</p></article>
+				<article class="plan-card"><header><small>RECEIVED</small><div class="plan-price"><strong id="stats-sats">—</strong><span>SATS</span></div></header><p>Total settled value recorded by the platform.</p></article>
+			</section>
+			<section class="product-card"><div class="card-index">Σ</div><div class="card-body"><div class="card-title"><div><p class="product-kicker">BY CARTRIDGE</p><h2>What the machine dispensed</h2></div><span>PUBLIC</span></div><div id="stats-products" class="feature-strip"><span>Loading aggregate activity…</span></div><p id="stats-status" class="checkout-status" role="status">Reading the durable event ledger.</p></div></section>
+		</main>
+		<footer class="footer shell"><span>THE402MACHINE.COM</span><span>AGGREGATES ONLY / NO USER TRACKING</span><span>© 2026</span></footer>
+		<script type="module" src="/assets/stats.js?v=1"></script>
+	</body>
+</html>

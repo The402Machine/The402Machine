@@ -19,7 +19,7 @@ beforeAll(async () => {
 	postgresContainer = await startPostgresTestContainer({ name: container, password });
 	databaseUrl = postgresContainer.databaseUrl;
 	sql = postgres(databaseUrl, { max: 1 });
-	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql", "0014_whisper_reveal_window.sql", "0015_whisper_custom_read_limit.sql", "0016_pulse_public_status_id.sql", "0017_payment_challenges.sql"]) {
+	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql", "0014_whisper_reveal_window.sql", "0015_whisper_custom_read_limit.sql", "0016_pulse_public_status_id.sql", "0017_payment_challenges.sql", "0018_platform_events.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${migrationName}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 	}
@@ -94,6 +94,7 @@ describe("PaymentRepository", () => {
 		const results = await Promise.all(Array.from({ length: 8 }, () => repository.consumePaymentChallengeAndDispense(input, () => Promise.resolve({ product: "pulse", publicId: "pulse_agent_once_abcdefghijklmnopqrstuv", publicStatusId: `pulse_status_${"s".repeat(32)}`, planId: "spark", ownerTokenHash: "a".repeat(64), pingTokenHash: "b".repeat(64), heartbeatLimit: 1_202, expectedIntervalSeconds: 300, graceSeconds: 600, ownerToken: "owner-agent-once", pingToken: "ping-agent-once", expiresAt: new Date(Date.now() + 60_000) }))));
 		expect(results.filter((result) => result.consumed)).toHaveLength(1);
 		expect(results.filter((result) => !result.consumed && result.reason === "replayed")).toHaveLength(7);
+		expect(await platformEventTypes(order.id)).toEqual(["payment_paid", "resource_dispensed"]);
 	});
 
 	it("dispenses exactly once under concurrent verification", async () => {
@@ -116,6 +117,8 @@ describe("PaymentRepository", () => {
 		expect(results.every((result) => result?.product === "catch" && result.ownerToken === "owner-once" && result.ingestToken === "ingest-once")).toBe(true);
 		const resourceCount = await sql<{ count: number }[]>`select count(*)::int as count from catch_resources where public_id = 'catch_payment_repository_once'`;
 		expect(resourceCount[0]?.count).toBe(1);
+		const events = await sql<{ event_type: string; count: number }[]>`select event_type, count(*)::int as count from platform_events where order_id = ${order.id} group by event_type order by event_type`;
+		expect(events).toEqual([{ event_type: "payment_paid", count: 1 }, { event_type: "resource_dispensed", count: 1 }]);
 	});
 
 	it("atomically dispenses an idempotent WHISPER delivery", async () => {
@@ -131,6 +134,7 @@ describe("PaymentRepository", () => {
 		expect(results.every((result) => result?.product === "whisper" && result.readToken === "read-once")).toBe(true);
 		const rows = await sql<{ count: number }[]>`select count(*)::int as count from whispers where public_id = 'whisper_payment_once_abcdefghijklmnopqrstuv'`;
 		expect(rows[0]?.count).toBe(1);
+		expect(await platformEventTypes(order.id)).toEqual(["payment_paid", "resource_dispensed"]);
 	});
 
 
@@ -141,6 +145,7 @@ describe("PaymentRepository", () => {
 		const results = await Promise.all(Array.from({ length: 4 }, () => repository.dispensePaidOrder(order.id, () => Promise.resolve({ product: "pulse", publicId: "pulse_payment_once_abcdefghijklmnopqrstuv", publicStatusId: "pulse_status_abcdefghijklmnopqrstuvwx12345678", planId: "spark", ownerTokenHash: "a".repeat(64), pingTokenHash: "b".repeat(64), heartbeatLimit: 1_202, expectedIntervalSeconds: 300, graceSeconds: 600, ownerToken: "pulse-owner", pingToken: "pulse-ping", expiresAt: new Date(Date.now() + 60_000) }))));
 		expect(results.every((result) => result?.product === "pulse" && result.ownerToken === "pulse-owner" && result.pingToken === "pulse-ping")).toBe(true);
 		expect((await sql`select id from pulse_resources where public_id = 'pulse_payment_once_abcdefghijklmnopqrstuv' and public_status_id = 'pulse_status_abcdefghijklmnopqrstuvwx12345678'`)).toHaveLength(1);
+		expect(await platformEventTypes(order.id)).toEqual(["payment_paid", "resource_dispensed"]);
 	});
 
 	it("consumes a PULSE quota atomically and erases the ping capability at exhaustion", async () => {
@@ -244,3 +249,7 @@ describe("PaymentRepository", () => {
 		await expect(repository.createOrder({ idempotencyKey: "idem-whisper-too-large", product: "whisper", planId: "spark", productPayload: Buffer.alloc(4_215_277, 7) })).rejects.toThrow("WHISPER ciphertext is invalid");
 	});
 });
+
+async function platformEventTypes(orderId: string): Promise<string[]> {
+	return (await sql<{ event_type: string }[]>`select event_type from platform_events where order_id = ${orderId} order by event_type`).map(({ event_type }) => event_type);
+}

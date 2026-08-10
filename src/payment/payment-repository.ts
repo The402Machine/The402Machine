@@ -97,11 +97,16 @@ export class PaymentRepository {
 	}
 
 	public async markPaid(orderId: string): Promise<PaymentOrder | null> {
-		const rows = await this.sql<PaymentOrderRow[]>`
-			update payment_orders set status = 'paid', paid_at = coalesce(paid_at, clock_timestamp()), updated_at = clock_timestamp()
-			where id = ${orderId} and status = 'invoice_issued' returning *, null::text as resource_public_id
-		`;
-		return rows[0] === undefined ? null : mapOrder(rows[0]);
+		return this.sql.begin(async (tx) => {
+			const rows = await tx<PaymentOrderRow[]>`
+				update payment_orders set status = 'paid', paid_at = coalesce(paid_at, clock_timestamp()), updated_at = clock_timestamp()
+				where id = ${orderId} and status = 'invoice_issued' returning *, null::text as resource_public_id
+			`;
+			const row = rows[0];
+			if (row === undefined) return null;
+			await recordPlatformEvent(tx, row, "payment_paid", row.paid_at);
+			return mapOrder(row);
+		});
 	}
 
 	public async getOrder(orderId: string): Promise<(PaymentOrder & { bolt11: string | null }) | null> {
@@ -137,7 +142,9 @@ export class PaymentRepository {
 					? { product: "whisper", publicId: input.publicId, readToken: input.readToken, expiresAt: input.expiresAt.toISOString() }
 					: { product: "pulse", publicId: input.publicId, ownerToken: input.ownerToken, pingToken: input.pingToken, expiresAt: input.expiresAt.toISOString() };
 			const encryptedDelivery = encryptDelivery(delivery, this.deliveryKey);
-			await tx`update payment_orders set status = 'dispensed', resource_id = ${resourceId}, delivery_ciphertext = ${encryptedDelivery}, product_payload = null, dispensed_at = clock_timestamp(), updated_at = clock_timestamp() where id = ${orderId} and status = 'paid'`;
+			const updated = await tx<PaymentOrderRow[]>`update payment_orders set status = 'dispensed', resource_id = ${resourceId}, delivery_ciphertext = ${encryptedDelivery}, product_payload = null, dispensed_at = clock_timestamp(), updated_at = clock_timestamp() where id = ${orderId} and status = 'paid' returning *, null::text as resource_public_id`;
+			if (updated[0] === undefined) throw new Error("Could not mark payment order as dispensed");
+			await recordPlatformEvent(tx, updated[0], "resource_dispensed", updated[0].dispensed_at);
 			return deliveryResource(resourceId, delivery);
 		});
 	}
@@ -172,11 +179,22 @@ export class PaymentRepository {
 					? { product: "whisper", publicId: provisionInput.publicId, readToken: provisionInput.readToken, expiresAt: provisionInput.expiresAt.toISOString() }
 					: { product: "pulse", publicId: provisionInput.publicId, ownerToken: provisionInput.ownerToken, pingToken: provisionInput.pingToken, expiresAt: provisionInput.expiresAt.toISOString() };
 			const encryptedDelivery = encryptDelivery(delivery, this.deliveryKey);
-			await tx`update payment_orders set status = 'dispensed', resource_id = ${resourceId}, delivery_ciphertext = ${encryptedDelivery}, product_payload = null, dispensed_at = clock_timestamp(), updated_at = clock_timestamp() where id = ${input.orderId} and status = 'paid'`;
+			const updated = await tx<PaymentOrderRow[]>`update payment_orders set status = 'dispensed', resource_id = ${resourceId}, delivery_ciphertext = ${encryptedDelivery}, product_payload = null, dispensed_at = clock_timestamp(), updated_at = clock_timestamp() where id = ${input.orderId} and status = 'paid' returning *, null::text as resource_public_id`;
+			if (updated[0] === undefined) throw new Error("Could not mark payment order as dispensed");
+			await recordPlatformEvent(tx, updated[0], "resource_dispensed", updated[0].dispensed_at);
 			await tx`update payment_challenges set consumed_at = clock_timestamp() where challenge_id = ${input.challengeId} and consumed_at is null`;
 			return { consumed: true, resource: deliveryResource(resourceId, delivery) };
 		});
 	}
+}
+
+async function recordPlatformEvent(tx: TransactionSql, order: PaymentOrderRow, eventType: "payment_paid" | "resource_dispensed", occurredAt: Date | null): Promise<void> {
+	if (occurredAt === null) throw new Error("Platform event is missing its occurrence timestamp");
+	await tx`
+		insert into platform_events (order_id, event_type, product, plan_id, amount_sats, occurred_at)
+		values (${order.id}, ${eventType}, ${order.product}, ${order.plan_id}, ${order.amount_sats}, ${occurredAt})
+		on conflict (order_id, event_type) do nothing
+	`;
 }
 
 async function insertCatch(tx: TransactionSql, input: AtomicCatchProvision): Promise<string> {

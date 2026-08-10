@@ -18,6 +18,7 @@ import type { AcceptPulseResult, PulseResource, PulseSettings } from "./pulse/pu
 import { verifyPulseToken } from "./security/pulse-tokens.js";
 import { generateIngestToken, generateOwnerToken, hashToken, verifyToken } from "./security/tokens.js";
 import type { AcceptEventInput, AcceptEventResult, CatchCredentialHashes, CatchEvent, CatchEventListOptions, CatchEventPage, CatchIpLocation, CatchResource, ProvisionInput } from "./storage/catch-repository.js";
+import type { PlatformStats } from "./stats/stats-repository.js";
 import type { CreateWhisperInput } from "./whisper/whisper-repository.js";
 
 const MAX_INGEST_BYTES = Math.max(...Object.values(CATCH_PLANS).map((plan) => plan.maxBytesPerRequest));
@@ -79,6 +80,7 @@ type PaymentAppOptions = {
 };
 
 type PaymentProtocolOptions = { realm: string; secret: Buffer };
+type StatsAppOptions = { getPublicStats(): Promise<PlatformStats> };
 
 type BuildAppOptions = {
 	logger?: boolean | object;
@@ -88,6 +90,7 @@ type BuildAppOptions = {
 	pulse?: PulseAppOptions;
 	payment?: PaymentAppOptions;
 	paymentProtocols?: PaymentProtocolOptions;
+	stats?: StatsAppOptions;
 };
 
 export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
@@ -115,6 +118,15 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
 	});
 	void app.register(fastifyStatic, { root: join(import.meta.dirname, "..", "public"), index: "index.html", extensions: ["html"], cacheControl: true, maxAge: "1h" });
 	app.get("/health", () => ({ service: "the402machine", status: "ok" }));
+	const stats = options.stats;
+	if (stats !== undefined) app.get("/api/stats", async (request, reply) => {
+		try {
+			return reply.header("Cache-Control", "public, max-age=30").send(await stats.getPublicStats());
+		} catch (error) {
+			request.log.error({ err: error }, "public stats unavailable");
+			return reply.header("Cache-Control", "no-store").code(503).send({ error: "stats unavailable" });
+		}
+	});
 
 	if (options.catch !== undefined) registerCatchRoutes(app, options.catch);
 	if (options.whisper !== undefined) registerWhisperRoutes(app, options.whisper);
