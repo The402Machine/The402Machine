@@ -67,9 +67,9 @@ describe("public landing page", () => {
 		expect(response.body).toContain('data-buy="whisper"');
 		expect(response.body).toContain('data-buy="pulse"');
 		expect(response.body).toContain('data-plan="long"');
-		expect(response.body).toContain('href="/assets/styles.css?v=22"');
+		expect(response.body).toContain('href="/assets/styles.css?v=23"');
 		expect(response.body).toContain('src="/assets/checkout.js?v=27"');
-		expect(response.body).toContain('src="/assets/landing.js?v=2"');
+		expect(response.body).toContain('src="/assets/landing.js?v=3"');
 		expect(response.body).toContain('href="/api"');
 		expect(response.body).not.toContain('id="api"');
 		expect(response.body).not.toContain("API / COMPLETE FLOW");
@@ -80,6 +80,7 @@ describe("public landing page", () => {
 		expect(response.body).toContain('href="/changelog"');
 		expect(response.body).toContain('rel="icon" href="/favicon.svg"');
 		expect(response.body).toContain('id="live-platform-line"');
+		expect(response.body).toContain('id="live-views"');
 		expect(response.body).toContain('id="live-dispensed"');
 		expect(response.body).toContain('id="live-sats"');
 		expect(response.body).toContain('href="/stats"');
@@ -156,7 +157,7 @@ describe("public landing page", () => {
 		for (const page of pages) {
 			const html = await readFile(new URL(`../public/${page}`, import.meta.url), "utf8");
 			expect(html, page).toContain('<link rel="icon" href="/favicon.svg" type="image/svg+xml" />');
-			expect(html, page).toContain('href="/assets/styles.css?v=22"');
+			expect(html, page).toContain('href="/assets/styles.css?v=23"');
 			if (!["catch.html", "whisper.html", "pulse.html", "pulse-public.html"].includes(page)) expect(html, page).toContain('href="/stats"');
 		}
 	});

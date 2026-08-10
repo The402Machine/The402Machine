@@ -11,15 +11,17 @@ const stat = document.querySelector("#machine-stat");
 const meter = document.querySelector("#machine-meter");
 const links = [...document.querySelectorAll("[data-machine-product]")];
 const liveLine = document.querySelector("#live-platform-line");
+const liveViews = document.querySelector("#live-views");
 const liveDispensed = document.querySelector("#live-dispensed");
 const liveSats = document.querySelector("#live-sats");
 
-if (liveLine instanceof HTMLElement && liveDispensed instanceof HTMLElement && liveSats instanceof HTMLElement) {
+if (liveLine instanceof HTMLElement && liveViews instanceof HTMLElement && liveDispensed instanceof HTMLElement && liveSats instanceof HTMLElement) {
 	void fetch("/api/stats", { headers: { accept: "application/json" } })
 		.then(async (response) => {
 			if (!response.ok) throw new Error("stats unavailable");
 			const data = await response.json();
-			if (!Number.isSafeInteger(data.dispensedResources) || !Number.isSafeInteger(data.receivedSats)) throw new Error("invalid stats");
+			if (!Number.isSafeInteger(data.pageViews) || !Number.isSafeInteger(data.dispensedResources) || !Number.isSafeInteger(data.receivedSats)) throw new Error("invalid stats");
+			liveViews.textContent = new Intl.NumberFormat("en-US").format(data.pageViews);
 			liveDispensed.textContent = new Intl.NumberFormat("en-US").format(data.dispensedResources);
 			liveSats.textContent = new Intl.NumberFormat("en-US").format(data.receivedSats);
 			liveLine.classList.add("loaded");

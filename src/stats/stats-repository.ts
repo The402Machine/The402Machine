@@ -21,6 +21,14 @@ export type DailyActivity = {
 	dispensedResources: number;
 };
 
+export type PeriodStats = {
+	pageViews: number;
+	quotesIssued: number;
+	paidPayments: number;
+	dispensedResources: number;
+	receivedSats: number;
+};
+
 export type PlatformStats = {
 	pageViews: number;
 	viewsToday: number;
@@ -29,6 +37,12 @@ export type PlatformStats = {
 	paidPayments: number;
 	dispensedResources: number;
 	receivedSats: number;
+	periods: {
+		all: PeriodStats;
+		today: PeriodStats;
+		last7Days: PeriodStats;
+		last30Days: PeriodStats;
+	};
 	funnel: {
 		trackingStartedOn: string | null;
 		pageViews: number;
@@ -67,6 +81,15 @@ type DailyActivityRow = {
 	dispensed_resources: string;
 };
 
+type PeriodRow = {
+	period: "today" | "last7Days" | "last30Days";
+	page_views: string;
+	quotes_issued: string;
+	paid_payments: string;
+	dispensed_resources: string;
+	received_sats: string;
+};
+
 export class StatsRepository {
 	public constructor(private readonly sql: Sql) {}
 
@@ -79,18 +102,16 @@ export class StatsRepository {
 	}
 
 	public async getPublicStats(): Promise<PlatformStats> {
-		const [rows, pageViewRows, activityRows] = await Promise.all([
+		const [rows, pageViewRows, activityRows, periodRows] = await Promise.all([
 			this.sql<StatsRow[]>`
-				with tracking as (select min(day) as started_on from page_view_daily)
 				select
 					product,
 					plan_id,
-					count(*) filter (where invoice_issued_at >= tracking.started_on) as quotes_issued,
-					count(*) filter (where paid_at >= tracking.started_on) as paid_payments,
-					count(*) filter (where dispensed_at >= tracking.started_on) as dispensed_resources,
-					coalesce(sum(amount_sats) filter (where paid_at >= tracking.started_on), 0) as received_sats
-				from payment_orders cross join tracking
-				where tracking.started_on is not null
+					count(invoice_issued_at) as quotes_issued,
+					count(paid_at) as paid_payments,
+					count(dispensed_at) as dispensed_resources,
+					coalesce(sum(amount_sats) filter (where paid_at is not null), 0) as received_sats
+				from payment_orders
 				group by product, plan_id
 			`,
 			this.sql<PageViewRow[]>`
@@ -140,6 +161,28 @@ export class StatsRepository {
 				left join dispensed using (day)
 				order by days.day
 			`,
+			this.sql<PeriodRow[]>`
+				with periods(period, started_on) as (
+					values
+						('today', (timezone('UTC', clock_timestamp()))::date),
+						('last7Days', (timezone('UTC', clock_timestamp()))::date - 6),
+						('last30Days', (timezone('UTC', clock_timestamp()))::date - 29)
+				), views as (
+					select periods.period, coalesce(sum(page_view_daily.views), 0) as page_views
+					from periods left join page_view_daily on page_view_daily.day >= periods.started_on
+					group by periods.period
+				), orders as (
+					select periods.period,
+						count(payment_orders.id) filter (where (timezone('UTC', invoice_issued_at))::date >= periods.started_on) as quotes_issued,
+						count(payment_orders.id) filter (where (timezone('UTC', paid_at))::date >= periods.started_on) as paid_payments,
+						count(payment_orders.id) filter (where (timezone('UTC', dispensed_at))::date >= periods.started_on) as dispensed_resources,
+						coalesce(sum(amount_sats) filter (where (timezone('UTC', paid_at))::date >= periods.started_on), 0) as received_sats
+					from periods left join payment_orders on true
+					group by periods.period
+				)
+				select periods.period, views.page_views, orders.quotes_issued, orders.paid_payments, orders.dispensed_resources, orders.received_sats
+				from periods join views using (period) join orders using (period)
+			`,
 		]);
 		const pageViews = pageViewRows[0];
 		if (pageViews === undefined) throw new Error("Page view aggregates unavailable");
@@ -162,6 +205,9 @@ export class StatsRepository {
 			paidPayments: sumProducts(byProduct, "paidPayments"),
 			dispensedResources: sumProducts(byProduct, "dispensedResources"),
 		};
+		const allPeriod: PeriodStats = { ...totals, receivedSats: sumProducts(byProduct, "receivedSats") };
+		const periods = { all: allPeriod, today: emptyPeriodStats(), last7Days: emptyPeriodStats(), last30Days: emptyPeriodStats() };
+		for (const row of periodRows) periods[row.period] = mapPeriodStats(row);
 		return {
 			pageViews: totals.pageViews,
 			viewsToday: safeCounter(pageViews.views_today),
@@ -169,7 +215,8 @@ export class StatsRepository {
 			quotesIssued: totals.quotesIssued,
 			paidPayments: totals.paidPayments,
 			dispensedResources: totals.dispensedResources,
-			receivedSats: sumProducts(byProduct, "receivedSats"),
+			receivedSats: allPeriod.receivedSats,
+			periods,
 			funnel: {
 				trackingStartedOn: asDay(pageViews.tracking_started_on),
 				...totals,
@@ -184,8 +231,10 @@ export class StatsRepository {
 }
 
 function emptyPlanStats(): PlanStats { return { quotesIssued: 0, paidPayments: 0, dispensedResources: 0, receivedSats: 0 }; }
+function emptyPeriodStats(): PeriodStats { return { pageViews: 0, ...emptyPlanStats() }; }
 function emptyProductStats(): ProductStats { return { ...emptyPlanStats(), byPlan: { spark: emptyPlanStats(), standard: emptyPlanStats(), long: emptyPlanStats() } }; }
 function mapPlanStats(row: StatsRow): PlanStats { return { quotesIssued: safeCounter(row.quotes_issued), paidPayments: safeCounter(row.paid_payments), dispensedResources: safeCounter(row.dispensed_resources), receivedSats: safeCounter(row.received_sats) }; }
+function mapPeriodStats(row: PeriodRow): PeriodStats { return { pageViews: safeCounter(row.page_views), quotesIssued: safeCounter(row.quotes_issued), paidPayments: safeCounter(row.paid_payments), dispensedResources: safeCounter(row.dispensed_resources), receivedSats: safeCounter(row.received_sats) }; }
 function sumProducts(products: Record<PaymentProduct, ProductStats>, key: keyof PlanStats): number { return products.catch[key] + products.whisper[key] + products.pulse[key]; }
 function conversion(numerator: number, denominator: number): number { return denominator === 0 ? 0 : Number(((numerator / denominator) * 100).toFixed(1)); }
 function asDay(value: string | Date | null): string | null { if (value === null) return null; return value instanceof Date ? value.toISOString().slice(0, 10) : value.slice(0, 10); }

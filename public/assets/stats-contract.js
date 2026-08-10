@@ -4,12 +4,15 @@ const COUNTERS = ["quotesIssued", "paidPayments", "dispensedResources", "receive
 const TRAFFIC_COUNTERS = ["pageViews", "viewsToday", "viewsLast7Days"];
 const FUNNEL_COUNTERS = ["pageViews", "quotesIssued", "paidPayments", "dispensedResources"];
 const CONVERSIONS = ["visitToQuotePercent", "quoteToPaidPercent", "paidToDispensedPercent"];
+const PERIODS = ["all", "today", "last7Days", "last30Days"];
+const PERIOD_COUNTERS = ["pageViews", ...COUNTERS];
 
 export function parsePublicStats(value) {
-	if (!isRecord(value) || !isRecord(value.byProduct) || !isRecord(value.funnel) || !Array.isArray(value.activityLast30Days)) return null;
+	if (!isRecord(value) || !isRecord(value.byProduct) || !isRecord(value.funnel) || !isRecord(value.periods) || !Array.isArray(value.activityLast30Days)) return null;
 	if (![...TRAFFIC_COUNTERS, ...COUNTERS].every((counter) => isCounter(value[counter]))) return null;
 	if (!FUNNEL_COUNTERS.every((counter) => isCounter(value.funnel[counter])) || !CONVERSIONS.every((counter) => isPercentage(value.funnel[counter]))) return null;
 	if (!(value.funnel.trackingStartedOn === null || isDay(value.funnel.trackingStartedOn))) return null;
+	for (const period of PERIODS) if (!isRecord(value.periods[period]) || !PERIOD_COUNTERS.every((counter) => isCounter(value.periods[period][counter]))) return null;
 	for (const product of PRODUCTS) {
 		const productStats = value.byProduct[product];
 		if (!isRecord(productStats) || !isRecord(productStats.byPlan) || !COUNTERS.every((counter) => isCounter(productStats[counter]))) return null;

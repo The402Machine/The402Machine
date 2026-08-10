@@ -12,6 +12,12 @@ describe("public stats", () => {
 			paidPayments: 5,
 			dispensedResources: 4,
 			receivedSats: 570,
+			periods: {
+				all: { pageViews: 1_402, quotesIssued: 8, paidPayments: 5, dispensedResources: 4, receivedSats: 570 },
+				today: { pageViews: 42, quotesIssued: 3, paidPayments: 2, dispensedResources: 2, receivedSats: 402 },
+				last7Days: { pageViews: 402, quotesIssued: 6, paidPayments: 4, dispensedResources: 3, receivedSats: 528 },
+				last30Days: { pageViews: 610, quotesIssued: 7, paidPayments: 4, dispensedResources: 3, receivedSats: 528 },
+			},
 			funnel: { trackingStartedOn: "2026-08-10", pageViews: 1_402, quotesIssued: 8, paidPayments: 5, dispensedResources: 4, visitToQuotePercent: 0.6, quoteToPaidPercent: 62.5, paidToDispensedPercent: 80 },
 			activityLast30Days: [{ day: "2026-08-10", pageViews: 42, quotesIssued: 3, paidPayments: 2, dispensedResources: 2 }],
 			byProduct: {
@@ -56,4 +62,4 @@ describe("public stats", () => {
 function emptyPlan() { return { quotesIssued: 0, paidPayments: 0, dispensedResources: 0, receivedSats: 0 }; }
 function emptyPlans(overrides: Partial<Record<"spark" | "standard" | "long", ReturnType<typeof emptyPlan>>> = {}) { return { spark: emptyPlan(), standard: emptyPlan(), long: emptyPlan(), ...overrides }; }
 function emptyProduct() { return { ...emptyPlan(), byPlan: emptyPlans() }; }
-function emptyStats() { return { pageViews: 0, viewsToday: 0, viewsLast7Days: 0, quotesIssued: 0, paidPayments: 0, dispensedResources: 0, receivedSats: 0, funnel: { trackingStartedOn: null, pageViews: 0, quotesIssued: 0, paidPayments: 0, dispensedResources: 0, visitToQuotePercent: 0, quoteToPaidPercent: 0, paidToDispensedPercent: 0 }, activityLast30Days: [], byProduct: { catch: emptyProduct(), whisper: emptyProduct(), pulse: emptyProduct() } }; }
+function emptyStats() { const period = { pageViews: 0, quotesIssued: 0, paidPayments: 0, dispensedResources: 0, receivedSats: 0 }; return { pageViews: 0, viewsToday: 0, viewsLast7Days: 0, quotesIssued: 0, paidPayments: 0, dispensedResources: 0, receivedSats: 0, periods: { all: period, today: period, last7Days: period, last30Days: period }, funnel: { trackingStartedOn: null, pageViews: 0, quotesIssued: 0, paidPayments: 0, dispensedResources: 0, visitToQuotePercent: 0, quoteToPaidPercent: 0, paidToDispensedPercent: 0 }, activityLast30Days: [], byProduct: { catch: emptyProduct(), whisper: emptyProduct(), pulse: emptyProduct() } }; }

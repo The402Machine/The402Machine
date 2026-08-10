@@ -28,7 +28,7 @@ afterAll(async () => {
 });
 
 describe("StatsRepository", () => {
-	it("returns an aligned aggregate funnel, per-plan totals, and 30 days of activity", async () => {
+	it("returns historical totals, period totals, per-plan totals, and 30 days of activity", async () => {
 		await sql`insert into page_view_daily (day, path, views) values ((timezone('UTC', clock_timestamp()))::date - 1, '/api', 1)`;
 		await repository.recordPageView("/");
 		await repository.recordPageView("/stats");
@@ -49,28 +49,34 @@ describe("StatsRepository", () => {
 			pageViews: 3,
 			viewsToday: 2,
 			viewsLast7Days: 3,
-			quotesIssued: 3,
+			quotesIssued: 4,
 			paidPayments: 2,
 			dispensedResources: 1,
 			receivedSats: 444,
 			funnel: {
 				trackingStartedOn: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10),
 				pageViews: 3,
-				quotesIssued: 3,
+				quotesIssued: 4,
 				paidPayments: 2,
 				dispensedResources: 1,
-				visitToQuotePercent: 100,
-				quoteToPaidPercent: 66.7,
+				visitToQuotePercent: 133.3,
+				quoteToPaidPercent: 50,
 				paidToDispensedPercent: 50,
 			},
+			periods: {
+				all: { pageViews: 3, quotesIssued: 4, paidPayments: 2, dispensedResources: 1, receivedSats: 444 },
+				today: { pageViews: 2, quotesIssued: 2, paidPayments: 1, dispensedResources: 0, receivedSats: 402 },
+				last7Days: { pageViews: 3, quotesIssued: 3, paidPayments: 2, dispensedResources: 1, receivedSats: 444 },
+				last30Days: { pageViews: 3, quotesIssued: 4, paidPayments: 2, dispensedResources: 1, receivedSats: 444 },
+			},
 			byProduct: {
-				catch: { quotesIssued: 1, paidPayments: 1, dispensedResources: 1, receivedSats: 42 },
+				catch: { quotesIssued: 2, paidPayments: 1, dispensedResources: 1, receivedSats: 42 },
 				whisper: { quotesIssued: 1, paidPayments: 1, dispensedResources: 0, receivedSats: 402 },
 				pulse: { quotesIssued: 1, paidPayments: 0, dispensedResources: 0, receivedSats: 0 },
 			},
 		});
 		expect(stats.byProduct.catch.byPlan.spark).toEqual({ quotesIssued: 1, paidPayments: 1, dispensedResources: 1, receivedSats: 42 });
-		expect(stats.byProduct.catch.byPlan.long).toEqual({ quotesIssued: 0, paidPayments: 0, dispensedResources: 0, receivedSats: 0 });
+		expect(stats.byProduct.catch.byPlan.long).toEqual({ quotesIssued: 1, paidPayments: 0, dispensedResources: 0, receivedSats: 0 });
 		expect(stats.byProduct.whisper.byPlan.standard).toEqual({ quotesIssued: 1, paidPayments: 1, dispensedResources: 0, receivedSats: 402 });
 		expect(stats.byProduct.pulse.byPlan.long).toEqual({ quotesIssued: 1, paidPayments: 0, dispensedResources: 0, receivedSats: 0 });
 		expect(stats.activityLast30Days).toHaveLength(30);
@@ -93,6 +99,46 @@ describe("StatsRepository", () => {
 		]);
 		const columns = await sql<{ column_name: string }[]>`select column_name from information_schema.columns where table_name = 'page_view_daily' order by column_name`;
 		expect(columns.map((column) => column.column_name)).toEqual(["day", "path", "views"]);
+	});
+
+	it("keeps historical orders in all-time and rolling periods even when page-view tracking started later", async () => {
+		await sql`begin`;
+		try {
+			await sql`delete from page_view_daily`;
+			await sql`delete from payment_orders`;
+			await repository.recordPageView("/stats");
+			await sql`
+				insert into payment_orders (idempotency_key, product, plan_id, amount_sats, status, payment_hash, bolt11, resource_id, delivery_ciphertext, invoice_issued_at, paid_at, dispensed_at)
+				values ('stats-pre-tracking-payment', 'catch', 'spark', 42, 'dispensed', ${"8".repeat(64)}, 'lnbc42pretracking', ${randomUUID()}, ${Buffer.alloc(29, 8)},
+					clock_timestamp() - interval '10 days', clock_timestamp() - interval '10 days', clock_timestamp() - interval '10 days')
+			`;
+			const stats = await repository.getPublicStats();
+			expect(stats.periods.all).toEqual({ pageViews: 1, quotesIssued: 1, paidPayments: 1, dispensedResources: 1, receivedSats: 42 });
+			expect(stats.periods.last30Days).toEqual({ pageViews: 1, quotesIssued: 1, paidPayments: 1, dispensedResources: 1, receivedSats: 42 });
+			expect(stats.periods.last7Days).toEqual({ pageViews: 1, quotesIssued: 0, paidPayments: 0, dispensedResources: 0, receivedSats: 0 });
+		} finally {
+			await sql`rollback`;
+		}
+	});
+
+	it("uses UTC day boundaries even when the PostgreSQL session timezone is not UTC", async () => {
+		await sql`set time zone 'Pacific/Honolulu'`;
+		try {
+			await sql`insert into page_view_daily (day, path, views) values ((timezone('UTC', clock_timestamp()))::date, '/api', 1) on conflict (day, path) do update set views = page_view_daily.views + 1`;
+			const resourceId = randomUUID();
+			await sql`
+				insert into payment_orders (idempotency_key, product, plan_id, amount_sats, status, payment_hash, bolt11, resource_id, delivery_ciphertext, invoice_issued_at, paid_at, dispensed_at)
+				values ('stats-utc-boundary', 'catch', 'spark', 42, 'dispensed', ${"9".repeat(64)}, 'lnbc42utcboundary', ${resourceId}, ${Buffer.alloc(29, 9)},
+					(date_trunc('day', timezone('UTC', clock_timestamp())) + interval '30 minutes') at time zone 'UTC',
+					(date_trunc('day', timezone('UTC', clock_timestamp())) + interval '30 minutes') at time zone 'UTC',
+					(date_trunc('day', timezone('UTC', clock_timestamp())) + interval '30 minutes') at time zone 'UTC')
+			`;
+			const stats = await repository.getPublicStats();
+			expect(stats.periods.today).toMatchObject({ quotesIssued: 3, paidPayments: 2, dispensedResources: 1, receivedSats: 444 });
+		} finally {
+			await sql`delete from payment_orders where idempotency_key = 'stats-utc-boundary'`;
+			await sql`set time zone 'UTC'`;
+		}
 	});
 
 	it("supports aggregate values above PostgreSQL int32", async () => {

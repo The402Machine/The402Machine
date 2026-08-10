@@ -20,7 +20,7 @@
 		<link rel="canonical" href="https://the402machine.com/stats" />
 		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 		<title>Stats — The402Machine</title>
-		<link rel="stylesheet" href="/assets/styles.css?v=22" />
+		<link rel="stylesheet" href="/assets/styles.css?v=23" />
 	</head>
 	<body>
 		<a class="skip-link" href="#stats">Skip to stats</a>
@@ -31,10 +31,11 @@
 		</header>
 		<main id="stats" class="shell section">
 			<header class="compact-heading"><p class="eyebrow">PLATFORM ACTIVITY / AGGREGATED</p><h1>Small numbers.<br /><em>Real machines.</em></h1><p class="section-intro">Public counters derived from daily page totals and aggregate order stages. No cookies, IP addresses, user agents, referrers, visitor identifiers, invoices, tokens, capabilities, payloads, or per-user history are exposed.</p></header>
+			<div class="stats-period-control" aria-label="Stats period"><span>PERIOD</span><div><button id="stats-period-all" class="active" type="button" data-stats-period="all" aria-pressed="true">All time</button><button id="stats-period-today" type="button" data-stats-period="today" aria-pressed="false">Today</button><button id="stats-period-7d" type="button" data-stats-period="last7Days" aria-pressed="false">7 days</button><button id="stats-period-30d" type="button" data-stats-period="last30Days" aria-pressed="false">30 days</button></div><strong id="stats-period-label">ALL TIME</strong></div>
 			<section class="plan-grid" aria-live="polite">
-				<article class="plan-card recommended"><header><small>PAGE VIEWS</small><div class="plan-price"><strong id="stats-views">—</strong></div></header><p>All public HTML page loads since this privacy-safe counter was enabled.</p></article>
-				<article class="plan-card"><header><small>TODAY / UTC</small><div class="plan-price"><strong id="stats-views-today">—</strong></div></header><p>Page loads counted during the current UTC day.</p></article>
-				<article class="plan-card"><header><small>LAST 7 DAYS</small><div class="plan-price"><strong id="stats-views-week">—</strong></div></header><p>Rolling seven-day page load total, including today.</p></article>
+				<article class="plan-card recommended"><header><small>PAGE VIEWS</small><div class="plan-price"><strong id="stats-views">—</strong></div></header><p>Public HTML page loads in the selected period.</p></article>
+				<article class="plan-card"><header><small>TODAY / UTC</small><div class="plan-price"><strong id="stats-views-today">—</strong></div></header><p>Current UTC day, kept visible as a quick reference.</p></article>
+				<article class="plan-card"><header><small>LAST 7 DAYS</small><div class="plan-price"><strong id="stats-views-week">—</strong></div></header><p>Rolling seven-day page loads, kept visible as a quick reference.</p></article>
 			</section>
 			<section class="plan-grid" aria-live="polite">
 				<article class="plan-card"><header><small>QUOTES ISSUED</small><div class="plan-price"><strong id="stats-quotes">—</strong></div></header><p>Orders that reached the Lightning invoice stage.</p></article>
@@ -43,7 +44,7 @@
 				<article class="plan-card"><header><small>RECEIVED</small><div class="plan-price"><strong id="stats-sats">—</strong><span>SATS</span></div></header><p>Total settled value recorded by the platform.</p></article>
 			</section>
 			<section class="plan-grid" aria-live="polite">
-				<article class="plan-card"><header><small>VIEW → QUOTE</small><div class="plan-price"><strong id="stats-visit-quote">—</strong></div></header><p>Quotes divided by page views recorded during the same aggregate counter era.</p></article>
+				<article class="plan-card"><header><small>VIEW → QUOTE</small><div class="plan-price"><strong id="stats-visit-quote">—</strong></div></header><p>Quotes divided by available page views. For periods before view tracking began, page-view coverage is partial.</p></article>
 				<article class="plan-card"><header><small>QUOTE → PAID</small><div class="plan-price"><strong id="stats-quote-paid">—</strong></div></header><p>Settled payments divided by invoices issued.</p></article>
 				<article class="plan-card"><header><small>PAID → DISPENSED</small><div class="plan-price"><strong id="stats-paid-dispensed">—</strong></div></header><p>Capabilities delivered after a settled payment.</p></article>
 			</section>
@@ -52,6 +53,6 @@
 			<section class="product-card"><div class="card-index">30</div><div class="card-body"><div class="card-title"><div><p class="product-kicker">DAILY ACTIVITY</p><h2>Last 30 UTC days</h2></div><span>NO IDENTITIES</span></div><div id="stats-activity" class="feature-strip"><span>Loading daily aggregate activity…</span></div></div></section>
 		</main>
 		<footer class="footer shell"><span>THE402MACHINE.COM</span><span>AGGREGATES ONLY / NO USER TRACKING</span><a href="/agents">AGENTS</a><a href="/install">INSTALL</a><a href="/changelog">CHANGELOG</a><a href="/api">API</a><a href="/stats">STATS</a></footer>
-		<script type="module" src="/assets/stats.js?v=3"></script>
+		<script type="module" src="/assets/stats.js?v=5"></script>
 	</body>
 </html>

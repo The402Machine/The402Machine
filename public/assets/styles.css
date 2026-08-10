@@ -54,6 +54,12 @@ h1 em { font-style: normal; color: var(--acid); }
 .live-platform-line .live-dot { width: 6px; height: 6px; margin-right: 1px; background: var(--acid); box-shadow: 0 0 12px rgba(199,255,61,.65); }
 .live-platform-line strong { color: var(--acid); }
 .live-platform-line b { margin-left: 4px; color: var(--muted); font-weight: 500; }
+.stats-period-control { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 0 0 20px; padding: 10px 12px; border: 1px solid #35412f; background: rgba(199,255,61,.025); font: 500 10px var(--mono); letter-spacing: .08em; }
+.stats-period-control > span { color: var(--muted); }
+.stats-period-control > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.stats-period-control button { min-height: 34px; padding: 7px 11px; border: 1px solid #35412f; background: #10140f; color: #aab4a4; font: inherit; letter-spacing: inherit; text-transform: uppercase; cursor: pointer; }
+.stats-period-control button:hover, .stats-period-control button.active { border-color: var(--acid); color: var(--acid); }
+.stats-period-control > strong { margin-left: auto; color: var(--cream); }
 .machine { position: relative; border: 1px solid #56644e; background: linear-gradient(145deg, #1a2018, #0d100d); box-shadow: 14px 18px 0 #050605, 0 0 90px rgba(199,255,61,.1); }
 .machine::after { content: ""; position: absolute; inset: 0; pointer-events: none; border: 1px solid rgba(255,255,255,.025); background: linear-gradient(125deg, rgba(255,255,255,.025), transparent 24%); }
 .machine-head, .machine-footer { display: flex; justify-content: space-between; align-items: center; padding: 15px 18px; border-bottom: 1px solid var(--line); font: 500 10px var(--mono); letter-spacing: .12em; }
