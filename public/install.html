@@ -25,8 +25,8 @@
 		<div class="noise" aria-hidden="true"></div>
 		<header class="topbar"><a class="brand" href="/" aria-label="The402Machine home"><span class="brand-mark">402</span><span>The402Machine</span></a><nav aria-label="Installation navigation"><a href="#local">Local</a><a href="#production">Production</a><a href="/agents">Agents</a><a href="/api">API</a><a href="/stats">Stats</a><a href="https://github.com/The402Machine/The402Machine" target="_blank" rel="noopener noreferrer">Source ↗</a></nav></header>
 		<main id="install">
-			<section class="shell docs-hero api-docs-hero"><div><p class="eyebrow">INSTALL / SELF-HOST</p><h1>Run your own<br /><em>small machine.</em></h1><p class="lede">The public interface and demos work with payments disabled. Add PostgreSQL and an invoice-only Lightning wallet when you are ready to operate the full service.</p></div><aside class="api-base-card"><small>Stack</small><code>Node.js 22 · Fastify · PostgreSQL 17 · Docker Compose</code><span>Open source under ISC. No hosted payment facilitator required.</span></aside></section>
-			<section id="local" class="api-section"><div class="shell section docs-longform"><div class="api-section-heading"><div><p class="eyebrow">LOCAL PREVIEW</p><h2>Interface first.</h2></div><p>Use the development server to inspect the storefront, documentation, stats surface, and local-only demos without wallet credentials.</p></div><pre>git clone https://github.com/The402Machine/The402Machine.git
+			<section class="shell docs-hero api-docs-hero"><div><p class="eyebrow">INSTALL / SELF-HOST</p><h1>Run your own<br /><em>small machine.</em></h1><p class="lede">Preview the interface with payments disabled. Add PostgreSQL and an invoice-only Lightning wallet for the full service.</p></div><aside class="api-base-card"><small>Stack</small><code>Node.js 22 · Fastify · PostgreSQL 17 · Docker Compose</code><span>ISC licensed. No hosted payment facilitator required.</span></aside></section>
+			<section id="local" class="api-section"><div class="shell section docs-longform"><div class="api-section-heading"><div><p class="eyebrow">LOCAL PREVIEW</p><h2>Interface first.</h2></div><p>Run the storefront, docs, stats, and demos without wallet credentials.</p></div><pre>git clone https://github.com/The402Machine/The402Machine.git
 cd The402Machine
 npm ci
 npm run dev</pre><p>Open <code>http://127.0.0.1:4020</code>. With <code>PAYMENT_PROVIDER=disabled</code>, the checkout catalogue and purchase endpoints remain unavailable by design.</p></div></section>
@@ -42,7 +42,7 @@ git diff --check</pre></section>
 docker compose --env-file .env.production build
 docker compose --env-file .env.production up -d
 docker compose --env-file .env.production ps</pre></div></section>
-			<section class="shell section api-final-cta"><div><p class="eyebrow">FULL OPERATIONS GUIDE</p><h2>Need every variable and invariant?</h2><p>The repository guide covers payment bridges, reverse proxies, product persistence, migrations, deployment, and verification without publishing private production topology.</p></div><div><a class="button primary" href="https://github.com/The402Machine/The402Machine/blob/master/INSTALL.md" target="_blank" rel="noopener noreferrer">Open INSTALL.md ↗</a><a class="button ghost" href="/changelog">Public changelog</a></div></section>
+			<section class="shell section api-final-cta"><div><p class="eyebrow">FULL OPERATIONS GUIDE</p><h2>Need the full setup?</h2><p>INSTALL.md covers configuration, migrations, deployment, and verification.</p></div><div><a class="button primary" href="https://github.com/The402Machine/The402Machine/blob/master/INSTALL.md" target="_blank" rel="noopener noreferrer">Open INSTALL.md ↗</a><a class="button ghost" href="/changelog">Public changelog</a></div></section>
 		</main>
 		<footer class="footer shell"><span>THE402MACHINE.COM</span><a href="/">HOME</a><a href="/agents">AGENTS</a><a href="/api">API</a><a href="/stats">STATS</a></footer>
 	</body>

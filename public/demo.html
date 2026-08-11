@@ -21,7 +21,7 @@
 			<header class="demo-hero">
 				<p class="eyebrow">FULL PRODUCT EXPERIENCE</p>
 				<h1>The dashboard after payment.<br /><em>Filled with live mock data.</em></h1>
-				<p class="lede">Use the filters, inspect events, open messages, change monitor settings and trigger state changes. Everything happens inside this tab. No invoice, capability, backend write or external request is created.</p>
+				<p class="lede">Use the filters, open messages, and change monitor states. Everything stays in this tab. No payment or network request is made.</p>
 				<div class="demo-safety-strip" aria-label="Demo safety properties"><span>LIVE MOCK DATA</span><span>NO PAYMENT</span><span>NO NETWORK</span><span>RESETS ON RELOAD</span></div>
 			</header>
 
@@ -32,7 +32,7 @@
 			</nav>
 
 			<section id="catch" class="demo-workspace demo-catch" data-demo-panel="catch" role="tabpanel" aria-labelledby="demo-tab-catch">
-				<div class="demo-mode-banner"><div><span class="demo-live-dot"></span><strong>SIMULATED OWNER PORTAL</strong></div><p>New synthetic requests arrive automatically while this tab is open.</p><button class="button ghost" id="demo-catch-reset" type="button">Reset inbox</button></div>
+				<div class="demo-mode-banner"><div><span class="demo-live-dot"></span><strong>SIMULATED OWNER PORTAL</strong></div><p>Synthetic requests arrive while this tab is open.</p><button class="button ghost" id="demo-catch-reset" type="button">Reset inbox</button></div>
 				<section class="portal-status-panel">
 					<div class="portal-status-head"><div><p class="eyebrow">LIVE RESOURCE</p><h2>SPARK CATCH</h2></div><span class="portal-status-badge">ACTIVE</span></div>
 					<div class="portal-countdown"><span>TIME REMAINING</span><strong id="demo-catch-remaining">4h 01m 42s</strong><small>Expires today at 14:02</small></div>
@@ -49,7 +49,7 @@
 						<label><span>URL</span><input value="https://the402machine.com/c/catch_demo_local" readonly /></label>
 						<div class="portal-code-row"><code>Authorization: Bearer demo-only-token</code></div>
 						<div class="portal-actions"><button class="button primary" data-demo-copy="Demo endpoint copied" type="button">Copy endpoint</button><button class="button" data-demo-copy="Demo header copied" type="button">Copy auth header</button><button class="button ghost" data-demo-copy="Demo cURL copied" type="button">Copy cURL example</button></div>
-						<p class="portal-hint">These controls copy inert example values. No real capability exists and no request leaves the browser.</p>
+						<p class="portal-hint">These controls copy inert examples. Nothing leaves the browser.</p>
 						<button id="demo-catch-add" class="button ghost demo-wide-button" type="button">Generate an event now</button>
 					</article>
 
@@ -72,7 +72,7 @@
 			</section>
 
 			<section id="whisper" class="demo-workspace demo-whisper" data-demo-panel="whisper" role="tabpanel" aria-labelledby="demo-tab-whisper" hidden>
-				<div class="demo-mode-banner"><div><span class="demo-live-dot whisper-dot"></span><strong>SIMULATED PRIVATE READER</strong></div><p>Choose a delivery state and experience the same read lifecycle without consuming anything.</p><button id="demo-whisper-reset" class="button ghost" type="button">Reset reader</button></div>
+				<div class="demo-mode-banner"><div><span class="demo-live-dot whisper-dot"></span><strong>SIMULATED PRIVATE READER</strong></div><p>Choose a delivery state without consuming a real read.</p><button id="demo-whisper-reset" class="button ghost" type="button">Reset reader</button></div>
 				<div class="demo-whisper-layout">
 					<aside class="demo-scenario-panel">
 						<p class="eyebrow">DELIVERY SCENARIO</p>
@@ -101,7 +101,7 @@ Reference: DEMO-402</pre>
 			</section>
 
 			<section id="pulse" class="demo-workspace demo-pulse" data-demo-panel="pulse" role="tabpanel" aria-labelledby="demo-tab-pulse" hidden>
-				<div class="demo-mode-banner"><div><span class="demo-live-dot pulse-dot"></span><strong>SIMULATED OWNER DASHBOARD</strong></div><p>The clock advances live. Pause automatic pings to watch the monitor become late.</p><button id="demo-pulse-reset" class="button ghost" type="button">Reset monitor</button></div>
+				<div class="demo-mode-banner"><div><span class="demo-live-dot pulse-dot"></span><strong>SIMULATED OWNER DASHBOARD</strong></div><p>Pause automatic pings to make the monitor late.</p><button id="demo-pulse-reset" class="button ghost" type="button">Reset monitor</button></div>
 				<section id="demo-pulse-dashboard">
 					<header class="pulse-hero"><div><p class="eyebrow">LIVE HEARTBEAT MONITOR</p><h2 id="demo-pulse-name">Nightly backup</h2><p id="demo-pulse-description" class="lede">Encrypted NAS snapshot and off-site verification.</p></div><div id="demo-pulse-state" class="pulse-state" data-state="operational"><i></i><span>OPERATIONAL</span></div></header>
 					<section class="pulse-overview">

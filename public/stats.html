@@ -30,12 +30,12 @@
 			<nav aria-label="Main navigation"><a href="/">Home</a><a href="/api">API</a><a href="/demo">Demos</a><a href="https://github.com/The402Machine/The402Machine" target="_blank" rel="noopener noreferrer">Source ↗</a></nav>
 		</header>
 		<main id="stats" class="shell section">
-			<header class="compact-heading"><p class="eyebrow">PLATFORM ACTIVITY / AGGREGATED</p><h1>Small numbers.<br /><em>Real machines.</em></h1><p class="section-intro">Public counters derived from daily page totals and aggregate order stages. No cookies, IP addresses, user agents, referrers, visitor identifiers, invoices, tokens, capabilities, payloads, or per-user history are exposed.</p></header>
+			<header class="compact-heading"><p class="eyebrow">PLATFORM ACTIVITY / AGGREGATED</p><h1>Small numbers.<br /><em>Real machines.</em></h1><p class="section-intro">Aggregate page and order counters. No cookies, visitor identifiers, invoices, tokens, capabilities, or payloads.</p></header>
 			<div class="stats-period-control" aria-label="Stats period"><span>PERIOD</span><div><button id="stats-period-all" class="active" type="button" data-stats-period="all" aria-pressed="true">All time</button><button id="stats-period-today" type="button" data-stats-period="today" aria-pressed="false">Today</button><button id="stats-period-7d" type="button" data-stats-period="last7Days" aria-pressed="false">7 days</button><button id="stats-period-30d" type="button" data-stats-period="last30Days" aria-pressed="false">30 days</button></div><strong id="stats-period-label">ALL TIME</strong></div>
 			<section class="plan-grid" aria-live="polite">
 				<article class="plan-card recommended"><header><small>PAGE VIEWS</small><div class="plan-price"><strong id="stats-views">—</strong></div></header><p>Public HTML page loads in the selected period.</p></article>
-				<article class="plan-card"><header><small>TODAY / UTC</small><div class="plan-price"><strong id="stats-views-today">—</strong></div></header><p>Current UTC day, kept visible as a quick reference.</p></article>
-				<article class="plan-card"><header><small>LAST 7 DAYS</small><div class="plan-price"><strong id="stats-views-week">—</strong></div></header><p>Rolling seven-day page loads, kept visible as a quick reference.</p></article>
+				<article class="plan-card"><header><small>TODAY / UTC</small><div class="plan-price"><strong id="stats-views-today">—</strong></div></header><p>Page loads today in UTC.</p></article>
+				<article class="plan-card"><header><small>LAST 7 DAYS</small><div class="plan-price"><strong id="stats-views-week">—</strong></div></header><p>Page loads over seven UTC days.</p></article>
 			</section>
 			<section class="plan-grid" aria-live="polite">
 				<article class="plan-card"><header><small>QUOTES ISSUED</small><div class="plan-price"><strong id="stats-quotes">—</strong></div></header><p>Orders that reached the Lightning invoice stage.</p></article>

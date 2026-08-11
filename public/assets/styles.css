@@ -141,8 +141,6 @@ h2 { font-size: clamp(42px, 6vw, 78px); line-height: .98; letter-spacing: -.065e
 .product-kicker { color: var(--muted); font: 500 10px var(--mono); letter-spacing: .14em; }
 .card-body > p { max-width: 880px; color: var(--cream); font-size: 18px; }
 .product-line { margin-bottom: 22px; font-size: clamp(19px, 2vw, 25px) !important; font-weight: 500; letter-spacing: -.025em; }
-.product-example { margin: -7px 0 20px; padding: 12px 14px; border-left: 2px solid var(--acid); background: rgba(199,255,61,.035); color: var(--muted) !important; font: 400 13px/1.6 var(--mono) !important; }
-.product-example strong { color: var(--cream); }
 .demo-link { display: inline-flex; min-height: 44px; align-items: center; margin: -6px 0 12px; padding-right: 8px; color: var(--acid); font: 500 10px var(--mono); text-transform: uppercase; letter-spacing: .08em; transition: color .18s ease, transform .18s ease; }
 .demo-link:hover { color: var(--ink); transform: translateX(3px); }
 .feature-strip { display: flex; flex-wrap: wrap; gap: 9px; margin: 0 0 30px; }

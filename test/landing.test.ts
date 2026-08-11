@@ -31,7 +31,7 @@ describe("public landing page", () => {
 		expect(response.body).toContain("about every 5 minutes");
 		expect(response.body).toContain("about every minute");
 		expect(response.body).toContain("about every 20 seconds");
-		expect(response.body).toContain("The quota belongs to the full lifetime");
+		expect(response.body).toContain("The quota covers the full lifetime");
 		expect(response.body).toContain('<div class="plan-price"><strong>42</strong><span>SATS</span>');
 		expect(response.body).toContain('<div class="plan-price"><strong>402</strong><span>SATS</span>');
 		expect(response.body).toContain('<div class="plan-price"><strong>4,002</strong><span>SATS</span>');
@@ -44,7 +44,7 @@ describe("public landing page", () => {
 		expect(response.body).not.toContain("Key location");
 		expect(response.body).not.toContain("HUMAN → ONE READ");
 		expect(response.body).toContain("Catch webhooks from GitHub, forms, monitors, or devices");
-		expect(response.body).toContain("Send an encrypted note, password, recovery detail, or private handoff");
+		expect(response.body).toContain("Send an encrypted note, password, or recovery detail");
 		expect(response.body).toContain('class="catalogue-illustration"');
 		expect(response.body).toContain('class="product-icon"');
 		expect(response.body).toContain("<title>CATCH webhook inbox</title>");
@@ -84,9 +84,7 @@ describe("public landing page", () => {
 		expect(response.body).toContain('id="live-dispensed"');
 		expect(response.body).toContain('id="live-sats"');
 		expect(response.body).toContain('href="/stats"');
-		expect(response.body).toContain("GitHub webhook delivery arrives in a temporary inbox");
-		expect(response.body).toContain("Share a recovery code as a client-encrypted handoff");
-		expect(response.body).toContain("A nightly backup job pings one temporary heartbeat URL");
+		expect(response.body).not.toContain('class="product-example"');
 		expect(response.body).toContain('id="machine-product"');
 		expect(response.body).toContain('data-machine-product="pulse"');
 		expect(response.body).toContain('href="/demo#catch"');
