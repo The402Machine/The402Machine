@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { encode, sign } from "bolt11-ts";
 import { describe, expect, it, vi } from "vitest";
 
-import { LightningAddressAdapter } from "../../src/gate/lightning-address-adapter.js";
+import { createPinnedLookup, LightningAddressAdapter } from "../../src/gate/lightning-address-adapter.js";
 
 const paymentHash = "a".repeat(64);
 const metadata = JSON.stringify([["text/plain", "Pay alice"]]);
@@ -53,6 +53,20 @@ describe("Lightning Address adapter", () => {
 			"https://wallet.example/.well-known/lnurlp/alice",
 			"https://wallet.example/lnurl/callback?amount=42000",
 		]);
+	});
+
+	it("uses a scalar address and family in the pinned DNS lookup callback", async () => {
+		const lookup = createPinnedLookup("93.184.216.34");
+		await new Promise<void>((resolve, reject) => {
+			lookup("wallet.example", { all: true }, (error, address, family) => {
+				try {
+					expect(error).toBeNull();
+					expect(address).toBe("93.184.216.34");
+					expect(family).toBe(4);
+					resolve();
+				} catch (caught) { reject(caught instanceof Error ? caught : new Error(String(caught))); }
+			});
+		});
 	});
 
 	it("falls back to payer preimage when the provider omits LUD-21 verify", async () => {

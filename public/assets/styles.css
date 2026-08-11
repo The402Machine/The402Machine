@@ -631,6 +631,9 @@ h2 { font-size: clamp(42px, 6vw, 78px); line-height: .98; letter-spacing: -.065e
 
 @media (max-width: 980px) {
 	.hero { grid-template-columns: 1fr; min-height: auto; }
+	.gate-hero { grid-template-columns: 1fr; min-height: auto; align-items: start; padding-block: 58px 78px; }
+	.gate-terminal { width: min(100%, 680px); }
+	.gate-price-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 	.machine { max-width: 590px; transform: none; }
 	.section-heading, .principles-grid { grid-template-columns: 1fr; }
 	.api-heading { grid-template-columns: 1fr; }
@@ -662,6 +665,23 @@ h2 { font-size: clamp(42px, 6vw, 78px); line-height: .98; letter-spacing: -.065e
 }
 @media (max-width: 700px) {
 	.shell { width: min(100% - 26px, 1240px); }
+	.gate-body { overflow-x: hidden; }
+	.gate-hero { gap: 32px; padding-block: 42px 64px; }
+	.gate-hero h1 { font-size: clamp(46px, 14.5vw, 66px); overflow-wrap: anywhere; }
+	.gate-hero .lede { font-size: 17px; }
+	.gate-terminal { box-shadow: 6px 7px 0 #050605; }
+	.gate-terminal header, .gate-terminal footer { gap: 10px; padding: 12px; letter-spacing: .06em; }
+	.gate-terminal li { grid-template-columns: 30px minmax(0, 1fr); gap: 8px; padding: 16px 12px; }
+	.gate-terminal li strong, .gate-terminal li small { overflow-wrap: anywhere; }
+	.gate-principles, .gate-price-grid { grid-template-columns: 1fr; }
+	.gate-principles article, .gate-price-grid article { padding: 22px 18px; }
+	.gate-body .section { padding-block: 64px; }
+	.gate-body .api-section-heading { gap: 16px; margin-bottom: 26px; }
+	.gate-body pre { max-width: 100%; padding: 14px 12px; overflow-x: auto; white-space: pre; font-size: 10px; line-height: 1.55; }
+	.gate-warning, .gate-pricing-note { padding: 16px; }
+	.gate-price-grid strong { font-size: 54px; }
+	.gate-body .api-final-cta .button { width: 100%; }
+	.gate-body .footer { gap: 14px; }
 	.topbar { padding-inline: 13px; }
 	nav a:not(:last-child) { display: none; }
 	h1 { font-size: clamp(48px, 16vw, 72px); }

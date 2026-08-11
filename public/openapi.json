@@ -1491,7 +1491,7 @@
     "/api/gate/intents/{intentId}/prove": {
       "post": {
         "summary": "Submit payer proof for an existing intent",
-        "description": "Accepts a direct preimage or a Payment credential. The preimage is never returned.",
+        "description": "Submit a direct payer preimage as JSON while authenticating the project with its bearer capability. X-Gate-Project is mandatory. Authorization: Payment credentials are also accepted by the runtime; they additionally require X-Gate-Method and X-Gate-Path and must be calculated over the exact JSON proof body bytes.",
         "parameters": [
           {
             "name": "intentId",
@@ -1502,9 +1502,39 @@
             }
           },
           {
-            "name": "Authorization",
+            "name": "X-Gate-Project",
+            "in": "header",
+            "required": true,
+            "description": "Public gate_project_* identifier owning the intent.",
+            "schema": {
+              "type": "string",
+              "pattern": "^gate_project_[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "X-Gate-Method",
             "in": "header",
             "required": false,
+            "description": "Required with Authorization: Payment. Original protected request method.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Gate-Path",
+            "in": "header",
+            "required": false,
+            "description": "Required with Authorization: Payment. Original canonical protected request path.",
+            "schema": {
+              "type": "string",
+              "pattern": "^/"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "description": "Bearer project capability, or a Payment credential bound to this exact proof request body and the original protected request metadata.",
             "schema": {
               "type": "string"
             }
@@ -1522,13 +1552,10 @@
                     "type": "string",
                     "pattern": "^[a-f0-9]{64}$"
                   }
-                }
-              }
-            },
-            "application/octet-stream": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
+                },
+                "required": [
+                  "preimage"
+                ]
               }
             }
           }

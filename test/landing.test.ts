@@ -156,12 +156,20 @@ describe("public landing page", () => {
 		for (const statement of ["private local operator command", "without a public signup endpoint", "without a public signup endpoint or Lightning network call"]) expect(html).toContain(statement);
 	});
 
+	it("keeps the GATE landing readable on narrow mobile viewports", async () => {
+		const css = await readFile(new URL("../public/assets/styles.css", import.meta.url), "utf8");
+		expect(css).toContain(".gate-hero { grid-template-columns: 1fr; min-height: auto;");
+		expect(css).toContain(".gate-principles, .gate-price-grid { grid-template-columns: 1fr;");
+		expect(css).toContain(".gate-terminal { box-shadow: 6px 7px 0 #050605;");
+		expect(css).toContain(".gate-body pre { max-width: 100%; padding: 14px 12px;");
+	});
+
 	it("declares the site favicon on every public HTML page", async () => {
 		const pages = ["index.html", "api.html", "demo.html", "catch.html", "whisper.html", "pulse.html", "pulse-public.html", "stats.html", "agents.html", "gate.html", "install.html", "changelog.html"];
 		for (const page of pages) {
 			const html = await readFile(new URL(`../public/${page}`, import.meta.url), "utf8");
 			expect(html, page).toContain('<link rel="icon" href="/favicon.svg" type="image/svg+xml" />');
-			expect(html, page).toMatch(/href="\/assets\/styles\.css\?v=(?:23|24)"/u);
+			expect(html, page).toMatch(/href="\/assets\/styles\.css\?v=(?:23|24|25)"/u);
 			if (!["catch.html", "whisper.html", "pulse.html", "pulse-public.html"].includes(page)) expect(html, page).toContain('href="/stats"');
 		}
 	});

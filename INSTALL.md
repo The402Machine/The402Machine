@@ -42,7 +42,17 @@ Store the protocol key and both PEM files in the production secret manager. The 
 Activation order:
 
 1. Back up the production database and deployment environment.
-2. Install and validate the GATE-specific Nginx locations and rate-limit zones.
+2. Install and validate the versioned Nginx configuration, keeping the previous files for rollback:
+
+   ```bash
+   sudo cp /etc/nginx/sites-available/the402machine.com /etc/nginx/sites-available/the402machine.com.pre-gate
+   sudo cp /etc/nginx/conf.d/the402machine-rate-limits.conf /etc/nginx/conf.d/the402machine-rate-limits.conf.pre-gate
+   sudo install -m 0644 deploy/nginx/the402machine.com.conf /etc/nginx/sites-available/the402machine.com
+   sudo install -m 0644 deploy/nginx/the402machine-rate-limits.conf /etc/nginx/conf.d/the402machine-rate-limits.conf
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
+
+   If validation fails, restore both `.pre-gate` files, run `sudo nginx -t`, then reload Nginx.
 3. Deploy the reviewed commit with `GATE_ENABLED=false`; require successful migrations and healthy web/worker services.
 4. Confirm migrations `0020_gate.sql` and `0021_page_view_public_paths.sql` are recorded.
 5. Configure realm, protocol key, receipt key pair and key ID; verify the published JWKS matches the configured public key.

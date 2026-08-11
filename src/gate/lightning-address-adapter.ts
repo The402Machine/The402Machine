@@ -86,7 +86,7 @@ export class LightningAddressAdapter {
 	async #fetchJson(url: URL): Promise<unknown> {
 		const [pinnedAddress] = await this.#publicAddresses(url);
 		if (pinnedAddress === undefined) throw new Error("Lightning provider requires a public HTTPS endpoint");
-		const dispatcher = this.#pinDns ? new Agent({ connect: { lookup: (_hostname, _options, callback) => callback(null, [{ address: pinnedAddress, family: isIP(pinnedAddress) }]) } }) : null;
+		const dispatcher = this.#pinDns ? new Agent({ connect: { lookup: createPinnedLookup(pinnedAddress) } }) : null;
 		const controller = new AbortController();
 		const timeout = setTimeout(() => controller.abort(), this.#timeoutMs);
 		let response: Response;
@@ -157,6 +157,12 @@ async function resolveWithDns(hostname: string): Promise<string[]> {
 	const { resolve4, resolve6 } = await import("node:dns/promises");
 	const [ipv4, ipv6] = await Promise.all([resolve4(hostname).catch(() => []), resolve6(hostname).catch(() => [])]);
 	return [...ipv4, ...ipv6];
+}
+
+export function createPinnedLookup(pinnedAddress: string) {
+	const family = isIP(pinnedAddress);
+	if (family === 0) throw new Error("Pinned Lightning provider address is invalid");
+	return (_hostname: string, _options: unknown, callback: (error: Error | null, address: string, family: number) => void): void => callback(null, pinnedAddress, family);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null; }
