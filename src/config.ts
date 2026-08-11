@@ -14,6 +14,15 @@ export type PaymentConfig = {
 	agentProtocols: { enabled: boolean; key: string | undefined; realm: string };
 };
 
+export type GateConfig = {
+	enabled: boolean;
+	protocolKey: string | undefined;
+	receiptPrivateKey: string | undefined;
+	receiptPublicKey: string | undefined;
+	receiptKeyId: string;
+	realm: string;
+};
+
 export type AppConfig = {
 	host: string;
 	port: number;
@@ -21,6 +30,7 @@ export type AppConfig = {
 	trustedProxy: string | undefined;
 	catch: CatchConfig;
 	payment: PaymentConfig;
+	gate: GateConfig;
 };
 
 const parsePort = (value: string | undefined): number => {
@@ -80,6 +90,22 @@ export const loadConfig = (environment: NodeJS.ProcessEnv = process.env): AppCon
 		if (!nonEmpty(payment.agentProtocols.key) || Buffer.from(payment.agentProtocols.key, "base64url").byteLength !== 32) throw new Error("PAYMENT_PROTOCOL_KEY must contain 32 base64url-encoded bytes");
 		if (!nonEmpty(payment.agentProtocols.realm)) throw new Error("PAYMENT_REALM is required when agent payment protocols are enabled");
 	}
+	const gate: GateConfig = {
+		enabled: parseBoolean("GATE_ENABLED", environment.GATE_ENABLED, false),
+		protocolKey: environment.GATE_PROTOCOL_KEY,
+		receiptPrivateKey: environment.GATE_RECEIPT_PRIVATE_KEY,
+		receiptPublicKey: environment.GATE_RECEIPT_PUBLIC_KEY,
+		receiptKeyId: environment.GATE_RECEIPT_KEY_ID ?? "gate-beta",
+		realm: environment.GATE_REALM ?? "the402machine.com",
+	};
+	if (gate.enabled) {
+		if (!hasDatabaseUrl || !hasTokenPepper) throw new Error("DATABASE_URL and CATCH_TOKEN_PEPPER are required when GATE is enabled");
+		if (!nonEmpty(gate.protocolKey) || Buffer.from(gate.protocolKey, "base64url").byteLength !== 32) throw new Error("GATE_PROTOCOL_KEY must contain 32 base64url-encoded bytes");
+		if (!validPemKey(gate.receiptPrivateKey, "PRIVATE KEY")) throw new Error("GATE_RECEIPT_PRIVATE_KEY must contain a base64url-encoded PKCS8 PEM key");
+		if (!validPemKey(gate.receiptPublicKey, "PUBLIC KEY")) throw new Error("GATE_RECEIPT_PUBLIC_KEY must contain a base64url-encoded SPKI PEM key");
+		if (!nonEmpty(gate.receiptKeyId) || gate.receiptKeyId.length > 120) throw new Error("GATE_RECEIPT_KEY_ID is invalid");
+		if (!nonEmpty(gate.realm)) throw new Error("GATE_REALM is required when GATE is enabled");
+	}
 
 	return {
 		host: environment.HOST ?? "127.0.0.1",
@@ -88,11 +114,18 @@ export const loadConfig = (environment: NodeJS.ProcessEnv = process.env): AppCon
 		trustedProxy: environment.TRUSTED_PROXY,
 		catch: catchConfig,
 		payment,
+		gate,
 	};
 };
 
 function nonEmpty(value: string | undefined): value is string {
 	return value !== undefined && value.length > 0;
+}
+
+function validPemKey(value: string | undefined, label: "PRIVATE KEY" | "PUBLIC KEY"): boolean {
+	if (!nonEmpty(value)) return false;
+	try { return Buffer.from(value, "base64url").toString("utf8").includes(`BEGIN ${label}`); }
+	catch { return false; }
 }
 
 function isPrivatePaymentBridgeUrl(value: string): boolean {

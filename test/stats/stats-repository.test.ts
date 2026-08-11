@@ -16,7 +16,7 @@ let repository: StatsRepository;
 beforeAll(async () => {
 	postgresContainer = await startPostgresTestContainer({ name: container, password });
 	sql = postgres(postgresContainer.databaseUrl, { max: 1 });
-	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql", "0014_whisper_reveal_window.sql", "0015_whisper_custom_read_limit.sql", "0016_pulse_public_status_id.sql", "0017_payment_challenges.sql", "0018_platform_events.sql", "0019_page_views.sql"]) {
+	for (const migrationName of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql", "0014_whisper_reveal_window.sql", "0015_whisper_custom_read_limit.sql", "0016_pulse_public_status_id.sql", "0017_payment_challenges.sql", "0018_platform_events.sql", "0019_page_views.sql", "0021_page_view_public_paths.sql"]) {
 		await sql.unsafe(await readFile(new URL(`../../migrations/${migrationName}`, import.meta.url), "utf8")).simple();
 	}
 	repository = new StatsRepository(sql);
@@ -86,15 +86,23 @@ describe("StatsRepository", () => {
 		expect(stats.funnel.quotesIssued).toBeLessThanOrEqual(stats.activityLast30Days.reduce((sum, day) => sum + day.quotesIssued, 0));
 	});
 
-	it("stores only daily counters for approved public pages", async () => {
+	it("stores only daily counters for approved public pages including GATE", async () => {
 		await repository.recordPageView("/api");
 		await repository.recordPageView("/api");
 		await repository.recordPageView("/catch");
+		await repository.recordPageView("/agents");
+		await repository.recordPageView("/gate");
+		await repository.recordPageView("/install");
+		await repository.recordPageView("/changelog");
 		const rows = await sql<{ path: string; views: string }[]>`select path, views::text from page_view_daily where day = (timezone('UTC', clock_timestamp()))::date order by path`;
 		expect(rows).toEqual([
 			{ path: "/", views: "1" },
+			{ path: "/agents", views: "1" },
 			{ path: "/api", views: "2" },
 			{ path: "/catch", views: "1" },
+			{ path: "/changelog", views: "1" },
+			{ path: "/gate", views: "1" },
+			{ path: "/install", views: "1" },
 			{ path: "/stats", views: "1" },
 		]);
 		const columns = await sql<{ column_name: string }[]>`select column_name from information_schema.columns where table_name = 'page_view_daily' order by column_name`;

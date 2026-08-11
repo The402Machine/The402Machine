@@ -31,6 +31,23 @@ The402Machine sells temporary webhook inboxes, encrypted handoffs and heartbeat 
 
 There are no customer accounts, subscriptions or prepaid balances. The server verifies settlement itself and provisions the resource in the same PostgreSQL transaction that consumes the payment challenge.
 
+## GATE private beta
+
+GATE turns a fixed external API route into a non-custodial Lightning HTTP 402 paywall. The merchant configures a Lightning Address, receives buyer sats directly, and uses a short-lived Ed25519 receipt to authorize the exact method, path and body digest.
+
+- Agent-first through native JSON 402 and HTTP Payment Authentication.
+- Receipts are reusable only for the same exact bound request during their five-minute validity. Non-idempotent origins must deduplicate by receipt JTI or their own request key.
+- 25 verified authorizations free per UTC month.
+- Planned prepaid beta packs: 420 for 42 sats, 4,200 for 402 sats, and 42,000 for 4,002 sats. Pack purchasing stays closed until its own settlement flow is implemented.
+- No subscription, wallet balance, payout, split or forwarding.
+- A credit is consumed only after verified `AUTHORIZED` persistence.
+- Human payment is supported through payer proof; provider polling is accepted only with cryptographic proof.
+- GATE does not claim x402 compatibility.
+
+The feature is disabled by default and is intentionally omitted from the default machine discovery manifest. See the [GATE beta page](https://the402machine.com/gate), contract preview, and [`src/gate/gate-sdk.ts`](src/gate/gate-sdk.ts).
+
+Private-beta projects and fixed route policies are created with the local `gate:operator` command documented in [INSTALL.md](INSTALL.md). There is no public signup or provisioning API, and the command performs no Lightning or payment network call.
+
 ## What can you buy?
 
 | Product | What you receive | Limits and privacy boundary |

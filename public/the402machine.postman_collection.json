@@ -69,6 +69,26 @@
     {
       "key": "l402IdempotencyKey",
       "value": "replace-with-one-stable-key-per-l402-purchase"
+    },
+    {
+      "key": "gateProjectId",
+      "value": "gate_project_replace_me"
+    },
+    {
+      "key": "gateProjectKey",
+      "value": "replace-with-private-project-capability"
+    },
+    {
+      "key": "gateRouteKey",
+      "value": "weather"
+    },
+    {
+      "key": "gateIntentId",
+      "value": "replace-after-quote"
+    },
+    {
+      "key": "gateIdempotencyKey",
+      "value": "gate-beta-stable-intent"
     }
   ],
   "item": [
@@ -979,6 +999,187 @@
             "description": ""
           },
           "response": []
+        }
+      ]
+    },
+    {
+      "name": "GATE private beta",
+      "description": "Agent-first HTTP 402 authorization. Merchant receives sats directly. Credits are consumed only after verified authorization. Not x402 compatibility.",
+      "item": [
+        {
+          "name": "GATE native quote",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{gateProjectKey}}",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{gateIdempotencyKey}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Gate-Project",
+                "value": "{{gateProjectId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Gate-Route",
+                "value": "{{gateRouteKey}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Gate-Method",
+                "value": "POST",
+                "type": "text"
+              },
+              {
+                "key": "X-Gate-Path",
+                "value": "/v1/weather",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/gate/intents"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"city\":\"Madrid\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Expected HTTP 402. Client recipient headers are ignored."
+          }
+        },
+        {
+          "name": "GATE Payment Auth challenge",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{gateProjectKey}}",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{gateIdempotencyKey}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Gate-Project",
+                "value": "{{gateProjectId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Gate-Route",
+                "value": "{{gateRouteKey}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Gate-Method",
+                "value": "POST",
+                "type": "text"
+              },
+              {
+                "key": "X-Gate-Path",
+                "value": "/v1/weather",
+                "type": "text"
+              },
+              {
+                "key": "X-Payment-Protocol",
+                "value": "payment",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/gate/intents"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"city\":\"Madrid\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GATE direct preimage proof",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Gate-Project",
+                "value": "{{gateProjectId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Gate-Project-Key",
+                "value": "{{gateProjectKey}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/gate/intents/{{gateIntentId}}/prove"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"preimage\":\"replace-with-64-lowercase-hex\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Inert placeholder. Never save a live preimage in shared Postman."
+          }
+        },
+        {
+          "name": "GATE poll verification",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{gateProjectKey}}", "type": "text" },
+              { "key": "X-Gate-Project", "value": "{{gateProjectId}}", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/gate/intents/{{gateIntentId}}"
+            }
+          }
+        },
+        {
+          "name": "GATE receipt JWKS",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/.well-known/gate-jwks.json"
+            }
+          }
         }
       ]
     }

@@ -1307,6 +1307,286 @@
         "security": [],
         "operationId": "getApiPulsePublicPublicstatusid"
       }
+    },
+    "/api/gate/intents": {
+      "post": {
+        "summary": "Create or recover one GATE payment intent",
+        "description": "Private beta. Exact request bytes are hashed. Payment goes directly to the project's stored Lightning Address. Credits are consumed only after verified authorization.",
+        "security": [
+          {
+            "gateProjectCapability": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "X-Gate-Project",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Gate-Route",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Gate-Method",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Gate-Path",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Payment-Protocol",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "payment"
+              ]
+            },
+            "description": "Optional Payment Authentication. No x402 compatibility claim."
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {}
+            },
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "402": {
+            "description": "Native Lightning quote or HTTP Payment Authentication challenge according to X-Payment-Protocol.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/GateQuote"
+                    },
+                    {
+                      "$ref": "#/components/schemas/GatePaymentChallenge"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid binding"
+          },
+          "401": {
+            "description": "Invalid project capability"
+          },
+          "200": {
+            "description": "Already authorized idempotent request",
+            "headers": {
+              "Gate-Receipt": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GateAuthorization"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "createGateIntent"
+      }
+    },
+    "/api/gate/intents/{intentId}": {
+      "get": {
+        "summary": "Poll optional provider verification",
+        "parameters": [
+          {
+            "name": "intentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized",
+            "headers": {
+              "Gate-Receipt": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GateAuthorization"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Pending",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatePending"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "pollGateIntent",
+        "security": [
+          {
+            "gateProjectCapability": []
+          }
+        ]
+      }
+    },
+    "/api/gate/intents/{intentId}/prove": {
+      "post": {
+        "summary": "Submit payer proof for an existing intent",
+        "description": "Accepts a direct preimage or a Payment credential. The preimage is never returned.",
+        "parameters": [
+          {
+            "name": "intentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "preimage": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              }
+            },
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authorized",
+            "headers": {
+              "Gate-Receipt": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GateAuthorization"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed proof"
+          },
+          "401": {
+            "description": "Invalid credential or intent mismatch"
+          },
+          "402": {
+            "description": "Not authorized"
+          }
+        },
+        "operationId": "proveGateIntent",
+        "security": [
+          {
+            "gateProjectCapability": []
+          }
+        ]
+      }
+    },
+    "/.well-known/gate-jwks.json": {
+      "get": {
+        "summary": "GATE receipt public keys",
+        "responses": {
+          "200": {
+            "description": "Ed25519 JWKS",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getGateReceiptJwks",
+        "security": []
+      }
     }
   },
   "components": {
@@ -1315,6 +1595,11 @@
         "type": "http",
         "scheme": "bearer",
         "description": "Use the exact owner, ingest, read or ping capability dispensed after settlement. Never commit real values."
+      },
+      "gateProjectCapability": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Private GATE project API capability. Keep it server-side."
       }
     },
     "parameters": {
@@ -2254,6 +2539,128 @@
           "expiresAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "GateQuote": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "intentId",
+          "amountSats",
+          "bolt11",
+          "paymentHash",
+          "expiresAt",
+          "verification"
+        ],
+        "properties": {
+          "intentId": {
+            "type": "string"
+          },
+          "amountSats": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "bolt11": {
+            "type": "string"
+          },
+          "paymentHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "verification": {
+            "type": "string",
+            "enum": [
+              "payer-preimage",
+              "url"
+            ]
+          }
+        }
+      },
+      "GateAuthorization": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "authorized",
+          "receipt",
+          "source"
+        ],
+        "properties": {
+          "authorized": {
+            "const": true
+          },
+          "receipt": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "monthly_free",
+              "prepaid_grant"
+            ]
+          }
+        }
+      },
+      "GatePending": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "authorized",
+          "state"
+        ],
+        "properties": {
+          "authorized": {
+            "const": false
+          },
+          "state": {
+            "type": "string"
+          }
+        }
+      },
+      "GatePaymentChallenge": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "protocol",
+          "method",
+          "intent",
+          "orderId",
+          "amountSats",
+          "expiresAt",
+          "proveUrl"
+        ],
+        "properties": {
+          "protocol": {
+            "type": "string",
+            "const": "payment"
+          },
+          "method": {
+            "type": "string",
+            "const": "lightning"
+          },
+          "intent": {
+            "type": "string",
+            "const": "charge"
+          },
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amountSats": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "proveUrl": {
+            "type": "string",
+            "pattern": "^/api/gate/intents/[^/]+/prove$"
           }
         }
       }

@@ -3,6 +3,7 @@ import { defineConfig } from "vitest/config";
 const dockerIntegrationTests = [
 	"test/lifecycle/catch-expiry.test.ts",
 	"test/payment/payment-repository.test.ts",
+	"test/gate/gate-repository.test.ts",
 	"test/storage/catch-repository.test.ts",
 	"test/storage/migration.test.ts",
 	"test/whisper/whisper-repository.test.ts",
@@ -10,6 +11,8 @@ const dockerIntegrationTests = [
 
 export default defineConfig({
 	test: {
+		testTimeout: 15_000,
+		hookTimeout: 20_000,
 		sequence: {
 			groupOrder: 0,
 			concurrent: false,

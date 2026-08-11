@@ -2,6 +2,54 @@
 
 This document contains the technical and self-hosting material intentionally kept out of the user-facing README.
 
+> GATE is a private beta and stays disabled by default. Enabling it requires `GATE_ENABLED=true`, a dedicated protocol key, and an Ed25519 receipt key pair. Do not enable GATE on a public deployment until projects and fixed routes have been provisioned through a private operator workflow.
+
+### Private GATE operator workflow
+
+Apply migrations before provisioning. The operator command writes directly to PostgreSQL, stores only capability hashes and never resolves the Lightning Address or creates an invoice:
+
+```sh
+npm run gate:operator -- create-project \
+  --name "Weather API" \
+  --lightning-address merchant@example.com \
+  --route forecast:GET:/v1/forecast:42 \
+  --allow-plaintext-capabilities
+```
+
+The explicit acknowledgement is mandatory because the command prints the project API capability and administrative capability exactly once. Run it only in a private interactive terminal, save both values directly in the operator's password manager, then clear terminal scrollback if appropriate. Do not run it from CI, command substitution or automation that captures stdout, and do not paste the output into tickets, logs, environment templates or public Postman environments.
+
+Inspect non-secret policy later with:
+
+```sh
+npm run gate:operator -- inspect-project --project gate_project_REPLACE_ME
+```
+
+The operator workflow does not activate GATE. Runtime routes remain absent until `GATE_ENABLED=true` and all signing/protocol variables are valid.
+
+### Production GATE activation
+
+Generate dedicated values offline in a private operator shell. Do not reuse another product key and do not expose the output through chat, CI logs or shell tracing:
+
+```bash
+umask 077
+openssl genpkey -algorithm Ed25519 -out gate-receipt-private.pem
+openssl pkey -in gate-receipt-private.pem -pubout -out gate-receipt-public.pem
+openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n'
+```
+
+Store the protocol key and both PEM files in the production secret manager. The application key variables contain base64url of the complete PEM bytes. Set `GATE_REALM=the402machine.com`, choose a stable unique `GATE_RECEIPT_KEY_ID`, and verify the Ed25519 pair offline before activation.
+
+Activation order:
+
+1. Back up the production database and deployment environment.
+2. Install and validate the GATE-specific Nginx locations and rate-limit zones.
+3. Deploy the reviewed commit with `GATE_ENABLED=false`; require successful migrations and healthy web/worker services.
+4. Confirm migrations `0020_gate.sql` and `0021_page_view_public_paths.sql` are recorded.
+5. Configure realm, protocol key, receipt key pair and key ID; verify the published JWKS matches the configured public key.
+6. Provision projects only in a private interactive terminal and transfer capabilities directly to the merchant secret manager.
+7. Set `GATE_ENABLED=true`, recreate web and expiry-worker, then run provider-free checks: health, JWKS, unauthenticated 401 and malformed-request 400.
+8. Do not send a valid authenticated quote until a payment test is explicitly approved. A valid quote resolves the merchant Lightning Address and can create an invoice.
+
 ## Requirements
 
 - Node.js 22

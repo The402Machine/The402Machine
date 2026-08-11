@@ -14,6 +14,8 @@ describe("Nginx security boundary", () => {
 		expect(zones).toContain("limit_req_zone $binary_remote_addr zone=the402_owner");
 		expect(zones).toContain("limit_req_zone $binary_remote_addr zone=the402_payment_quote");
 		expect(zones).toContain("limit_req_zone $binary_remote_addr zone=the402_payment_check");
+		expect(zones).toContain("limit_req_zone $binary_remote_addr zone=the402_gate_quote");
+		expect(zones).toContain("limit_req_zone $binary_remote_addr zone=the402_gate_check");
 		expect(zones).toContain("limit_req_status 429");
 		expect(realIp).toContain("set_real_ip_from 173.245.48.0/20;");
 		expect(realIp).toContain("real_ip_header CF-Connecting-IP;");
@@ -29,6 +31,11 @@ describe("Nginx security boundary", () => {
 		expect(site).toContain("limit_req zone=the402_payment_quote");
 		expect(site).toContain("location ^~ /api/payments/");
 		expect(site).toContain("limit_req zone=the402_payment_check");
+		expect(site).toContain("location = /api/gate/intents");
+		expect(site).toContain("location ^~ /api/gate/intents/");
+		expect(site).toContain("client_max_body_size 1m;");
+		expect(site).toContain("limit_req zone=the402_gate_quote");
+		expect(site).toContain("limit_req zone=the402_gate_check");
 		expect(proxy).toContain("proxy_set_header X-Forwarded-For $remote_addr;");
 		expect(proxy).not.toContain("$proxy_add_x_forwarded_for");
 	});

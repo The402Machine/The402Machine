@@ -28,7 +28,7 @@ describe("agent discovery and public SEO", () => {
 		for (const [url, contentType, expected] of [
 			["/.well-known/the402machine.json", "application/json", '"paymentProtocols"'],
 			["/robots.txt", "text/plain", "Sitemap: https://the402machine.com/sitemap.xml"],
-			["/sitemap.xml", "application/xml", "https://the402machine.com/agents"],
+			["/sitemap.xml", "application/xml", "https://the402machine.com/gate"],
 			["/agents", "text/html", "AGENT PURCHASE GUIDE"],
 			["/install", "text/html", "INSTALL / SELF-HOST"],
 			["/changelog", "text/html", "PUBLIC CHANGELOG"],

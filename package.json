@@ -12,6 +12,7 @@
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
     "migrate": "node scripts/migrate.mjs",
+    "gate:operator": "tsx src/gate/gate-operator-cli.ts",
     "worker": "node dist/worker.js",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
@@ -30,6 +31,7 @@
     "fastify": "5.11.3",
     "postgres": "^3.4.9",
     "qrcode": "^1.5.4",
+    "undici": "^7.29.0",
     "webln": "^0.3.2"
   },
   "devDependencies": {
