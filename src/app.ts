@@ -7,6 +7,8 @@ import Fastify, { LogController, type FastifyInstance, type FastifyReply, type F
 
 import { calculatePlanExpiry, CATCH_PLANS } from "./domain/catch-plans.js";
 import { PULSE_PLANS } from "./domain/pulse-plans.js";
+import { createGatePaymentChallenge, verifyGatePaymentCredential } from "./gate/gate-payment-auth.js";
+import type { GateAuthorizationResult, GateQuote } from "./gate/gate-service.js";
 import { calculateWhisperSchedule, isWhisperReadLimit, MAX_WHISPER_CIPHERTEXT_BYTES, WHISPER_PLANS } from "./domain/whisper-plans.js";
 import { CATCH_PRICES_SATS, PULSE_PRICES_SATS, WHISPER_PRICES_SATS } from "./payment/payment-domain.js";
 import { createL402Challenge, parseL402Authorization, verifyL402Authorization } from "./payment/l402-protocol.js";
@@ -81,8 +83,18 @@ type PaymentAppOptions = {
 
 type PaymentProtocolOptions = { realm: string; secret: Buffer };
 type StatsAppOptions = { getPublicStats(): Promise<PlatformStats>; recordPageView?(path: string): Promise<void> };
+type GateAppOptions = {
+	quote(input: { publicId: string; projectId: string; routeKey: string; idempotencyKey: string; method: string; path: string; body: Buffer; lightningAddress: string }): Promise<GateQuote>;
+	prove(input: { intentId: string; preimage: string }): Promise<GateAuthorizationResult>;
+	poll(intentId: string): Promise<GateAuthorizationResult>;
+	authenticateProject(projectId: string, token: string): Promise<{ id: string; lightningAddress: string } | null>;
+	projectOwnsIntent(projectId: string, intentId: string): Promise<boolean>;
+	jwks: object;
+	realm: string;
+	protocolSecret: Buffer;
+};
 
-const PUBLIC_PAGE_PATHS = new Set(["/", "/api", "/demo", "/catch", "/whisper", "/pulse", "/pulse-public", "/stats", "/agents", "/install", "/changelog"]);
+const PUBLIC_PAGE_PATHS = new Set(["/", "/api", "/demo", "/catch", "/whisper", "/pulse", "/pulse-public", "/stats", "/agents", "/gate", "/install", "/changelog"]);
 
 type BuildAppOptions = {
 	logger?: boolean | object;
@@ -93,6 +105,7 @@ type BuildAppOptions = {
 	payment?: PaymentAppOptions;
 	paymentProtocols?: PaymentProtocolOptions;
 	stats?: StatsAppOptions;
+	gate?: GateAppOptions;
 };
 
 export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
@@ -106,7 +119,7 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
 	if (options.whisper !== undefined || options.payment !== undefined) {
 		app.addContentTypeParser("application/octet-stream", { parseAs: "buffer" }, (_request, body, done) => done(null, body));
 	}
-	if (options.payment !== undefined) {
+	if (options.payment !== undefined || options.gate !== undefined) {
 		app.addContentTypeParser("application/json", { parseAs: "buffer" }, (_request, body, done) => done(null, body));
 	}
 
@@ -141,8 +154,86 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
 	if (options.whisper !== undefined) registerWhisperRoutes(app, options.whisper);
 	if (options.pulse !== undefined) registerPulseRoutes(app, options.pulse);
 	if (options.payment !== undefined) registerPaymentRoutes(app, options.payment, options.paymentProtocols);
+	if (options.gate !== undefined) registerGateRoutes(app, options.gate);
 	return app;
 };
+
+function registerGateRoutes(app: FastifyInstance, gate: GateAppOptions): void {
+	const quoteRateLimits = new Map<string, RateLimitBucket>();
+	const proofRateLimits = new Map<string, RateLimitBucket>();
+	const pollRateLimits = new Map<string, RateLimitBucket>();
+	app.get("/.well-known/gate-jwks.json", async (_request, reply) => reply.header("Cache-Control", "public, max-age=300").send(gate.jwks));
+	app.post("/api/gate/intents", async (request, reply) => {
+		const idempotencyKey = request.headers["idempotency-key"];
+		const projectId = request.headers["x-gate-project"];
+		const routeKey = request.headers["x-gate-route"];
+		const method = request.headers["x-gate-method"];
+		const path = request.headers["x-gate-path"];
+		if (typeof idempotencyKey !== "string" || idempotencyKey.length < 8 || idempotencyKey.length > 128 || typeof projectId !== "string" || typeof routeKey !== "string" || typeof method !== "string" || typeof path !== "string") return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid GATE request" });
+		const project = await authenticatedGateProject(request.headers, gate);
+		if (project === null) return gateUnauthorized(reply);
+		if (!consumeRateLimit(quoteRateLimits, `${project.id}:${request.ip}`, 30, 60_000)) return reply.header("Retry-After", "60").header("Cache-Control", "no-store").code(429).send({ error: "rate limit exceeded" });
+		const body = Buffer.isBuffer(request.body) ? request.body : Buffer.alloc(0);
+		const quote = await gate.quote({ publicId: `gate_intent_${randomBytes(24).toString("base64url")}`, projectId: project.id, routeKey, idempotencyKey, method, path, body, lightningAddress: project.lightningAddress });
+		if (request.headers["x-payment-protocol"] !== "payment") return reply.header("Cache-Control", "no-store").code(402).send(quote);
+		const challenge = createGatePaymentChallenge({ intentId: quote.intentId, amountSats: quote.amountSats, bolt11: quote.bolt11, paymentHash: quote.paymentHash, realm: gate.realm, targetMethod: method, targetPath: path, targetBody: body, expiresAt: new Date(quote.expiresAt), secret: gate.protocolSecret });
+		return reply.header("Cache-Control", "no-store").header("WWW-Authenticate", challenge.header).code(402).send({ protocol: "payment", method: "lightning", intent: "charge", orderId: quote.intentId, amountSats: quote.amountSats, expiresAt: quote.expiresAt, proveUrl: `/api/gate/intents/${quote.intentId}/prove` });
+	});
+	app.get<{ Params: { intentId: string } }>("/api/gate/intents/:intentId", async (request, reply) => {
+		const project = await authenticatedGateProject(request.headers, gate);
+		if (project === null || !await gate.projectOwnsIntent(project.id, request.params.intentId)) return gateUnauthorized(reply);
+		if (!consumeRateLimit(pollRateLimits, `${project.id}:${request.ip}`, 120, 60_000)) return reply.header("Retry-After", "60").header("Cache-Control", "no-store").code(429).send({ error: "rate limit exceeded" });
+		const result = await gate.poll(request.params.intentId);
+		return result.authorized ? reply.header("Cache-Control", "private, no-store").header("Gate-Receipt", result.receipt).send(result) : reply.header("Cache-Control", "no-store").code(402).send(result);
+	});
+	app.post<{ Params: { intentId: string } }>("/api/gate/intents/:intentId/prove", async (request, reply) => {
+		const project = await authenticatedGateProject(request.headers, gate);
+		if (project === null || !await gate.projectOwnsIntent(project.id, request.params.intentId)) return gateUnauthorized(reply);
+		if (!consumeRateLimit(proofRateLimits, `${project.id}:${request.ip}`, 30, 60_000)) return reply.header("Retry-After", "60").header("Cache-Control", "no-store").code(429).send({ error: "rate limit exceeded" });
+		const authorization = typeof request.headers.authorization === "string" ? request.headers.authorization : undefined;
+		let preimage: string | null;
+		if (authorization?.startsWith("Payment ") === true) {
+			const body = Buffer.isBuffer(request.body) ? request.body : Buffer.alloc(0);
+			const targetMethod = request.headers["x-gate-method"];
+			const targetPath = request.headers["x-gate-path"];
+			if (typeof targetMethod !== "string" || typeof targetPath !== "string") return reply.header("Cache-Control", "no-store").code(400).send({ error: "missing GATE request binding" });
+			const verification = verifyGatePaymentCredential({ authorization, intentId: request.params.intentId, targetMethod, targetPath, targetBody: body, secret: gate.protocolSecret, now: new Date() });
+			if (!verification.valid) return reply.header("Cache-Control", "no-store").code(401).send({ error: verification.reason });
+			preimage = verification.preimage;
+		} else {
+			preimage = Buffer.isBuffer(request.body) ? parseGateProof(request.body) : null;
+		}
+		if (preimage === null) return reply.header("Cache-Control", "no-store").code(400).send({ error: "invalid proof" });
+		const result = await gate.prove({ intentId: request.params.intentId, preimage });
+		return result.authorized ? reply.header("Cache-Control", "private, no-store").header("Gate-Receipt", result.receipt).send(result) : reply.header("Cache-Control", "no-store").code(402).send(result);
+	});
+}
+
+async function authenticatedGateProject(headers: Record<string, string | string[] | undefined>, gate: GateAppOptions): Promise<{ id: string; lightningAddress: string } | null> {
+	const projectId = headers["x-gate-project"];
+	const bearerToken = bearer(typeof headers.authorization === "string" ? headers.authorization : undefined);
+	const projectKey = bearerToken ?? (typeof headers["x-gate-project-key"] === "string" ? headers["x-gate-project-key"] : null);
+	return typeof projectId === "string" && projectKey !== null ? gate.authenticateProject(projectId, projectKey) : null;
+}
+
+function gateUnauthorized(reply: FastifyReply): unknown {
+	return reply.header("Cache-Control", "no-store").header("WWW-Authenticate", 'Bearer realm="gate"').code(401).send({ error: "project authentication failed" });
+}
+
+function parseGateProof(body: Buffer): string | null {
+	try {
+		const parsed: unknown = JSON.parse(body.toString("utf8"));
+		return typeof parsed === "object" && parsed !== null && typeof (parsed as { preimage?: unknown }).preimage === "string" ? (parsed as { preimage: string }).preimage : null;
+	} catch {
+		return null;
+	}
+}
+
+function bearer(value: string | undefined): string | null {
+	if (value === undefined || !value.startsWith("Bearer ")) return null;
+	const token = value.slice("Bearer ".length);
+	return token.length >= 16 && token.length <= 256 ? token : null;
+}
 
 function registerPaymentRoutes(app: FastifyInstance, payment: PaymentAppOptions, protocols?: PaymentProtocolOptions): void {
 	const quoteRateLimits = new Map<string, RateLimitBucket>();

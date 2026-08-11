@@ -42,6 +42,11 @@ describe("public API documentation", () => {
 			"GET /api/pulse/{publicId}",
 			"PATCH /api/pulse/{publicId}",
 			"DELETE /api/pulse/{publicId}",
+			"POST /api/gate/intents",
+			"POST /api/gate/intents/{intentId}/prove",
+			"GET /api/gate/intents/{intentId}",
+			"Gate-Receipt",
+			"not x402 compatibility",
 		]) expect(html).toContain(contract);
 		expect(html).toContain("accepted with or without the ingest token");
 		expect(html).toContain("any whole number from 1 through the selected plan allowance");
@@ -80,8 +85,13 @@ describe("public API documentation", () => {
 			"/p/{publicId}": ["post"],
 			"/api/pulse/{publicId}": ["get", "patch", "delete"],
 			"/api/pulse/public/{publicStatusId}": ["get"],
+			"/api/gate/intents": ["post"],
+			"/api/gate/intents/{intentId}": ["get"],
+			"/api/gate/intents/{intentId}/prove": ["post"],
+			"/.well-known/gate-jwks.json": ["get"],
 		})) for (const method of methods) expect(openApi.paths?.[path]?.[method], `${method.toUpperCase()} ${path}`).toBeDefined();
 		expect(openApi.components?.securitySchemes).toHaveProperty("bearerCapability");
+		expect(openApi.components?.securitySchemes).toHaveProperty("gateProjectCapability");
 		expect(openApi.paths?.["/api/catalog"]?.get?.responses?.["200"]?.content?.["application/json"]?.schema).toEqual({ $ref: "#/components/schemas/Catalogue" });
 		const pulsePayment = openApi.paths?.["/api/payments/pulse"]?.post as { parameters?: { $ref?: string }[]; responses?: Record<string, { headers?: Record<string, unknown>; content?: Record<string, { schema?: unknown }> }> } | undefined;
 		expect(pulsePayment?.parameters).toContainEqual({ $ref: "#/components/parameters/PaymentProtocol" });
@@ -122,7 +132,7 @@ describe("public API documentation", () => {
 		expect(postman.variable).toContainEqual(expect.objectContaining({ key: "l402IdempotencyKey" }));
 		expect(postman.item?.length).toBeGreaterThanOrEqual(5);
 		const postmanRequests = flattenPostmanRequests(postman.item ?? []);
-		expect(postmanRequests).toHaveLength(26);
+		expect(postmanRequests).toHaveLength(31);
 		expect(postmanRequests.find((request) => request.name === "Public status")?.url?.raw).toBe("{{baseUrl}}/api/pulse/public/{{publicStatusId}}");
 		const whisperQuote = postmanRequests.find((request) => request.name === "Quote WHISPER ciphertext");
 		expect(whisperQuote?.header).toContainEqual(expect.objectContaining({ key: "X-Whisper-Reveal-At", disabled: true }));

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="description" content="GATE turns fixed API routes into non-custodial Lightning HTTP 402 paywalls using only the merchant's Lightning Address." />
+		<meta name="theme-color" content="#080a08" />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="The402Machine" />
+		<meta property="og:title" content="GATE — Lightning paywalls for agents" />
+		<meta property="og:description" content="Your API. Your Lightning Address. GATE handles HTTP 402 authorization while payments go directly to you." />
+		<meta property="og:url" content="https://the402machine.com/gate" />
+		<meta property="og:image" content="https://the402machine.com/og-image.png" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<link rel="canonical" href="https://the402machine.com/gate" />
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+		<title>GATE — Lightning paywalls for agents</title>
+		<link rel="stylesheet" href="/assets/styles.css?v=24" />
+	</head>
+	<body class="gate-body">
+		<a class="skip-link" href="#gate-main">Skip to content</a>
+		<div class="noise" aria-hidden="true"></div>
+		<header class="topbar"><a class="brand" href="/" aria-label="The402Machine home"><span class="brand-mark">402</span><span>The402Machine</span></a><nav aria-label="GATE navigation"><a href="#flow">Flow</a><a href="#pricing">Credits</a><a href="#humans">Humans</a><a href="/api">API</a><a href="/agents">Agents</a><a href="https://github.com/The402Machine/The402Machine" target="_blank" rel="noopener noreferrer">Source ↗</a></nav></header>
+		<main id="gate-main">
+			<section class="shell gate-hero">
+				<div>
+					<p class="eyebrow"><span class="live-dot"></span> PRIVATE BETA / AGENT FIRST</p>
+					<h1>Your API.<br /><em>Your Lightning Address.</em></h1>
+					<p class="lede">Put a fixed sat price on an endpoint. GATE creates the HTTP 402 challenge, verifies payment and signs access. The buyer pays your wallet directly.</p>
+					<div class="hero-actions"><a class="button primary" href="#quickstart">See the integration</a><a class="button ghost" href="#pricing">View prepaid credits</a></div>
+					<ul class="signal-list"><li>25 authorizations free monthly</li><li>No subscription</li><li>No custody</li><li>Payment Auth</li><li>Lightning Address</li></ul>
+				</div>
+				<aside class="gate-terminal" aria-label="GATE authorization sequence">
+					<header><span>GATE / AUTHORIZATION TRACE</span><b>DIRECT SETTLEMENT</b></header>
+					<ol><li><span>01</span><p><strong>REQUEST</strong><small>POST /v1/weather</small></p></li><li><span>02</span><p><strong>402 + BOLT11</strong><small>42 sats → merchant wallet</small></p></li><li><span>03</span><p><strong>PROOF</strong><small>payer preimage or verified provider proof</small></p></li><li><span>04</span><p><strong>SIGNED RECEIPT</strong><small>method · path · body hash · short expiry</small></p></li></ol>
+					<footer><span>FUNDS HELD BY GATE</span><strong>0 SATS</strong></footer>
+				</aside>
+			</section>
+
+			<section class="manifesto-band"><div class="shell band-inner"><span>ONE LIGHTNING ADDRESS</span><i>→</i><span>DIRECT MERCHANT PAYMENT</span><i>→</i><span>ONE VERIFIED AUTHORIZATION</span></div></section>
+
+			<section id="flow" class="shell section gate-section">
+				<div class="api-section-heading"><div><p class="eyebrow">WHAT GATE DOES</p><h2>Proxy the authorization.<br />Never the money.</h2></div><p>GATE is not a wallet, payment account or payout service. It resolves the merchant's Lightning Address, validates the exact invoice and releases one request-bound receipt after cryptographic proof.</p></div>
+				<div class="gate-principles">
+					<article><span>01</span><h3>Merchant receives sats</h3><p>The BOLT11 invoice belongs to the configured Lightning Address. GATE never receives or forwards buyer funds.</p></article>
+					<article><span>02</span><h3>Agents prove payment</h3><p>The preferred beta path is a payer preimage delivered through Payment Authentication or the direct proof endpoint.</p></article>
+					<article><span>03</span><h3>Origin checks a receipt</h3><p>Ed25519 receipts bind project, route, method, path, body SHA-256, amount and payment hash. Spoofed identity headers are stripped.</p></article>
+					<article><span>04</span><h3>Credits follow success</h3><p>One GATE credit is consumed only when payment is verified and an authorization is persisted. Quotes, expiry and failed attempts cost nothing.</p></article>
+				</div>
+			</section>
+
+			<section id="quickstart" class="api-section"><div class="shell section docs-longform">
+				<div class="api-section-heading"><div><p class="eyebrow">AGENT QUICKSTART</p><h2>Exact bytes in.<br />Signed permission out.</h2></div><p>The private beta provisions a project capability and fixed route policy. Keep the API capability server-side and reuse the same idempotency key and request bytes after an uncertain response.</p></div>
+				<pre>const gate = createGateClient({
+  gateBaseUrl: "https://the402machine.com",
+  projectId: "gate_project_…",
+  projectKey: process.env.GATE_PROJECT_KEY,
+  routeKey: "weather",
+  routeId: "route-uuid-from-provisioning",
+  receiptPublicKey,
+  receiptKeyId: "gate-beta"
+});
+
+const result = await gate.authorize({
+  method: "POST",
+  path: "/v1/weather",
+  body: Buffer.from('{"city":"Madrid"}'),
+  idempotencyKey: crypto.randomUUID()
+});
+
+if (!result.authorized) {
+  // Forward its HTTP 402 body and WWW-Authenticate challenge unchanged.
+}</pre>
+				<div class="gate-warning"><strong>Beta boundary</strong><p>This is not Coinbase x402 compatibility. GATE implements HTTP 402, Lightning Payment Authentication and cryptographic payer proof. x402 has a different contract.</p></div>
+			</div></section>
+
+			<section id="pricing" class="shell section gate-section">
+				<div class="api-section-heading"><div><p class="eyebrow">PLANNED PREPAID AUTHORIZATIONS</p><h2>No subscription.<br />Buy when needed.</h2></div><p>Every project receives 25 successful authorizations per UTC calendar month. The beta pack ladder is fixed in the domain model, while pack purchasing stays closed until its own verified Lightning settlement flow is implemented. Grants are service credits, not sats or wallet balances, and last 402 days.</p></div>
+				<div class="gate-price-grid">
+					<article class="recommended"><small>FREE MONTHLY</small><strong>25</strong><span>authorizations</span><p>Resets each UTC month. Used before prepaid credits.</p><b>0 SATS</b></article>
+					<article><small>SPARK</small><strong>420</strong><span>authorizations</span><p>Reference pack for small agents and prototypes.</p><b>42 SATS</b></article>
+					<article><small>STANDARD</small><strong>4,200</strong><span>authorizations</span><p>Progressive discount for sustained machine traffic.</p><b>402 SATS</b></article>
+					<article><small>LONG</small><strong>42,000</strong><span>authorizations</span><p>Largest beta pack and best unit price.</p><b>4,002 SATS</b></article>
+				</div>
+				<p class="gate-pricing-note">A credit is consumed only on <code>AUTHORIZED</code>. Creating an invoice, polling, an expired payment or an invalid proof never consumes one.</p>
+			</section>
+
+			<section id="humans" class="principles"><div class="shell section principles-grid"><div><p class="eyebrow">HUMAN CHECKOUT</p><h2>Supported.<br />Not overpromised.</h2></div><div class="rules"><div><span>01</span><p><strong>WebLN can return payer proof.</strong> A compatible browser wallet can pay and immediately submit its preimage.</p></div><div><span>02</span><p><strong>External wallets vary.</strong> Automatic QR unlock is available only when the recipient provider returns a verifiable cryptographic result.</p></div><div><span>03</span><p><strong>No “I paid” trust button.</strong> GATE does not unlock a resource from a claim, screenshot or wallet success page.</p></div><div><span>04</span><p><strong>Agents remain the primary path.</strong> Human support is additive and does not weaken request binding or settlement checks.</p></div></div></div></section>
+
+			<section class="shell section api-final-cta"><div><p class="eyebrow">PRIVATE BETA</p><h2>Build the paywall.<br />Keep your wallet.</h2><p>GATE is disabled by default in production while beta provisioning and provider compatibility are validated.</p></div><div><a class="button primary" href="/agents#gate">Agent guide</a><a class="button ghost" href="/api#gate-api">API contract</a></div></section>
+		</main>
+		<footer class="footer shell"><span>THE402MACHINE.COM</span><a href="/">HOME</a><a href="/agents">AGENTS</a><a href="/api">API</a><a href="/stats">STATS</a><a href="https://github.com/The402Machine/The402Machine" target="_blank" rel="noopener noreferrer">SOURCE ↗</a></footer>
+	</body>
+</html>

@@ -25,7 +25,7 @@
 	<body>
 		<a class="skip-link" href="#guide">Skip to guide</a>
 		<div class="noise" aria-hidden="true"></div>
-		<header class="topbar"><a class="brand" href="/" aria-label="The402Machine home"><span class="brand-mark">402</span><span>The402Machine</span></a><nav aria-label="Agent documentation"><a href="#native">Native</a><a href="#payment-auth">Payment Auth</a><a href="#l402">L402</a><a href="/api">API</a><a href="/stats">Stats</a><a href="https://github.com/The402Machine/The402Machine" target="_blank" rel="noopener noreferrer">Source ↗</a></nav></header>
+		<header class="topbar"><a class="brand" href="/" aria-label="The402Machine home"><span class="brand-mark">402</span><span>The402Machine</span></a><nav aria-label="Agent documentation"><a href="#gate">GATE</a><a href="#native">Native</a><a href="#payment-auth">Payment Auth</a><a href="#l402">L402</a><a href="/api">API</a><a href="/stats">Stats</a><a href="https://github.com/The402Machine/The402Machine" target="_blank" rel="noopener noreferrer">Source ↗</a></nav></header>
 		<main id="guide">
 			<section class="shell docs-hero api-docs-hero">
 				<div><p class="eyebrow">AGENT PURCHASE GUIDE / COMPLETE FLOW</p><h1>Discover.<br /><em>Negotiate. Save.</em></h1><p class="lede">Inspect the catalogue, create one purchase, pay its Lightning invoice, and save the delivered capability without printing it.</p></div>
@@ -49,6 +49,27 @@
 					<article><span>DELIVERY</span><h3>Trust the server response</h3><p>A wallet success screen is not delivery. Native clients poll the order. Payment Auth and L402 clients accept only the server's credential-bearing HTTP 200 response.</p></article>
 					<article><span>SECRETS</span><h3>Never print capabilities</h3><p>Invoices, preimages, macaroons, and delivered capabilities do not belong in command traces, CI logs, analytics, shell history, or shared environments.</p></article>
 				</div>
+			</div></section>
+
+			<section id="gate" class="api-section"><div class="shell section docs-longform">
+				<div class="api-section-heading"><div><p class="eyebrow">GATE / MERCHANT PAYWALL</p><h2>Request-bound access.<br />Direct merchant settlement.</h2></div><p>GATE protects a fixed external API route. Agents create an intent, pay the merchant invoice, submit payer proof, then verify the signed receipt locally.</p></div>
+				<pre>BODY='{"city":"Madrid"}'
+IDEMPOTENCY_KEY="gate-$(cat /proc/sys/kernel/random/uuid)"
+
+curl --silent --show-error --dump-header gate.headers \
+  --output gate-quote.json \
+  --request POST https://the402machine.com/api/gate/intents \
+  --header "Authorization: Bearer $GATE_PROJECT_KEY" \
+  --header "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  --header 'X-Gate-Project: gate_project_…' \
+  --header 'X-Gate-Route: weather' \
+  --header 'X-Gate-Method: POST' \
+  --header 'X-Gate-Path: /v1/weather' \
+  --header 'Content-Type: application/json' \
+  --data-binary "$BODY"</pre>
+				<p>The expected response is HTTP 402. Payment goes to the project's stored Lightning Address. Do not send a recipient address from the client.</p>
+				<p><strong>Credit rule:</strong> quotes, polling, expiry and invalid proofs consume zero credits. Only a persisted <code>AUTHORIZED</code> result consumes one monthly or prepaid authorization.</p>
+				<p>GATE does not claim x402 compatibility. It uses HTTP 402, payer proof and signed Ed25519 receipts.</p>
 			</div></section>
 
 			<section id="native" class="shell section docs-longform">

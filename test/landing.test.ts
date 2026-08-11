@@ -140,6 +140,7 @@ describe("public landing page", () => {
 			["/pulse-public", "SHAREABLE STATUS / READ ONLY"],
 			["/stats", "PLATFORM ACTIVITY / AGGREGATED"],
 			["/agents", "AGENT PURCHASE GUIDE"],
+			["/gate", "PRIVATE BETA / AGENT FIRST"],
 			["/install", "INSTALL / SELF-HOST"],
 			["/changelog", "PUBLIC CHANGELOG"],
 		] as const) {
@@ -151,11 +152,11 @@ describe("public landing page", () => {
 	});
 
 	it("declares the site favicon on every public HTML page", async () => {
-		const pages = ["index.html", "api.html", "demo.html", "catch.html", "whisper.html", "pulse.html", "pulse-public.html", "stats.html", "agents.html", "install.html", "changelog.html"];
+		const pages = ["index.html", "api.html", "demo.html", "catch.html", "whisper.html", "pulse.html", "pulse-public.html", "stats.html", "agents.html", "gate.html", "install.html", "changelog.html"];
 		for (const page of pages) {
 			const html = await readFile(new URL(`../public/${page}`, import.meta.url), "utf8");
 			expect(html, page).toContain('<link rel="icon" href="/favicon.svg" type="image/svg+xml" />');
-			expect(html, page).toContain('href="/assets/styles.css?v=23"');
+			expect(html, page).toMatch(/href="\/assets\/styles\.css\?v=(?:23|24)"/u);
 			if (!["catch.html", "whisper.html", "pulse.html", "pulse-public.html"].includes(page)) expect(html, page).toContain('href="/stats"');
 		}
 	});

@@ -1,3 +1,5 @@
+import { generateKeyPairSync } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 
 import { loadConfig } from "../src/config.js";
@@ -62,5 +64,15 @@ describe("CATCH configuration", () => {
 		};
 		expect(loadConfig({ ...base, PAYMENT_API_URL: "http://172.30.240.1:2180" }).payment.apiUrl).toBe("http://172.30.240.1:2180");
 		expect(() => loadConfig({ ...base, PAYMENT_API_URL: "http://10.22.2.16:5000" })).toThrow(/private payment bridge/);
+	});
+
+	it("keeps GATE disabled by default and requires isolated beta keys when enabled", () => {
+		expect(loadConfig({}).gate.enabled).toBe(false);
+		const base = { DATABASE_URL: "postgres://example", CATCH_TOKEN_PEPPER: "pepper", GATE_ENABLED: "true" };
+		expect(() => loadConfig(base)).toThrow(/GATE_PROTOCOL_KEY/);
+		expect(() => loadConfig({ ...base, GATE_PROTOCOL_KEY: Buffer.alloc(32, 3).toString("base64url") })).toThrow(/GATE_RECEIPT_PRIVATE_KEY/);
+		const keys = generateKeyPairSync("ed25519", { privateKeyEncoding: { format: "pem", type: "pkcs8" }, publicKeyEncoding: { format: "pem", type: "spki" } });
+		const config = loadConfig({ ...base, GATE_PROTOCOL_KEY: Buffer.alloc(32, 3).toString("base64url"), GATE_RECEIPT_PRIVATE_KEY: Buffer.from(keys.privateKey).toString("base64url"), GATE_RECEIPT_PUBLIC_KEY: Buffer.from(keys.publicKey).toString("base64url"), GATE_RECEIPT_KEY_ID: "gate-beta", GATE_REALM: "the402machine.com" });
+		expect(config.gate).toMatchObject({ enabled: true, receiptKeyId: "gate-beta", realm: "the402machine.com" });
 	});
 });

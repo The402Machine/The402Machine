@@ -54,9 +54,10 @@ beforeAll(async () => {
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 1 });
 
-	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql", "0014_whisper_reveal_window.sql", "0015_whisper_custom_read_limit.sql", "0016_pulse_public_status_id.sql", "0017_payment_challenges.sql", "0018_platform_events.sql", "0019_page_views.sql"]) {
+	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql", "0014_whisper_reveal_window.sql", "0015_whisper_custom_read_limit.sql", "0016_pulse_public_status_id.sql", "0017_payment_challenges.sql", "0018_platform_events.sql", "0019_page_views.sql", "0020_gate.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
+		await sql`insert into schema_migrations (version) values (${file.replace(/\.sql$/u, "")}) on conflict (version) do nothing`;
 	}
 	await sql.end();
 	sql = postgres(databaseUrl, { max: 4 });
@@ -72,6 +73,65 @@ afterAll(async () => {
 });
 
 describe("CATCH migration", () => {
+	it("creates the non-custodial GATE project, route, intent and authorization ledger", async () => {
+		expect((await sql`select version from schema_migrations where version = '0020_gate'`)).toHaveLength(1);
+		const migration = await readFile(new URL("../../migrations/0020_gate.sql", import.meta.url), "utf8");
+		await expect(sql.unsafe(migration).simple()).resolves.toBeDefined();
+		const [tables] = await sql<{ projects: string | null; routes: string | null; intents: string | null; grants: string | null; authorizations: string | null }[]>`
+			select
+				to_regclass('public.gate_projects')::text as projects,
+				to_regclass('public.gate_routes')::text as routes,
+				to_regclass('public.gate_intents')::text as intents,
+				to_regclass('public.gate_credit_grants')::text as grants,
+				to_regclass('public.gate_authorizations')::text as authorizations
+		`;
+		expect(tables).toEqual({ projects: "gate_projects", routes: "gate_routes", intents: "gate_intents", grants: "gate_credit_grants", authorizations: "gate_authorizations" });
+
+		const [project] = await sql<{ id: string }[]>`
+			insert into gate_projects (public_id, display_name, lightning_address, admin_token_hash, api_token_hash)
+			values ('gate_project_abcdefghijklmnopqrstuv', 'Agent API', 'alice@example.com', ${"a".repeat(64)}, ${"b".repeat(64)}) returning id
+		`;
+		const [route] = await sql<{ id: string }[]>`
+			insert into gate_routes (project_id, route_key, method, path, price_sats)
+			values (${project!.id}, 'premium-report', 'GET', '/premium-report', 42) returning id
+		`;
+		const [intent] = await sql<{ id: string }[]>`
+			insert into gate_intents (public_id, project_id, route_id, idempotency_key, method, path, body_digest, amount_sats, lightning_address)
+			values ('gate_intent_abcdefghijklmnopqrstuvwx', ${project!.id}, ${route!.id}, 'migration-intent-key', 'GET', '/premium-report', ${"c".repeat(64)}, 42, 'alice@example.com') returning id
+		`;
+		expect(project).toBeDefined();
+		expect(route).toBeDefined();
+		expect(intent).toBeDefined();
+
+		await expect(sql`
+			insert into gate_routes (project_id, route_key, method, path, price_sats)
+			values (${project!.id}, 'bad-connect', 'CONNECT', '/premium-report', 42)
+		`).rejects.toMatchObject({ code: "23514" });
+		await expect(sql`
+			insert into gate_intents (public_id, project_id, route_id, idempotency_key, method, path, body_digest, amount_sats, lightning_address, payment_hash)
+			values ('gate_intent_invalid_payment_hash_ab', ${project!.id}, ${route!.id}, 'invalid-payment-hash', 'GET', '/premium-report', ${"c".repeat(64)}, 42, 'alice@example.com', 'not-a-hash')
+		`).rejects.toMatchObject({ code: "23514" });
+	});
+
+	it("enforces GATE pack grant identity and authorization source consistency", async () => {
+		const [project] = await sql<{ id: string }[]>`
+			insert into gate_projects (public_id, display_name, lightning_address, admin_token_hash, api_token_hash)
+			values ('gate_project_packabcdefghijklmnop', 'Pack Project', 'pack@example.com', ${"d".repeat(64)}, ${"e".repeat(64)}) returning id
+		`;
+		const [grant] = await sql<{ id: string }[]>`
+			insert into gate_credit_grants (project_id, source_order_id, pack_id, total_authorizations, remaining_authorizations, purchased_at, expires_at)
+			values (${project!.id}, ${randomUUID()}, 'spark', 420, 420, '2026-08-11T00:00:00Z', '2027-09-17T00:00:00Z') returning id
+		`;
+		expect(grant).toBeDefined();
+		await expect(sql`
+			insert into gate_credit_grants (project_id, source_order_id, pack_id, total_authorizations, remaining_authorizations, purchased_at, expires_at)
+			values (${project!.id}, ${randomUUID()}, 'spark', 421, 421, '2026-08-11T00:00:00Z', '2027-09-17T00:00:00Z')
+		`).rejects.toMatchObject({ code: "23514" });
+		await expect(sql`
+			insert into gate_authorizations (intent_id, receipt_jti, source, source_month, grant_id, project_id)
+			values (${randomUUID()}, ${"f".repeat(43)}, 'monthly_free', date '2026-08-01', ${grant!.id}, ${project!.id})
+		`).rejects.toBeDefined();
+	});
 	it("creates privacy-safe daily page counters", async () => {
 		const [table] = await sql<{ views_table: string | null }[]>`select to_regclass('public.page_view_daily')::text as views_table`;
 		expect(table).toEqual({ views_table: "page_view_daily" });

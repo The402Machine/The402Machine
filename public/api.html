@@ -70,6 +70,15 @@
 				<div class="api-section-heading"><div><p class="eyebrow">Public endpoints</p><h2>Endpoint reference.</h2></div><p>Operational provisioning endpoints are intentionally excluded. These are the routes intended for buyers, integrations and public status consumers.</p></div>
 				<nav class="api-jump" aria-label="Endpoint groups"><a href="#payments">Payments</a><a href="#catch-api">CATCH</a><a href="#whisper-api">WHISPER</a><a href="#pulse-api">PULSE</a></nav>
 
+				<section id="gate-api" class="api-endpoint-group"><header><span>G</span><div><p class="eyebrow">GATE CONTRACT PREVIEW / DISABLED BY DEFAULT</p><h3>Paywall an external API route</h3></div></header>
+					<div class="api-endpoint-list">
+						<article><div class="api-route"><b data-method="post">POST</b><code>/api/gate/intents</code><span>Project capability</span></div><p><span class="api-contract-label">POST /api/gate/intents</span> Creates or recovers one request-bound invoice. The stored Lightning Address receives the payment directly.</p></article>
+						<article><div class="api-route"><b data-method="post">POST</b><code>/api/gate/intents/{intentId}/prove</code><span>Payer proof</span></div><p><span class="api-contract-label">POST /api/gate/intents/{intentId}/prove</span> Submits a preimage or Payment Authentication credential for the existing intent. A verified success returns <code>Gate-Receipt</code>.</p></article>
+						<article><div class="api-route"><b data-method="get">GET</b><code>/api/gate/intents/{intentId}</code><span>Optional verify</span></div><p><span class="api-contract-label">GET /api/gate/intents/{intentId}</span> Polls provider verification only when cryptographic proof is available.</p></article>
+						<article><div class="api-route"><b data-method="get">GET</b><code>/.well-known/gate-jwks.json</code><span>Public</span></div><p>Publishes the Ed25519 key for GATE receipts. GATE is HTTP 402 and Payment Authentication, not x402 compatibility.</p></article>
+					</div>
+				</section>
+
 				<section id="payments" class="api-endpoint-group"><header><span>01</span><div><p class="eyebrow">PAYMENTS</p><h3>Discover, quote and settle</h3></div></header>
 					<div class="api-endpoint-list">
 						<article><div class="api-route"><b data-method="get">GET</b><code>/api/catalog</code><span>Public</span></div><p><span class="api-contract-label">GET /api/catalog</span> Returns products, plans, prices, lifetimes, quotas and current availability.</p></article>

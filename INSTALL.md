@@ -2,6 +2,8 @@
 
 This document contains the technical and self-hosting material intentionally kept out of the user-facing README.
 
+> GATE is a private beta and stays disabled by default. Enabling it requires `GATE_ENABLED=true`, a dedicated protocol key, and an Ed25519 receipt key pair. Do not enable GATE on a public deployment until projects and fixed routes have been provisioned through a private operator workflow.
+
 ## Requirements
 
 - Node.js 22

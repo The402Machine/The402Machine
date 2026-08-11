@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHmac, createPrivateKey, createPublicKey, randomBytes } from "node:crypto";
 
 import postgres from "postgres";
 
@@ -7,6 +7,10 @@ import { loadConfig } from "./config.js";
 import { calculatePlanExpiry, CATCH_PLANS } from "./domain/catch-plans.js";
 import { calculatePulseExpiry, PULSE_PLANS } from "./domain/pulse-plans.js";
 import { calculateWhisperSchedule } from "./domain/whisper-plans.js";
+import { GateRepository } from "./gate/gate-repository.js";
+import { gateReceiptJwks } from "./gate/gate-receipt.js";
+import { GateService } from "./gate/gate-service.js";
+import { LightningAddressAdapter } from "./gate/lightning-address-adapter.js";
 import { lookupIpLocally } from "./ip-location.js";
 import { LnbitsPaymentAdapter } from "./payment/lnbits-adapter.js";
 import { PaymentRepository } from "./payment/payment-repository.js";
@@ -24,6 +28,12 @@ const catchRepository = database === undefined ? undefined : new CatchRepository
 const whisperRepository = database === undefined ? undefined : new WhisperRepository(database);
 const pulseRepository = database === undefined ? undefined : new PulseRepository(database);
 const statsRepository = database === undefined ? undefined : new StatsRepository(database);
+const gateRepository = database === undefined || !config.gate.enabled ? undefined : new GateRepository(database);
+const gatePrivateKey = config.gate.enabled && config.gate.receiptPrivateKey !== undefined ? createPrivateKey(Buffer.from(config.gate.receiptPrivateKey, "base64url").toString("utf8")) : undefined;
+const gatePublicKey = config.gate.enabled && config.gate.receiptPublicKey !== undefined ? createPublicKey(Buffer.from(config.gate.receiptPublicKey, "base64url").toString("utf8")) : undefined;
+const gateService = gateRepository === undefined || gatePrivateKey === undefined || gatePublicKey === undefined || config.gate.protocolKey === undefined
+	? undefined
+	: new GateService({ repository: gateRepository, lightning: new LightningAddressAdapter(), receipt: { issuer: `https://${config.gate.realm}`, privateKey: gatePrivateKey, publicKey: gatePublicKey, keyId: config.gate.receiptKeyId } });
 const catchOptions = catchRepository === undefined || config.catch.tokenPepper === undefined
 	? undefined
 	: {
@@ -103,6 +113,7 @@ const app = buildApp({
 	...(pulseOptions === undefined ? {} : { pulse: pulseOptions }),
 	...(paymentService === undefined ? {} : { payment: paymentService }),
 	...(statsRepository === undefined ? {} : { stats: statsRepository }),
+	...(gateService === undefined || gateRepository === undefined || gatePublicKey === undefined || config.gate.protocolKey === undefined || config.catch.tokenPepper === undefined ? {} : { gate: { quote: gateService.quote.bind(gateService), prove: gateService.prove.bind(gateService), poll: gateService.poll.bind(gateService), authenticateProject: (projectId: string, token: string) => gateRepository.authenticateProjectApi(projectId, createHmac("sha256", config.catch.tokenPepper!).update(`gate-api\0${token}`, "utf8").digest("hex")), projectOwnsIntent: async (projectId: string, intentId: string) => await gateRepository.getIntentForProject(intentId, projectId) !== null, jwks: gateReceiptJwks({ publicKey: gatePublicKey, keyId: config.gate.receiptKeyId }), realm: config.gate.realm, protocolSecret: Buffer.from(config.gate.protocolKey, "base64url") } }),
 	...(config.payment.agentProtocols.enabled && config.payment.agentProtocols.key !== undefined ? { paymentProtocols: { realm: config.payment.agentProtocols.realm, secret: Buffer.from(config.payment.agentProtocols.key, "base64url") } } : {}),
 });
 
