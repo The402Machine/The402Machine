@@ -49,10 +49,11 @@ Activation order:
    test ! -e /etc/nginx/conf.d/the402machine-rate-limits.conf || sudo cp /etc/nginx/conf.d/the402machine-rate-limits.conf /etc/nginx/conf.d/the402machine-rate-limits.conf.pre-gate
    sudo install -m 0644 deploy/nginx/the402machine.com.conf /etc/nginx/sites-available/the402machine.com
    sudo install -m 0644 deploy/nginx/the402machine-rate-limits.conf /etc/nginx/conf.d/the402machine-rate-limits.conf
+   sudo ln -sfn /etc/nginx/sites-available/the402machine.com /etc/nginx/sites-enabled/the402machine.com
    sudo nginx -t && sudo systemctl reload nginx
    ```
 
-   If validation fails, restore each `.pre-gate` file that exists; remove any newly created target that has no backup. Then run `sudo nginx -t` before reloading Nginx. Do not reload after a failed validation.
+   If validation fails, restore each `.pre-gate` file that exists; remove any newly created target that has no backup and remove the new `sites-enabled` symlink if this was a first deployment. Then run `sudo nginx -t` before reloading Nginx. Do not reload after a failed validation.
 3. Deploy the reviewed commit with `GATE_ENABLED=false`; require successful migrations and healthy web/worker services.
 4. Confirm migrations `0020_gate.sql` and `0021_page_view_public_paths.sql` are recorded.
 5. Configure realm, protocol key, receipt key pair and key ID; verify the published JWKS matches the configured public key.
