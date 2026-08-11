@@ -45,6 +45,12 @@ Activation order:
 2. Install and validate the versioned Nginx configuration, keeping the previous files for rollback:
 
    ```bash
+   if test -L /etc/nginx/sites-enabled/the402machine.com; then
+     readlink /etc/nginx/sites-enabled/the402machine.com | sudo tee /etc/nginx/sites-enabled/the402machine.com.pre-gate-target >/dev/null
+   elif test -e /etc/nginx/sites-enabled/the402machine.com; then
+     echo "Refusing to replace a non-symlink enabled site" >&2
+     exit 1
+   fi
    test ! -e /etc/nginx/sites-available/the402machine.com || sudo cp /etc/nginx/sites-available/the402machine.com /etc/nginx/sites-available/the402machine.com.pre-gate
    test ! -e /etc/nginx/conf.d/the402machine-rate-limits.conf || sudo cp /etc/nginx/conf.d/the402machine-rate-limits.conf /etc/nginx/conf.d/the402machine-rate-limits.conf.pre-gate
    sudo install -m 0644 deploy/nginx/the402machine.com.conf /etc/nginx/sites-available/the402machine.com
@@ -53,7 +59,7 @@ Activation order:
    sudo nginx -t && sudo systemctl reload nginx
    ```
 
-   If validation fails, restore each `.pre-gate` file that exists; remove any newly created target that has no backup and remove the new `sites-enabled` symlink if this was a first deployment. Then run `sudo nginx -t` before reloading Nginx. Do not reload after a failed validation.
+   If validation fails, restore each `.pre-gate` file that exists and remove any newly created target that has no backup. For `sites-enabled`, run `sudo ln -sfn "$(cat /etc/nginx/sites-enabled/the402machine.com.pre-gate-target)" /etc/nginx/sites-enabled/the402machine.com` when the target backup exists; otherwise remove the newly created symlink. Then run `sudo nginx -t` before reloading Nginx. Do not reload after a failed validation.
 3. Deploy the reviewed commit with `GATE_ENABLED=false`; require successful migrations and healthy web/worker services.
 4. Confirm migrations `0020_gate.sql` and `0021_page_view_public_paths.sql` are recorded.
 5. Configure realm, protocol key, receipt key pair and key ID; verify the published JWKS matches the configured public key.
