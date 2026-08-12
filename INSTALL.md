@@ -46,7 +46,7 @@ Activation order:
 
    ```bash
    if test -L /etc/nginx/sites-enabled/the402machine.com; then
-     readlink /etc/nginx/sites-enabled/the402machine.com | sudo tee /etc/nginx/sites-enabled/the402machine.com.pre-gate-target >/dev/null
+     readlink /etc/nginx/sites-enabled/the402machine.com | sudo tee /var/backups/the402machine.com.pre-gate-target >/dev/null
    elif test -e /etc/nginx/sites-enabled/the402machine.com; then
      echo "Refusing to replace a non-symlink enabled site" >&2
      exit 1
@@ -59,7 +59,7 @@ Activation order:
    sudo nginx -t && sudo systemctl reload nginx
    ```
 
-   If validation fails, restore each `.pre-gate` file that exists and remove any newly created target that has no backup. For `sites-enabled`, run `sudo ln -sfn "$(cat /etc/nginx/sites-enabled/the402machine.com.pre-gate-target)" /etc/nginx/sites-enabled/the402machine.com` when the target backup exists; otherwise remove the newly created symlink. Then run `sudo nginx -t` before reloading Nginx. Do not reload after a failed validation.
+   If validation fails, restore each `.pre-gate` file that exists and remove any newly created target that has no backup. For `sites-enabled`, run `sudo ln -sfn "$(cat /var/backups/the402machine.com.pre-gate-target)" /etc/nginx/sites-enabled/the402machine.com` when the target backup exists; otherwise remove the newly created symlink. Then run `sudo nginx -t` before reloading Nginx. Do not reload after a failed validation.
 3. Deploy the reviewed commit with `GATE_ENABLED=false`; require successful migrations and healthy web/worker services.
 4. Confirm migrations `0020_gate.sql` and `0021_page_view_public_paths.sql` are recorded.
 5. Configure realm, protocol key, receipt key pair and key ID; verify the published JWKS matches the configured public key.
