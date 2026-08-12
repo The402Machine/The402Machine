@@ -54,7 +54,7 @@ beforeAll(async () => {
 	await waitForPostgres();
 	sql = postgres(databaseUrl, { max: 1 });
 
-	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql", "0014_whisper_reveal_window.sql", "0015_whisper_custom_read_limit.sql", "0016_pulse_public_status_id.sql", "0017_payment_challenges.sql", "0018_platform_events.sql", "0019_page_views.sql", "0020_gate.sql", "0021_page_view_public_paths.sql"]) {
+	for (const file of ["0001_catch.sql", "0002_payments.sql", "0003_whisper.sql", "0004_catch_storage_hardening.sql", "0005_catch_storage_reconcile.sql", "0006_payment_pricing_v2.sql", "0007_whisper_payload_v2.sql", "0008_catch_flexible_ingest.sql", "0009_catch_ip_metadata.sql", "0010_whisper_multiread.sql", "0011_whisper_burn_after_read.sql", "0012_pulse.sql", "0013_whisper_scheduled_reveal.sql", "0014_whisper_reveal_window.sql", "0015_whisper_custom_read_limit.sql", "0016_pulse_public_status_id.sql", "0017_payment_challenges.sql", "0018_platform_events.sql", "0019_page_views.sql", "0020_gate.sql", "0021_page_view_public_paths.sql", "0022_gate_invoice_issuing_state.sql"]) {
 		const migration = await readFile(new URL(`../../migrations/${file}`, import.meta.url), "utf8");
 		await sql.unsafe(migration).simple();
 		await sql`insert into schema_migrations (version) values (${file.replace(/\.sql$/u, "")}) on conflict (version) do nothing`;
@@ -73,12 +73,46 @@ afterAll(async () => {
 });
 
 describe("CATCH migration", () => {
+	it("upgrades a released 0020 database that lacks invoice_issuing", async () => {
+		const legacySchema = `legacy_${randomUUID().replaceAll("-", "")}`;
+		await sql.unsafe(`create schema ${legacySchema}`);
+		try {
+			await sql.unsafe(`set search_path to ${legacySchema}, public`);
+			const current0020 = await readFile(new URL("../../migrations/0020_gate.sql", import.meta.url), "utf8");
+			const released0020 = current0020.replace(", 'invoice_issuing'", "");
+			await sql.unsafe(released0020).simple();
+			await sql`create table schema_migrations (version text primary key, applied_at timestamptz not null default clock_timestamp())`;
+			await sql`insert into schema_migrations (version) values ('0020_gate')`;
+			const migration = await readFile(new URL("../../migrations/0022_gate_invoice_issuing_state.sql", import.meta.url), "utf8");
+			await sql.unsafe(migration).simple();
+			const [constraint] = await sql<{ definition: string }[]>`
+				select pg_get_constraintdef(oid) as definition
+				from pg_constraint
+				where conrelid = 'gate_intents'::regclass and conname = 'gate_intents_state_check'
+			`;
+			expect(constraint?.definition).toContain("invoice_issuing");
+		} finally {
+			await sql`set search_path to public`;
+			await sql.unsafe(`drop schema ${legacySchema} cascade`);
+		}
+	});
+
 	it("extends page view tracking to every public GATE and documentation page", async () => {
 		expect((await sql`select version from schema_migrations where version = '0021_page_view_public_paths'`)).toHaveLength(1);
 		for (const path of ["/agents", "/gate", "/install", "/changelog"]) {
 			await expect(sql`insert into page_view_daily (path, views) values (${path}, 1)`).resolves.toBeDefined();
 		}
 		await expect(sql`insert into page_view_daily (path, views) values ('/private', 1)`).rejects.toMatchObject({ code: "23514" });
+	});
+
+	it("upgrades the released GATE state constraint to allow exclusive invoice issuance", async () => {
+		expect((await sql`select version from schema_migrations where version = '0022_gate_invoice_issuing_state'`)).toHaveLength(1);
+		const [constraint] = await sql<{ definition: string }[]>`
+			select pg_get_constraintdef(oid) as definition
+			from pg_constraint
+			where conrelid = 'gate_intents'::regclass and conname = 'gate_intents_state_check'
+		`;
+		expect(constraint?.definition).toContain("invoice_issuing");
 	});
 
 	it("creates the non-custodial GATE project, route, intent and authorization ledger", async () => {

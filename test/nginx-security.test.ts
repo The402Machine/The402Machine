@@ -39,4 +39,10 @@ describe("Nginx security boundary", () => {
 		expect(proxy).toContain("proxy_set_header X-Forwarded-For $remote_addr;");
 		expect(proxy).not.toContain("$proxy_add_x_forwarded_for");
 	});
+
+	it("keeps rollback metadata outside Nginx's sites-enabled include glob", async () => {
+		const install = await readFile(new URL("../INSTALL.md", import.meta.url), "utf8");
+		expect(install).toContain("/var/backups/the402machine.com.pre-gate-target");
+		expect(install).not.toContain("/etc/nginx/sites-enabled/the402machine.com.pre-gate-target");
+	});
 });

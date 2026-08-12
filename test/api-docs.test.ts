@@ -92,6 +92,7 @@ describe("public API documentation", () => {
 		})) for (const method of methods) expect(openApi.paths?.[path]?.[method], `${method.toUpperCase()} ${path}`).toBeDefined();
 		expect(openApi.components?.securitySchemes).toHaveProperty("bearerCapability");
 		expect(openApi.components?.securitySchemes).toHaveProperty("gateProjectCapability");
+		expect(openApi.paths?.["/api/gate/intents"]?.post?.responses?.["200"]).toBeUndefined();
 		expect(openApi.paths?.["/api/catalog"]?.get?.responses?.["200"]?.content?.["application/json"]?.schema).toEqual({ $ref: "#/components/schemas/Catalogue" });
 		const pulsePayment = openApi.paths?.["/api/payments/pulse"]?.post as { parameters?: { $ref?: string }[]; responses?: Record<string, { headers?: Record<string, unknown>; content?: Record<string, { schema?: unknown }> }> } | undefined;
 		expect(pulsePayment?.parameters).toContainEqual({ $ref: "#/components/parameters/PaymentProtocol" });
@@ -122,8 +123,8 @@ describe("public API documentation", () => {
 		const ownerDto = ownerPulseStatus(ownerFixture, Date.parse("2026-07-24T10:06:00.000Z"));
 		expect(Object.keys(ownerDto).sort()).toEqual(Object.keys(ownerPulseSchema?.properties ?? {}).sort());
 		for (const requiredProperty of ownerPulseSchema?.required ?? []) expect(ownerDto).toHaveProperty(requiredProperty);
-		expect(openApiSource).toContain('"enum": [\n              "waiting",\n              "operational"');
-		expect(openApiSource).not.toContain('"waiting",\n              "healthy"');
+		expect((ownerPulseSchema?.properties?.state as { enum?: string[] } | undefined)?.enum).toEqual(["waiting", "operational", "late", "exhausted", "expired"]);
+		expect((ownerPulseSchema?.properties?.state as { enum?: string[] } | undefined)?.enum).not.toContain("healthy");
 		expect(postman.info?.schema).toContain("collection");
 		expect(postman.info?._postman_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u);
 		expect(postman.variable).toContainEqual(expect.objectContaining({ key: "baseUrl", value: "https://the402machine.com" }));

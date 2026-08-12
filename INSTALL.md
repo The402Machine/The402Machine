@@ -61,7 +61,7 @@ Activation order:
 
    If validation fails, restore each `.pre-gate` file that exists and remove any newly created target that has no backup. For `sites-enabled`, run `sudo ln -sfn "$(cat /var/backups/the402machine.com.pre-gate-target)" /etc/nginx/sites-enabled/the402machine.com` when the target backup exists; otherwise remove the newly created symlink. Then run `sudo nginx -t` before reloading Nginx. Do not reload after a failed validation.
 3. Deploy the reviewed commit with `GATE_ENABLED=false`; require successful migrations and healthy web/worker services.
-4. Confirm migrations `0020_gate.sql` and `0021_page_view_public_paths.sql` are recorded.
+4. Confirm migrations `0020_gate.sql`, `0021_page_view_public_paths.sql` and `0022_gate_invoice_issuing_state.sql` are recorded, and verify the live `gate_intents_state_check` includes `invoice_issuing`.
 5. Configure realm, protocol key, receipt key pair and key ID; verify the published JWKS matches the configured public key.
 6. Provision projects only in a private interactive terminal and transfer capabilities directly to the merchant secret manager.
 7. Set `GATE_ENABLED=true`, recreate web and expiry-worker, then run provider-free checks: health, JWKS, unauthenticated 401 and malformed-request 400.

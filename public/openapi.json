@@ -1416,23 +1416,6 @@
           },
           "401": {
             "description": "Invalid project capability"
-          },
-          "200": {
-            "description": "Already authorized idempotent request",
-            "headers": {
-              "Gate-Receipt": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GateAuthorization"
-                }
-              }
-            }
           }
         },
         "operationId": "createGateIntent"
