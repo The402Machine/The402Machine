@@ -55,14 +55,28 @@ describe("Lightning Address adapter", () => {
 		]);
 	});
 
-	it("uses a scalar address and family in the pinned DNS lookup callback", async () => {
+	it("uses a scalar address and family when the pinned lookup requests one address", async () => {
 		const lookup = createPinnedLookup("93.184.216.34");
 		await new Promise<void>((resolve, reject) => {
-			lookup("wallet.example", { all: true }, (error, address, family) => {
+			lookup("wallet.example", { all: false }, (error, address, family) => {
 				try {
 					expect(error).toBeNull();
 					expect(address).toBe("93.184.216.34");
 					expect(family).toBe(4);
+					resolve();
+				} catch (caught) { reject(caught instanceof Error ? caught : new Error(String(caught))); }
+			});
+		});
+	});
+
+	it.each(["93.184.216.34", "2606:4700:4700::1111"])("returns only the pinned address for an all-addresses lookup (%s)", async (pinnedAddress) => {
+		const lookup = createPinnedLookup(pinnedAddress);
+		await new Promise<void>((resolve, reject) => {
+			lookup("wallet.example", { all: true }, (error, addresses, family) => {
+				try {
+					expect(error).toBeNull();
+					expect(addresses).toEqual([{ address: pinnedAddress, family: pinnedAddress.includes(":") ? 6 : 4 }]);
+					expect(family).toBeUndefined();
 					resolve();
 				} catch (caught) { reject(caught instanceof Error ? caught : new Error(String(caught))); }
 			});

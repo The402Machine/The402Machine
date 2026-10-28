@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { isIP } from "node:net";
+import { isIP, type LookupFunction } from "node:net";
 
 import { decode } from "bolt11-ts";
 import { Agent } from "undici";
@@ -159,10 +159,13 @@ async function resolveWithDns(hostname: string): Promise<string[]> {
 	return [...ipv4, ...ipv6];
 }
 
-export function createPinnedLookup(pinnedAddress: string) {
+export function createPinnedLookup(pinnedAddress: string): LookupFunction {
 	const family = isIP(pinnedAddress);
 	if (family === 0) throw new Error("Pinned Lightning provider address is invalid");
-	return (_hostname: string, _options: unknown, callback: (error: Error | null, address: string, family: number) => void): void => callback(null, pinnedAddress, family);
+	return (_hostname, options, callback): void => {
+		if (options.all === true) callback(null, [{ address: pinnedAddress, family }]);
+		else callback(null, pinnedAddress, family);
+	};
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null; }
